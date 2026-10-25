@@ -1,0 +1,13 @@
+# Dauerhafte Entwicklungsanweisungen
+
+- Zuerst `docs/GSM_Kurswahl_Anforderungen_Codex.md` vollständig lesen. M1 bis M5 in dieser Reihenfolge bearbeiten; aktueller Umfang: M1.
+- C#/.NET 10 LTS, Avalonia. Domain ohne UI/Dateisystem; Rules nur auf Domain; Storage und ImportExport nur auf Domain; Application auf Domain/Rules. Beide Desktopprogramme nutzen diese gemeinsamen Komponenten. Keine Rechtsregeln in UI oder Importadaptern.
+- Ausschließlich synthetische Personen und Accounts in Code, Tests, Samples und Protokollen. Keine Signierschlüssel, Echtdaten, Diagnosen oder konkreten Schulnetzpfade einchecken.
+- Unbekannt ist nicht falsch und nicht erfüllt: explizit `needs_review`. M1 darf niemals verbindlich grün oder eingereicht melden. Vorbildung aus Wahl-JSON ist keine Vertrauensquelle. Profilprüfung folgt in M2, administrative Signierung in M3.
+- Jede Regel mit stabiler ID, Quelle, Version, Geltungsbereich und Schweregrad dokumentieren und testen. Keine unbestätigten rechtlichen Sonderregeln implementieren. Offene Punkte in `docs/OFFENE_PUNKTE.md` ergänzen.
+- Fach, Kursart, Variante, Halbjahre, Angebot und spätere Unterrichtsgruppe getrennt modellieren. Planungsszenarien dürfen aktive Wahlen nicht verändern.
+- JSON-Schemaänderungen explizit versionieren. Unbekannte Schemaversionen ablehnen; niemals stillschweigend migrieren oder defekte Dateien überschreiben. Austausch über temporäre Datei im Zielverzeichnis; Konkurrenzänderungen erkennen.
+- Lehrerrevisionen sind unabhängig von Schülerdateien, append-only mit Herkunft und vollständigem Snapshot. Wiederherstellung erzeugt neue Revision. Import benötigt Vorschau und bestätigte Übernahme; ASV-Adapter erst anhand anonymisierter Musterdatei.
+- Nach jedem abgeschlossenen Entwicklungsschritt verfügbare Tests ausführen und tatsächliche Ergebnisse inklusive Fehlern in `docs/TESTPROTOKOLL.md` dokumentieren. Abschließend Restore, Release-Build, gesamte Testsuite und verfügbaren UI-Smoke-Test ausführen. Keine erfolgreichen Tests behaupten, die nicht liefen.
+- Pakete explizit pinnen, Lockdateien behalten, Lizenz-/Sicherheitsstand in `docs/ABHAENGIGKEITEN.md` pflegen. Keine automatischen Onlinezugriffe der Desktopanwendungen.
+- Änderungen im bestehenden Arbeitsverzeichnis erhalten. Keine ungefragten Deployments oder Arbeit an M2–M5 über dokumentierte Schnittstellen/Modelle hinaus.

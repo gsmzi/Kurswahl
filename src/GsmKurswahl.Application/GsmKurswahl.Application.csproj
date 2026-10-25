@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><ProjectReference Include="../GsmKurswahl.Domain/GsmKurswahl.Domain.csproj" /><ProjectReference Include="../GsmKurswahl.Rules/GsmKurswahl.Rules.csproj" /></ItemGroup></Project>

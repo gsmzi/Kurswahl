@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "documentId": "a5b85177-88ec-447a-bbed-d76e53c708c3",
+  "studentId": "demo-001",
+  "graduationYear": 2029,
+  "offerVersion": "demo-2029-v1",
+  "ruleVersion": "m1-1",
+  "revision": 1,
+  "createdAt": "2026-10-25T12:00:00+00:00",
+  "updatedAt": "2026-10-25T12:00:00+00:00",
+  "submissionStatus": "draft",
+  "phase": "preliminary",
+  "selections": [
+    {"offerId": "D-LF", "subjectId": "D", "type": "lf", "variant": "normal", "semesters": [1, 2, 3, 4]},
+    {"offerId": "M-LF", "subjectId": "M", "type": "lf", "variant": "normal", "semesters": [1, 2, 3, 4]},
+    {"offerId": "BIO-LF", "subjectId": "BIO", "type": "lf", "variant": "normal", "semesters": [1, 2, 3, 4]},
+    {"offerId": "PSY-WF", "subjectId": "PSY", "type": "elective", "variant": "normal", "semesters": [1, 2]}
+  ]
+}

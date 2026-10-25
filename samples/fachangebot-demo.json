@@ -1,0 +1,880 @@
+{
+  "schemaVersion": 1,
+  "version": "demo-2029-v1",
+  "graduationYear": 2029,
+  "isDemo": true,
+  "subjects": [
+    {
+      "name": "Deutsch",
+      "id": "D"
+    },
+    {
+      "name": "Mathematik",
+      "id": "M"
+    },
+    {
+      "name": "Englisch",
+      "id": "E"
+    },
+    {
+      "name": "Biologie",
+      "id": "BIO"
+    },
+    {
+      "name": "Chemie",
+      "id": "CH"
+    },
+    {
+      "name": "Physik",
+      "id": "PH"
+    },
+    {
+      "name": "Geschichte",
+      "id": "G"
+    },
+    {
+      "name": "Bildende Kunst",
+      "id": "BK"
+    },
+    {
+      "name": "Musik",
+      "id": "MU"
+    },
+    {
+      "name": "Gemeinschaftskunde",
+      "id": "GK"
+    },
+    {
+      "name": "Geographie",
+      "id": "GEO"
+    },
+    {
+      "name": "Wirtschaft",
+      "id": "W"
+    },
+    {
+      "name": "Sport",
+      "id": "SP"
+    },
+    {
+      "name": "Informatik",
+      "id": "INF"
+    },
+    {
+      "name": "Italienisch",
+      "id": "I"
+    },
+    {
+      "name": "Ethik",
+      "id": "ETH"
+    },
+    {
+      "name": "Evangelische Religion",
+      "id": "ER"
+    },
+    {
+      "name": "Katholische Religion",
+      "id": "KR"
+    },
+    {
+      "name": "Psychologie",
+      "id": "PSY"
+    },
+    {
+      "name": "Schüler-Ingenieur-Akademie",
+      "id": "SIA"
+    }
+  ],
+  "offers": [
+    {
+      "id": "D-BF",
+      "subjectId": "D",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "D-LF",
+      "subjectId": "D",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "M-BF",
+      "subjectId": "M",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "M-LF",
+      "subjectId": "M",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "E-BF",
+      "subjectId": "E",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "E-LF",
+      "subjectId": "E",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "BIO-BF",
+      "subjectId": "BIO",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "BIO-LF",
+      "subjectId": "BIO",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "CH-BF",
+      "subjectId": "CH",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "CH-LF",
+      "subjectId": "CH",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "PH-BF",
+      "subjectId": "PH",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "PH-LF",
+      "subjectId": "PH",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "G-BF",
+      "subjectId": "G",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "BK-BF",
+      "subjectId": "BK",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "MU-BF",
+      "subjectId": "MU",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "SP-BF",
+      "subjectId": "SP",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "ETH-BF",
+      "subjectId": "ETH",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "ER-BF",
+      "subjectId": "ER",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "KR-BF",
+      "subjectId": "KR",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "BIO-BF-BILI",
+      "subjectId": "BIO",
+      "type": "bf",
+      "variant": "bilingual",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": [
+        "continuous_bilingual"
+      ]
+    },
+    {
+      "id": "BIO-LF-BILI",
+      "subjectId": "BIO",
+      "type": "lf",
+      "variant": "bilingual",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": [
+        "continuous_bilingual"
+      ]
+    },
+    {
+      "id": "GK-BF",
+      "subjectId": "GK",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "GEO-BF",
+      "subjectId": "GEO",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "GK-LF",
+      "subjectId": "GK",
+      "type": "lf",
+      "variant": "normal",
+      "status": "planned",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "GEO-LF",
+      "subjectId": "GEO",
+      "type": "lf",
+      "variant": "normal",
+      "status": "planned",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "W-LF",
+      "subjectId": "W",
+      "type": "lf",
+      "variant": "normal",
+      "status": "planned",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "SP-LF",
+      "subjectId": "SP",
+      "type": "lf",
+      "variant": "normal",
+      "status": "planned",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "INF-BF",
+      "subjectId": "INF",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": [
+        "informatics"
+      ]
+    },
+    {
+      "id": "I-BF",
+      "subjectId": "I",
+      "type": "bf",
+      "variant": "normal",
+      "status": "planned",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": [
+        "italian_profile"
+      ]
+    },
+    {
+      "id": "PSY-WF",
+      "subjectId": "PSY",
+      "type": "elective",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 2,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 2,
+          "semester": 2
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "SIA-SK",
+      "subjectId": "SIA",
+      "type": "seminar",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        }
+      ],
+      "requirements": []
+    }
+  ]
+}

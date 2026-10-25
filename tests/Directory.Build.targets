@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup><Compile Include="$(MSBuildThisFileDirectory)TestData.cs" Link="TestData.cs" /></ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)../samples/*.json" Link="samples/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
