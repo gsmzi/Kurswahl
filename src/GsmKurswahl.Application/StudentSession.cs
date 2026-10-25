@@ -67,8 +67,14 @@ public sealed class StudentSession
             var loaded = await store.LoadAsync(cancellationToken);
             if (loaded is null)
             {
-                if (contentToken is not null || IsDirty) throw new IOException("Die gespeicherte Datei fehlt. Vorhandener Entwurf bleibt erhalten.");
-                Message = "Keine gespeicherte Wahl vorhanden. Neuer vorläufiger Entwurf.";
+                if (contentToken is not null || IsDirty)
+                {
+                    // Keep the open draft. Without a token the next save may only create the file, never replace one.
+                    contentToken = null;
+                    IsDirty = true;
+                    Message = "Gespeicherte Datei nicht gefunden. Entwurf bleibt erhalten und wird beim nächsten Speichern neu angelegt.";
+                }
+                else Message = "Keine gespeicherte Wahl vorhanden. Neuer vorläufiger Entwurf.";
             }
             else
             {

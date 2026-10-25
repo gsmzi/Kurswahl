@@ -16,11 +16,17 @@ public sealed record StudentSettings(int SchemaVersion, string HomeDirectory, st
         return settings;
     }
 
-    public string ResolveChoicePath()
+    public string ResolveHomeDirectory()
     {
         var home = HomeDirectory == "{HOME}" ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : HomeDirectory;
         if (string.IsNullOrWhiteSpace(home) || !Path.IsPathFullyQualified(home))
             throw new ArgumentException("HomeDirectory muss {HOME} oder ein absoluter Pfad sein.");
+        return Path.GetFullPath(home);
+    }
+
+    public string ResolveChoicePath()
+    {
+        var home = ResolveHomeDirectory();
         if (string.IsNullOrWhiteSpace(ChoiceDirectory) || Path.IsPathRooted(ChoiceDirectory)
             || ChoiceDirectory.Split(['/', '\\']).Any(s => s is ".." or "." or ""))
             throw new ArgumentException("ChoiceDirectory muss ein relativer Unterordner ohne Traversierung sein.");

@@ -56,6 +56,37 @@ public class StudentSessionTests
         var session = new StudentSession(TestData.Catalog with { Offers = [offer] }, "demo-001", new MemoryStore());
         Assert.Throws<InvalidOperationException>(() => session.SetSelection(offer.Id, [1, 2, 3, 4]));
     }
+    [Fact] public async Task VanishedFileKeepsDraftAndNextSaveOnlyCreates()
+    {
+        var store = new MemoryStore();
+        var session = new StudentSession(TestData.Catalog, "demo-001", store);
+        session.SetSelection("D-BF", [1, 2]);
+        await session.SaveAsync();
+        store.Value = null; // file deleted or moved outside the application
+        await session.LoadAsync();
+        Assert.False(session.LoadFailed); Assert.True(session.IsDirty);
+        Assert.Single(session.Choice.Selections);
+        await session.SaveAsync();
+        Assert.Equal(2, store.Writes); Assert.Null(store.LastExpectedToken);
+    }
+    [Fact] public async Task DiscardLoadWithoutAnyFileKeepsDraftAndAllowsSaving()
+    {
+        var store = new MemoryStore();
+        var session = new StudentSession(TestData.Catalog, "demo-001", store);
+        session.SetSelection("D-BF", [1, 2]);
+        await session.LoadAsync(discardChanges: true);
+        Assert.False(session.LoadFailed); Assert.Single(session.Choice.Selections);
+        await session.SaveAsync();
+        Assert.Equal(1, store.Writes);
+    }
+    [Fact] public void CatalogRuleViolationBlocksOfferWithRuleId()
+    {
+        var offer = TestData.Offer("INF-LF", "INF", CourseType.Lf);
+        var session = new StudentSession(TestData.Catalog with { Subjects = [new("INF", "Informatik")], Offers = [offer] }, "demo-001", new MemoryStore());
+        Assert.False(session.Availability(offer).CanSelect);
+        var error = Assert.Throws<InvalidOperationException>(() => session.SetSelection(offer.Id, [1, 2, 3, 4]));
+        Assert.Contains("CATALOG-", error.Message);
+    }
     [Fact] public void ProductionCatalogRejected() => Assert.Throws<ArgumentException>(() =>
         new StudentSession(TestData.Catalog with { IsDemo = false }, "demo-001", new MemoryStore()));
 
@@ -64,10 +95,12 @@ public class StudentSessionTests
         public StoredChoice? Value { get; set; }
         public bool FailSave { get; init; }
         public int Writes { get; private set; }
+        public string? LastExpectedToken { get; private set; }
         public Task<StoredChoice?> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Value);
         public Task<StoredChoice> SaveAsync(CourseChoice choice, string? expectedToken, CancellationToken cancellationToken = default)
         {
             if (FailSave) throw new IOException("synthetic failure");
+            LastExpectedToken = expectedToken;
             Writes++; Value = new(choice, Writes.ToString()); return Task.FromResult(Value);
         }
     }

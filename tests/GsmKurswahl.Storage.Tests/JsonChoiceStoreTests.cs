@@ -31,7 +31,7 @@ public sealed class JsonChoiceStoreTests : IDisposable
     [Fact] public async Task InterruptedCommitLeavesOriginalIntact()
     {
         var first = await new JsonChoiceStore(FilePath).SaveAsync(TestData.Choice, null);
-        var store = new JsonChoiceStore(FilePath, new FailingCommitter());
+        var store = new JsonChoiceStore(FilePath, committer: new FailingCommitter());
         await Assert.ThrowsAsync<IOException>(() => store.SaveAsync(first.Choice with { Revision = 2 }, first.ContentToken));
         Assert.Equal(first.ContentToken, (await store.LoadAsync())!.ContentToken);
         Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
@@ -83,8 +83,36 @@ public sealed class JsonChoiceStoreTests : IDisposable
     [InlineData("Kurswahl", "profil.json")] [InlineData("Kurswahl", "x.txt")]
     public void UnsafeRelativePathsRejected(string folder, string name) => Assert.Throws<ArgumentException>(() =>
         new StudentSettings(1, directory, folder, name, "catalog.json", "demo-001").ResolveChoicePath());
-    [Fact] public void ConfigurablePathUsesSpecifiedHome() => Assert.Equal(Path.Combine(directory, "Demo", "wahl.json"),
-        new StudentSettings(1, directory, "Demo", "wahl.json", "catalog.json", "demo-001").ResolveChoicePath());
+    [Fact] public void ConfigurablePathUsesSpecifiedHome()
+    {
+        var settings = new StudentSettings(1, directory, "Demo", "wahl.json", "catalog.json", "demo-001");
+        Assert.Equal(Path.Combine(directory, "Demo", "wahl.json"), settings.ResolveChoicePath());
+        Assert.Equal(Path.GetFullPath(directory), settings.ResolveHomeDirectory());
+    }
+
+    [Fact] public async Task MissingStorageRootIsReportedNotTreatedAsEmpty()
+    {
+        // Simulates a disconnected network home: the configured root itself is missing.
+        var store = new JsonChoiceStore(Path.Combine(directory, "Kurswahl", "aktuell.json"), directory);
+        await Assert.ThrowsAsync<StorageUnavailableException>(() => store.LoadAsync());
+    }
+    [Fact] public async Task SaveNeverCreatesMissingStorageRoot()
+    {
+        var store = new JsonChoiceStore(Path.Combine(directory, "Kurswahl", "aktuell.json"), directory);
+        await Assert.ThrowsAsync<StorageUnavailableException>(() => store.SaveAsync(TestData.Choice, null));
+        Assert.False(Directory.Exists(directory));
+    }
+    [Fact] public async Task MissingSubfolderUnderExistingRootIsNewDraft()
+    {
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "Kurswahl", "aktuell.json");
+        var store = new JsonChoiceStore(path, directory);
+        Assert.Null(await store.LoadAsync());
+        await store.SaveAsync(TestData.Choice, null);
+        Assert.True(File.Exists(path));
+    }
+    [Fact] public void TargetOutsideStorageRootRejected() => Assert.Throws<ArgumentException>(() =>
+        new JsonChoiceStore(Path.Combine(Path.GetTempPath(), "anderswo.json"), directory));
 
     private sealed class FailingCommitter : IFileCommitter
     {

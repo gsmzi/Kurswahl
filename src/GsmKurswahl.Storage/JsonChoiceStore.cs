@@ -18,11 +18,30 @@ public sealed class AtomicFileCommitter : IFileCommitter
     }
 }
 
-public sealed class JsonChoiceStore(string path, IFileCommitter? committer = null) : IChoiceStore
+public sealed class StorageUnavailableException(string message) : IOException(message);
+
+public sealed class JsonChoiceStore : IChoiceStore
 {
     private const int MaximumBytes = 2 * 1024 * 1024;
-    private readonly string target = Path.GetFullPath(path);
-    private readonly IFileCommitter fileCommitter = committer ?? new AtomicFileCommitter();
+    private readonly string target;
+    private readonly string? storageRoot;
+    private readonly IFileCommitter fileCommitter;
+
+    // storageRoot (e.g. the home directory) must already exist; it is never created, so an unavailable
+    // network drive is reported instead of being mistaken for "no saved choice".
+    public JsonChoiceStore(string path, string? storageRoot = null, IFileCommitter? committer = null)
+    {
+        target = Path.GetFullPath(path);
+        if (storageRoot is not null)
+        {
+            this.storageRoot = Path.GetFullPath(storageRoot);
+            var prefix = Path.EndsInDirectorySeparator(this.storageRoot) ? this.storageRoot : this.storageRoot + Path.DirectorySeparatorChar;
+            var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (!target.StartsWith(prefix, comparison))
+                throw new ArgumentException("Die Wahldatei liegt nicht im konfigurierten Speicherort.");
+        }
+        fileCommitter = committer ?? new AtomicFileCommitter();
+    }
 
     public async Task<StoredChoice?> LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -31,8 +50,11 @@ public sealed class JsonChoiceStore(string path, IFileCommitter? committer = nul
             var bytes = await ReadBoundedAsync(target, cancellationToken);
             return new(JsonDocuments.ReadChoice(bytes), Token(bytes));
         }
-        catch (FileNotFoundException) { return null; }
-        catch (DirectoryNotFoundException) { return null; }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            EnsureStorageReachable();
+            return null;
+        }
         // Do not turn malformed data, denied access or an unavailable drive into an empty draft.
     }
 
@@ -40,6 +62,7 @@ public sealed class JsonChoiceStore(string path, IFileCommitter? committer = nul
     {
         var bytes = JsonDocuments.WriteChoice(choice);
         if (bytes.Length > MaximumBytes) throw new IOException("Wahldatei überschreitet 2 MiB.");
+        EnsureStorageReachable();
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         // All writers in this application cooperate through this exclusive lock. The file may remain after a crash.
         using var writeLock = new FileStream(target + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
@@ -66,6 +89,13 @@ public sealed class JsonChoiceStore(string path, IFileCommitter? committer = nul
         {
             if (File.Exists(temporary)) File.Delete(temporary);
         }
+    }
+
+    private void EnsureStorageReachable()
+    {
+        var required = storageRoot ?? Path.GetPathRoot(target);
+        if (!string.IsNullOrEmpty(required) && !Directory.Exists(required))
+            throw new StorageUnavailableException("Speicherort nicht erreichbar (z. B. Netzlaufwerk getrennt). Es wurde nichts gelesen oder geschrieben.");
     }
 
     private static string Token(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));

@@ -16,11 +16,11 @@ public class ModelTests
     public void InvalidSemestersRejected(int semester) => Assert.Throws<ArgumentException>(() => ModelGuard.Choice(TestData.Choice with
     { Selections = [TestData.Select(TestData.Offer()) with { Semesters = [semester] }] }));
     [Fact] public void DuplicateOffersRejected() => Assert.Throws<ArgumentException>(() => ModelGuard.Catalog(TestData.Catalog with { Offers = [TestData.Offer(), TestData.Offer()] }));
-    [Theory] [InlineData("INF")] [InlineData("I")] [InlineData("ETH")] [InlineData("ER")] [InlineData("KR")]
-    public void GsmForbiddenLfRejectedAtConfigurationBoundary(string subject)
+    [Fact] public void StructuralGuardLeavesSchoolOfferRulesToRules()
     {
-        // Source: Pflichtenheft Abschnitt 4, kein rechtlicher Volltest.
-        Assert.Throws<ArgumentException>(() => ModelGuard.Catalog(TestData.Catalog with
-        { Subjects = [new(subject, subject)], Offers = [TestData.Offer(subject, subject, CourseType.Lf)] }));
+        // Schulische Angebotsgrenzen sind Regeln mit ID in GsmKurswahl.Rules, keine Strukturfehler.
+        ModelGuard.Catalog(TestData.Catalog with { Subjects = [new("INF", "Informatik")], Offers = [TestData.Offer("INF-LF", "INF", CourseType.Lf)] });
     }
+    [Fact] public void UnknownSubjectReferenceRejected() => Assert.Throws<ArgumentException>(() =>
+        ModelGuard.Catalog(TestData.Catalog with { Offers = [TestData.Offer("X-BF", "X")] }));
 }

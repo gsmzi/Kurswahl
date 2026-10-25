@@ -96,6 +96,12 @@
       "gsmkurswahl.domain": {
         "type": "Project"
       },
+      "gsmkurswahl.rules": {
+        "type": "Project",
+        "dependencies": {
+          "GsmKurswahl.Domain": "[1.0.0, )"
+        }
+      },
       "gsmkurswahl.storage": {
         "type": "Project",
         "dependencies": {

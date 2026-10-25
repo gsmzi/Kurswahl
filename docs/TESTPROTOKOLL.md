@@ -35,6 +35,22 @@ Umgebung: Windows x64, .NET SDK 10.0.400; ausschließlich synthetische Daten. TR
 - Frameworkabhängiger Release-Publish für **beide Programme erfolgreich**: `artifacts/publish/student-framework-dependent` und `artifacts/publish/teacher-framework-dependent`. .NET-10-Laufzeit auf dem Zielrechner erforderlich. Schüler-Konfiguration und Fachangebot werden mitkopiert.
 - Erneuter Solution-Restore mit `--locked-mode` nach den Publish-Versuchen erfolgreich. Kein nativer Windows-Sichttest und kein Test auf einem Rechner ohne SDK durchgeführt; UI-Funktion automatisiert headless geprüft.
 
+## Schritt 6 – Korrekturen nach Review (25.10.2026)
+
+Umgebung: Windows 11 x64, .NET SDK 10.0.400, Bash-Aufrufe der Einzelbefehle aus dem README. `scripts/Test.ps1` konnte nicht laufen, weil auf diesem Rechner kein PowerShell 7 (`pwsh`, für `Test-Json`) installiert ist; die JSON-Schemaprüfung wurde daher in diesem Schritt **nicht** ausgeführt (die Schemata wurden nicht geändert).
+
+- Ausgangsstand vor den Änderungen: Restore `--locked-mode`, Release-Build 0 Warnungen / 0 Fehler, **55/55 Tests bestanden**.
+- Änderungen: GSM-Angebotsgrenzen aus `ModelGuard` als Regeln mit ID nach `GsmKurswahl.Rules/CatalogRules` verlagert (sperren das betroffene Angebot statt den ganzen Katalog); Regelkatalog in `RECHTSQUELLEN.md`; `JsonChoiceStore` meldet ein fehlendes Home/Laufwerk als „Speicherort nicht erreichbar“ und legt das Home nie an; `StudentSession` behält bei verschwundener Datei den Entwurf und speichert danach nur anlegend statt dauerhaft gesperrt.
+- Normaler Restore aktualisierte `tests/GsmKurswahl.Storage.Tests/packages.lock.json` (neuer Projektverweis auf Rules, keine neuen Pakete). Danach Restore `--locked-mode` erfolgreich.
+- Erster Build: **1 Fehler** CS0407 (Methodengruppe `Check` in `SelectMany` mehrdeutig). Der anschließende `dotnet test` lief nur gegen veraltete Binärdateien und wird nicht gewertet. Korrigiert durch Lambda.
+- Zweiter Release-Build: **0 Warnungen, 0 Fehler**.
+- **78/78 Tests bestanden**, keine übersprungen: Domain 8, Rules 33, Storage 24, ImportExport 1, Application 10, StudentApp 2 (Avalonia headless).
+  - Domain: Test „verbotene LF im ModelGuard“ (5 Fälle) entfernt, da Regel verlagert; neu: Strukturprüfung lässt Schulregeln an Rules, unbekannte Fachkennung wird abgewiesen.
+  - Rules: verbotene LF mit Regel-ID (5), je ein Negativfall für alle `CATALOG-*`-Regeln inkl. Sperre und `invalid` in `Validate` (9), gültiges Angebot ohne Verstoß, `PROFILE-TRUST`/`PREREQUISITE-UNKNOWN`, `PREREQUISITE-NO`, gestrichenes Angebot → `OFFER-SELECTION`, jede Regel-ID in `RECHTSQUELLEN.md` dokumentiert.
+  - Storage: fehlender Speicherort beim Laden und Speichern (Home wird nicht angelegt), fehlender Unterordner unter vorhandenem Home = neuer Entwurf, Ziel außerhalb des Speicherorts abgewiesen; Beispielkatalog ohne `CATALOG-*`-Verstoß und Beispielwahl `needs_review`.
+  - Application: verschwundene Datei erhält Entwurf, nächstes Speichern ohne Ersetzungs-Token; Laden mit Verwerfen ohne Datei sperrt nicht; Katalogverstoß sperrt Angebot mit Regel-ID.
+- Nicht ausgeführt: JSON-Schemaprüfung (kein `pwsh`), manueller Sichttest der Schüler-App, Publish, Paket-Audit.
+
 ## Grenzen der Prüfung
 
 Kein Schulnetz/SMB-Ausfalltest, keine echten Profile, kein AGVO-Volltest, kein realer CSV-/XLSX-/ASV-Import. Headless-Tests ersetzen keine Sicht-/Tastatur-/DPI-Prüfung auf dem Schulgerät. GitHub-CI wurde vorbereitet, aber nicht remote ausgeführt. macOS wurde hier nicht ausgeführt.

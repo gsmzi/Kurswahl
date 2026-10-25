@@ -21,7 +21,7 @@ public sealed class App : Avalonia.Application
                 var settings = StudentSettings.Load(settingsPath);
                 var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(settings.ResolveCatalogPath(settingsPath)));
                 var path = settings.ResolveChoicePath();
-                var session = new StudentSession(catalog, settings.DemoStudentId, new JsonChoiceStore(path));
+                var session = new StudentSession(catalog, settings.DemoStudentId, new JsonChoiceStore(path, settings.ResolveHomeDirectory()));
                 desktop.MainWindow = new MainWindow(session, path, new OperatingSystemIdentityProvider().GetCurrent().Username);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)

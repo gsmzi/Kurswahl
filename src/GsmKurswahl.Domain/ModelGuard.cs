@@ -40,14 +40,7 @@ public static class ModelGuard
             Require(!offer.Schedule.IsDefaultOrEmpty && offer.Schedule.All(s => s is not null && s.Semester is >= 1 and <= 4 && s.WeeklyHours is > 0 and <= 10)
                 && offer.Schedule.Select(s => s.Semester).Distinct().Count() == offer.Schedule.Length, "Ungültiger Halbjahresplan.");
             Require(!offer.Requirements.IsDefault && offer.Requirements.All(Enum.IsDefined), "Unbekannte Voraussetzung.");
-            Require(offer.Type != CourseType.Lf || offer.Schedule.Select(s => s.Semester).Order().SequenceEqual([1, 2, 3, 4]), "LF benötigen HJ 1–4.");
-            Require(offer.Type != CourseType.Lf || !new[] { "INF", "I", "ETH", "ER", "KR" }.Contains(offer.SubjectId), "Am GSM ausgeschlossenes LF (Pflichtenheft §4).");
-            Require(offer.SubjectId != "PSY" || (offer.Type == CourseType.Elective && offer.Schedule.All(s => s.Semester <= 2 && s.WeeklyHours == 2)), "PSY: Wahlfach nur HJ 1–2, zweistündig.");
-            Require(offer.SubjectId != "SIA" || (offer.Type == CourseType.Seminar && offer.Schedule.Select(s => s.Semester).Order().SequenceEqual([1, 2]) && offer.Schedule.All(s => s.WeeklyHours == 3)), "SIA: Seminarkurs HJ 1–2, dreistündig.");
-            Require(offer.SubjectId != "GEO" || offer.Type != CourseType.Bf || offer.Schedule.All(s => s.Semester >= 3), "GEO-BF nur HJ 3–4.");
-            Require(offer.SubjectId != "INF" || (offer.Type == CourseType.Bf && offer.Schedule.Select(s => s.Semester).Order().SequenceEqual([1, 2, 3, 4]) && offer.Schedule.All(s => s.WeeklyHours == 3) && offer.Requirements.Contains(Requirement.Informatics)), "INF benötigt BF HJ 1–4, drei Stunden und Vorbildungsprüfung.");
-            Require(offer.SubjectId != "I" || offer.Requirements.Contains(Requirement.ItalianProfile), "Italienisch benötigt Profilprüfung.");
-            Require(offer.Variant != CourseVariant.Bilingual || offer.Requirements.Contains(Requirement.ContinuousBilingual), "Bilinguale Angebote benötigen Vorbildungsprüfung.");
+            // Schulische Angebotsgrenzen (LF-Ausschlüsse, PSY, SIA, GEO, INF, I, bilingual) prüft GsmKurswahl.Rules.CatalogRules.
         }
     }
 

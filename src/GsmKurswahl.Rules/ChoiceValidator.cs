@@ -16,11 +16,15 @@ public sealed class ChoiceValidator
         new("OFFER-SELECTION", "Angebot, Variante und Halbjahre", "Pflichtenheft §§4,8", "Jede Belegung", Version, ReviewStatus.Invalid),
         new("SUBJECT-DUPLICATE", "Keine doppelte Fachbelegung", "Pflichtenheft §6 Nr.1,7", "Alle Fächer/Varianten", Version, ReviewStatus.Invalid),
         new("PREREQUISITE-NO", "Persönliche Voraussetzung nicht erfüllt", "Pflichtenheft §§4,5", "INF/I/bilingual", Version, ReviewStatus.Invalid),
-        new("PREREQUISITE-UNKNOWN", "Persönliche Voraussetzung ungeklärt", "Pflichtenheft §§5,5a", "INF/I/bilingual", Version, ReviewStatus.NeedsReview)
+        new("PREREQUISITE-UNKNOWN", "Persönliche Voraussetzung ungeklärt", "Pflichtenheft §§5,5a", "INF/I/bilingual", Version, ReviewStatus.NeedsReview),
+        .. CatalogRules.Definitions
     ];
 
     public Availability GetAvailability(CourseOffer offer, ProfileContext profile)
     {
+        var violation = CatalogRules.Check(offer).FirstOrDefault();
+        if (violation is not null)
+            return new(false, ReviewStatus.Invalid, $"{violation.Rule.Id}: {violation.Explanation} Bitte an die Oberstufenberatung wenden.");
         if (offer.Status is not (OfferStatus.Offered or OfferStatus.Established))
             return new(false, ReviewStatus.Invalid, "Dieses Angebot ist geplant oder nicht zustande gekommen und nicht freigegeben.");
         if (offer.Requirements.IsEmpty) return new(true, ReviewStatus.NeedsReview, "Vorläufig wählbar; vollständige Rechtsprüfung folgt in M2.");
@@ -53,6 +57,8 @@ public sealed class ChoiceValidator
         foreach (var selection in choice.Selections)
         {
             var offer = catalog.Offers.SingleOrDefault(o => o.Id == selection.OfferId);
+            ImmutableArray<RuleMessage> catalogViolations = offer is null ? [] : CatalogRules.Check(offer);
+            foreach (var violation in catalogViolations) messages.Add(violation with { Semesters = selection.Semesters });
             if (offer is null || offer.SubjectId != selection.SubjectId || offer.Type != selection.Type || offer.Variant != selection.Variant
                 || selection.Semesters.Any(s => !offer.Schedule.Any(h => h.Semester == s))
                 || (offer.Type == CourseType.Lf && selection.Semesters.Length != 4))
@@ -60,6 +66,7 @@ public sealed class ChoiceValidator
                 Add("OFFER-SELECTION", "Belegung passt nicht zum konfigurierten Angebot.", "Fach, Kursart, Variante und Halbjahre kontrollieren.", selection.SubjectId, selection.Semesters);
                 continue;
             }
+            if (!catalogViolations.IsEmpty) continue;
             var availability = GetAvailability(offer, profile);
             if (!availability.CanSelect)
                 Add(offer.Status is not (OfferStatus.Offered or OfferStatus.Established) ? "OFFER-SELECTION" : availability.Status == ReviewStatus.Invalid ? "PREREQUISITE-NO" : "PREREQUISITE-UNKNOWN",
