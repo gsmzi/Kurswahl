@@ -50,6 +50,7 @@ Umgebung: Windows 11 x64, .NET SDK 10.0.400, Bash-Aufrufe der Einzelbefehle aus 
   - Storage: fehlender Speicherort beim Laden und Speichern (Home wird nicht angelegt), fehlender Unterordner unter vorhandenem Home = neuer Entwurf, Ziel außerhalb des Speicherorts abgewiesen; Beispielkatalog ohne `CATALOG-*`-Verstoß und Beispielwahl `needs_review`.
   - Application: verschwundene Datei erhält Entwurf, nächstes Speichern ohne Ersetzungs-Token; Laden mit Verwerfen ohne Datei sperrt nicht; Katalogverstoß sperrt Angebot mit Regel-ID.
 - Nicht ausgeführt: JSON-Schemaprüfung (kein `pwsh`), manueller Sichttest der Schüler-App, Publish, Paket-Audit.
+- Nachtrag nach Installation von PowerShell 7.6.8: `pwsh -NoProfile -File scripts/Test.ps1 -LockedMode` vom Anwender ausgeführt, Ausgabe gesichtet. Restore `--locked-mode` und Release-Build erfolgreich, **78/78 Tests bestanden** (Testhost .NET 10.0.14), beide Schemaprüfungen bestanden (`Schema OK` für `schueler-demo.json` und `fachangebot-demo.json`). Weiterhin nicht ausgeführt: manueller Sichttest, Publish, Paket-Audit.
 
 ## Grenzen der Prüfung
 
