@@ -27,6 +27,59 @@ public sealed class TestApp : Avalonia.Application
 
 public class WindowTests
 {
+    [AvaloniaFact]
+    public async Task ShippedCatalogShowsFrenchLatinAndScienceAsAlternatives()
+    {
+        var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json")));
+        var session = new StudentSession(catalog, "demo-001", new UiMemoryStore());
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            foreach (var s in new[] { "E", "BIO", "W" }) session.SetSelection(s + "-LF", [1, 2, 3, 4]);
+            session.NextStep(); session.NextStep();
+            session.ChooseTaskOption("PLAN-AREA-ART", "BK-BF", true);
+            session.ChooseTaskOption("PLAN-AREA-RELIGION", "ETH-BF", true);
+            window.UpdateLayout();
+            var toggles = window.GetVisualDescendants().OfType<ToggleButton>().ToArray();
+            foreach (var id in new[] { "Option_F_BF", "Option_L_BF", "Option_CH_BF" })
+                Assert.Contains(toggles, b => b.Name == id && b.IsEnabled);
+            toggles.Single(b => b.Name == "Option_F_BF").IsChecked = true;
+            Assert.True(session.Tasks.Single(t => t.Id == "PLAN-AREA-BREADTH").IsSatisfied);
+            Assert.DoesNotContain(session.Choice.Selections, s => s.SubjectId == "CH");
+        }
+        finally { await session.SaveAsync(); window.Close(); }
+    }
+    [AvaloniaFact]
+    public async Task ReviewShowsControlSheetAndRequiresExamPlanning()
+    {
+        var session = new StudentSession(TestData.WorkflowCatalog, "demo-001", new UiMemoryStore());
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            foreach (var subject in new[] { "D", "M", "E" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
+            session.NextStep();
+            window.UpdateLayout();
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Name == "DeferOralButton");
+            Assert.False(window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "NextStep").IsEnabled);
+            session.SetOral("BIO", true);
+            session.SetOral("G", true);
+            session.NextStep(); session.NextStep(); session.NextStep();
+            await session.SaveAsync();
+            window.UpdateLayout();
+            Assert.Equal(new[] { "BIO", "G" }, session.Choice.PlannedOralSubjects);
+            Assert.Contains(window.GetVisualDescendants().OfType<Button>(), b => b.Name == "ControlSheetButton");
+            Assert.Contains("PDF", window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ControlSheetButton").Content?.ToString());
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Content?.ToString()?.Contains("Drucken") == true);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), b => b.Text?.Contains("Mögliche mündliche Kombinationen") == true);
+            var sportRow = session.Plan.Single(r => r.OfferId == "SP-BF");
+            Assert.Equal(ReviewStatus.NeedsReview, sportRow.Issue);
+            Assert.Contains("AGVO-SPORT", sportRow.IssueText);
+            Assert.Contains(window.GetVisualDescendants().OfType<Control>(), c => ToolTip.GetTip(c)?.ToString()?.Contains("AGVO-SPORT") == true);
+        }
+        finally { if (session.IsDirty) await session.SaveAsync(); window.Close(); }
+    }
     [AvaloniaTheory]
     [InlineData(1920, 1000)]
     [InlineData(1536, 780)]
@@ -146,6 +199,16 @@ public class WindowTests
             Assert.DoesNotContain(prerequisites.GetLogicalDescendants().OfType<Control>(), c => c is ToggleButton or TextBox);
         }
         finally { window.Close(); }
+    }
+    private sealed class UiMemoryStore : IChoiceStore
+    {
+        private StoredChoice? value;
+        public Task<StoredChoice?> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(value);
+        public Task<StoredChoice> SaveAsync(CourseChoice choice, string? expectedToken, CancellationToken cancellationToken = default)
+        {
+            value = new(choice, "synthetic-token");
+            return Task.FromResult(value);
+        }
     }
     private sealed class EmptyStore : IChoiceStore
     {

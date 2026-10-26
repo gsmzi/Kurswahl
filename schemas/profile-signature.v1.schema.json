@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:gsm-kurswahl:profile-signature:1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "keyId", "algorithm", "signature"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "keyId": {"type": "string", "minLength": 1},
+    "algorithm": {"const": "ECDSA-P256-SHA256-P1363"},
+    "signature": {"type": "string", "minLength": 1, "contentEncoding": "base64"}
+  }
+}

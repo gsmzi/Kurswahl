@@ -5,6 +5,25 @@ namespace GsmKurswahl.Application.Tests;
 
 public class StudentSessionTests
 {
+    [Fact] public async Task NewProfileReevaluatesExistingChoiceWithoutChangingDraft()
+    {
+        var inf = TestData.Offer("INF-BF", "INF") with { Requirements = [Requirement.Informatics] };
+        var catalog = TestData.Catalog with { Subjects = TestData.Catalog.Subjects.Add(new("INF", "Informatik")), Offers = TestData.Catalog.Offers.Add(inf) };
+        var store = new MemoryStore();
+        var old = new StudentSession(catalog, "demo-001", store, new(ProfileStatus.Verified, PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes }));
+        old.SetSelection("INF-BF", [1, 2, 3, 4]);
+        await old.SaveAsync();
+        var updated = new StudentSession(catalog, "demo-001", store, new(ProfileStatus.Verified, PriorEducation.Unknown with { InformaticsImp = Knowledge.No, InformaticsBridge = Knowledge.No }) { Revision = 4 });
+        await updated.LoadAsync();
+        Assert.Equal(old.Choice, updated.Choice);
+        Assert.Contains(updated.Validation.Messages, m => m.Rule.Id == "PREREQUISITE-NO");
+        Assert.Contains("Revision 4", updated.ProfileStatusText);
+        Assert.Equal(1, store.Writes);
+        var invalid = new StudentSession(catalog, "demo-001", store, new(ProfileStatus.ProfileInvalid, PriorEducation.Unknown));
+        await invalid.LoadAsync();
+        Assert.Equal(old.Choice, invalid.Choice);
+        Assert.Contains(invalid.Validation.Messages, m => m.Rule.Id == "PROFILE-TRUST");
+    }
     [Fact] public async Task SelectSaveLoadPreservesDraftAndDoesNotInflateRevisionOnUnchangedSave()
     {
         var store = new MemoryStore();
@@ -15,7 +34,7 @@ public class StudentSessionTests
         var second = new StudentSession(TestData.Catalog, "demo-001", store);
         await second.LoadAsync();
         Assert.Single(second.Choice.Selections);
-        Assert.Equal(ReviewStatus.NeedsReview, second.Validation.Status);
+        Assert.Equal(ReviewStatus.Invalid, second.Validation.Status);
         Assert.Equal(SubmissionStatus.Draft, second.Choice.SubmissionStatus);
     }
     [Fact] public void DuplicateSubjectIsNotSilentlyReplaced()

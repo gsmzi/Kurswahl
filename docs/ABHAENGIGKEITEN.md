@@ -29,3 +29,15 @@ Die transitive Laufzeit enthält unter anderem Avalonia (MIT), SkiaSharp/native 
 ## Wahlassistent 25.10.2026
 
 Keine neuen Pakete oder Paketversionsänderungen; bestehende Lockdateien bleiben unverändert. Lokales SDK 10.0.403. Der abschließende Restore verwendet den vorhandenen Paketcache, `--locked-mode`, `--ignore-failed-sources` und `-p:NuGetAudit=false`, weil Onlinezugriff in dieser Ausführungsumgebung gesperrt ist. Dies ist kein neuer Sicherheits-Audit; der zuvor dokumentierte Lizenz-/Sicherheitsstand bleibt maßgeblich.
+
+## M2 (26.10.2026)
+
+Keine neuen externen Pakete und keine Paketversionsänderungen. ECDSA/SHA-256 aus .NET-System.Security.Cryptography; HTML-Export nutzt System.Net.WebUtility und benötigt keine Browserbibliothek. StudentApp referenziert jetzt intern ImportExport; die beiden betroffenen Lockdateien wurden per Restore aktualisiert. SDK lokal 10.0.403. Desktopprogramme bleiben ohne Onlinezugriffe. Der Restore lief nach einem Sandbox-Lesefehler auf die lokale NuGet-Konfiguration erfolgreich mit erweitertem Zugriff; keine Änderung der NuGet-Konfiguration.
+
+Audit am 26.10.2026: `dotnet list GSM-Kurswahl.sln package --vulnerable --include-transitive --no-restore` erfolgreich; für alle Projekte keine bekannten anfälligen Pakete gemäß abgefragtem NuGet.org-Feed. Dies ist keine umfassende Sicherheitsfreigabe.
+
+## Direkter PDF-Export (26.10.2026)
+
+ImportExport pinnt jetzt `SkiaSharp` **2.88.9** und `SkiaSharp.NativeAssets.Linux` **2.88.9** explizit (MIT). Diese Versionen waren bereits transitiv über Avalonia vorhanden und werden wiederverwendet; keine Aktualisierung auf eine abweichende Skia-Hauptversion. Native Windows-/macOS-Assets über SkiaSharp, Linux explizit für CI. [Paket/Lizenz](https://www.nuget.org/packages/SkiaSharp/2.88.9), [PDF-API](https://learn.microsoft.com/en-us/dotnet/api/skiasharp.skdocument.createpdf). Schriftauflösung erfolgt lokal über Skia/systemeigene Schriftverwaltung (Arial oder Plattformersatz), ausgewählte Schriften werden in die PDF eingebettet. Keine heruntergeladenen Fonts, keine Browser-/Druckerabhängigkeit und keine Onlinezugriffe beim Export. Lockdateien wurden per Restore aktualisiert. Aktueller Paket-Audit folgt im Abschlusslauf.
+
+Abschließender Audit nach PDF-Referenzänderung am 26.10.2026 erfolgreich: für sämtliche Projekte einschließlich transitiver Pakete keine bekannten anfälligen Pakete laut NuGet.org. Locked-Restore und Release-Build erfolgreich; 151 Tests bestanden. Plattform-Sichtprüfung hier auf Windows; Linux/macOS-Fontauflösung bleibt im jeweiligen Zielbetrieb zu testen.

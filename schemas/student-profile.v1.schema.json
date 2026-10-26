@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:gsm-kurswahl:student-profile:1",
+  "title": "Individuelles Schülerprofil v1 (Signatur separat über exakte UTF-8-Bytes)",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "profileRevision", "studentId", "windowsUsername", "accountId", "graduationYear", "issuedAt", "keyId", "prerequisites"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "profileRevision": {"type": "integer", "minimum": 1},
+    "studentId": {"type": "string", "minLength": 1},
+    "windowsUsername": {"type": "string", "minLength": 1},
+    "accountId": {"type": "string", "minLength": 1},
+    "graduationYear": {"type": "integer", "minimum": 2000, "maximum": 2200},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "keyId": {"type": "string", "minLength": 1},
+    "prerequisites": {
+      "type": "object", "additionalProperties": false,
+      "required": ["italianProfile", "informaticsBridge", "informaticsImp", "continuousBilingual", "religionEthicsGrade10", "sportExemptSemesters"],
+      "properties": {
+        "italianProfile": {"$ref": "#/$defs/knowledge"},
+        "informaticsBridge": {"$ref": "#/$defs/knowledge"},
+        "informaticsImp": {"$ref": "#/$defs/knowledge"},
+        "continuousBilingual": {"$ref": "#/$defs/knowledge"},
+        "religionEthicsGrade10": {"enum": [null, "ETH", "ER", "KR"]},
+        "sportExemptSemesters": {"type": ["array", "null"], "uniqueItems": true, "items": {"type": "integer", "minimum": 1, "maximum": 4}},
+        "continuedLanguages": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "religionEthicsPermission": {"$ref": "#/$defs/knowledge"},
+        "religionEthicsExamPermission": {"$ref": "#/$defs/knowledge"},
+        "permanentSportExemption": {"$ref": "#/$defs/knowledge"}
+      }
+    }
+  },
+  "$defs": {"knowledge": {"enum": ["unknown", "yes", "no"]}}
+}

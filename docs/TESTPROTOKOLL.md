@@ -143,3 +143,66 @@ Kein Schulnetz/SMB-Ausfalltest, keine echten Profile, kein AGVO-Volltest, kein r
 - Restore mit `--locked-mode --ignore-failed-sources -p:NuGetAudit=false` aus dem lokalen Paketcache erfolgreich; keine Paket-/Lockdateiänderung, kein Online-Audit.
 - Release-Build im getrennten Ausgabeordner `bin/FullHd/`: **0 Warnungen, 0 Fehler**.
 - Gesamte Testsuite: **109/109 bestanden**, keine übersprungen; darin 5 StudentApp-Tests mit UI-Workflow und drei Layoutgrößen. Beide JSON-Schemaprüfungen bestanden. Kein nativer Windows-Sichttest.
+
+## M2 Schritt 1 – Profilprüfung (26.10.2026)
+
+`dotnet test tests/GsmKurswahl.Storage.Tests -c Release --no-restore`: 44 bestanden, 0 Fehler, 0 übersprungen. Enthält flüchtig erzeugte ECDSA-P256-Testschlüssel, Manipulation, falsche Identität/SID/Jahrgang/Schema/Revision, unbekannten Schlüssel, ungültigen Algorithmus und fehlende Dateien. Keine Testschlüssel gespeichert.
+
+## M2 Zwischenprüfung – Regelkern (26.10.2026)
+
+Erster Gesamtbuild ohne `AVALONIA_TELEMETRY_OPTOUT=1`: fehlgeschlagen (MSB4018/UnauthorizedAccessException im Avalonia-BuildServices-Logpfad). Anschließender Gesamttest mit Opt-out: Domain 8/8, ImportExport 1/1, UI-Smoke 5/5 bestanden; Rules 34/38, Storage 43/44, Application 25/27. Sieben Fehler: bisherige M1-Gesamtstatus-Erwartungen für unvollständige Wahlen, alter M1-COMPLETENESS-Marker, noch fehlende Regeldokumentation und bisher als geplant erwartetes Wirtschaft-LF. M2 erkennt fehlende Pflichtbelegungen nun als invalid; Tests und Dokumentation werden entsprechend aktualisiert. Keine fachlichen Prüfungen zur Behebung abgeschaltet.
+
+## M2 Schritt 2 – Belegungsregeln und Oberfläche (26.10.2026)
+
+Zweiter Gesamttest `dotnet test GSM-Kurswahl.sln -c Release --no-restore` mit Avalonia-Opt-out: **137/137 bestanden** (Domain 8, Rules 52, Storage 44, ImportExport 1, Application 27, UI-Smoke 5). Zuvor Restore zunächst an nicht lesbarer Benutzer-NuGet.Config gescheitert; wiederholt mit erweitertem Zugriff: erfolgreich. Neue interne Projektreferenz zu ImportExport, keine neuen Paketversionen.
+
+## M2 Abschlussprüfung – Korrekturlauf (26.10.2026)
+
+Locked-Restore erfolgreich, Release-Build erfolgreich (0 Warnungen/0 Fehler). Drei Beispieldateien bestehen die JSON-Schemaprüfung. NuGet-Audit mit `--vulnerable --include-transitive --no-restore` meldet für alle Projekte keine bekannten anfälligen Pakete aus den abgefragten Quellen.
+
+Erweiterter Testlauf: Domain 8, Rules 54, Storage 44, ImportExport 2, Application 28 bestanden. Neuer UI-Test blieb beim Schließen seines ungespeicherten Testentwurfs im Schutzdialog hängen; Lauf abgebrochen, kein Gesamt-Erfolg behauptet. Test verwendet jetzt einen speicherfähigen In-Memory-Store und speichert vor dem Schließen. `git diff --check` meldete zusätzliche Leerzeilen am Dateiende; diese bereinigt. Wiederholung folgt.
+
+## M2 vor der PDF-/Sprachenkorrektur (26.10.2026)
+
+Abschließendes `scripts/Test.ps1 -LockedMode` erfolgreich: Restore, Release-Build mit 0 Warnungen/Fehlern, **142 Tests bestanden** (Domain 8, Rules 54, Storage 44, ImportExport 2, Application 28, UI-Smoke 6), drei JSON-Schemaprüfungen erfolgreich. Danach Nutzerkorrektur: ausschließlich PDF statt HTML/Browserdruck; Französisch/Latein ergänzen und Fremdsprachenpflicht plus Sprach-/NW-Alternative immer sichtbar machen. Folgende Prüfungen beziehen sich auf diesen neuen Schritt.
+
+## PDF-/Sprachenkorrektur – erster Testlauf (26.10.2026)
+
+Restore mit expliziten SkiaSharp-Referenzen erfolgreich. Erster Gesamttest: Domain 8, Rules 54, Storage 44, ImportExport 3, UI-Smoke 6 erfolgreich; Application 24 erfolgreich/4 fehlgeschlagen. Die vier Tests erwarteten noch die alte gemeinsame Zwei-NW-Aufgabe bzw. INF in der ersten NW-Aufgabe. Tests an die getrennten Pflicht-/Alternativaufgaben angepasst; sieben neue Sprachpfad-Regressionstests ergänzt. PDF-Stresstest mit langen Labels/18 Meldungen erzeugt gültige dreiseitige PDF; pypdf bestätigt Umlaute und letzte Meldung. Erste Sichtprüfung zeigte Meldungen über Seitengrenzen geteilt; Layout hält jetzt normale Meldungsblöcke zusammen. Erneute Prüfung folgt.
+
+PDF-/Sprachen-Korrekturlauf 2: Application-Tests zunächst nicht kompilierbar (mehrdeutiges ImmutableArray.AddRange mit Collection-Ausdruck und nur lokal in anderer Testklasse vorhandener MemoryStore). Collection-Ausdrücke direkt verwendet und eigenständigen Teststore ergänzt. Andere Projekte: Domain 8, Rules 54, Storage 44, ImportExport 3 und UI 6 bestanden. Kein Gesamt-Erfolg dieses Laufs.
+
+PDF-/Sprachen-Korrekturlauf 3: Application **35/35 bestanden**, einschließlich sieben neuen Sprachpfadtests. Layout der dreiseitigen Stress-PDF nach Blockumbruch erneut vollständig visuell geprüft: keine Überlagerungen/Abschneidungen, Umlaute sichtbar, Seitenzahlen vorhanden. pdfplumber bestätigt sämtliche Textgrenzen innerhalb der A4-Seite; pypdf zuvor Vollständigkeit bis Prüfhinweis 18. Ein zusätzlicher UI-Smoke prüft nun die tatsächlich ausgelieferten F-/L-/CH-Optionen aus dem Samplekatalog.
+
+## M2 PDF-/Sprachenstand – Abschluss (26.10.2026)
+
+`scripts/Test.ps1 -LockedMode` vollständig erfolgreich: Locked-Restore; Release-Build **0 Warnungen, 0 Fehler**; gesamte Testsuite **151 bestanden, 0 fehlgeschlagen, 0 übersprungen** (Domain 8, Rules 54, Storage 44, ImportExport 3, Application 35, StudentApp 7); drei Beispieldatei-Schemas erfolgreich. UI-Smoke umfasst jetzt direkte PDF-Aktion ohne Druckbutton sowie tatsächlich sichtbare, wählbare F-/L-/CH-Alternativen aus dem ausgelieferten Katalog.
+
+Aktueller PDF-Stresstest: 3 A4-Seiten aus dem Produktionsrenderer, Text mit Umlauten/ß, letzter Prüfhinweis 18 und Regelstand m2-2 nachweislich enthalten; alle Textbegrenzungen innerhalb der Seitenränder. Mit Poppler gerendert, visuell geprüft, normale Meldungsblöcke ungeteilt. Keine native Druckfunktion, kein HTML-/Browserexport. Der Stressbogen ist ausschließlich ein lokales Testartefakt, kein administrativ freigegebener Schulbogen.
+
+Paket-Audit `dotnet list GSM-Kurswahl.sln package --vulnerable --include-transitive --no-restore`: erfolgreich, keine bekannten anfälligen Pakete für alle Projekte laut NuGet.org. `git diff --check`: erfolgreich. Keine Tests auf Schuldomäne/SMB, kein nativer macOS-/Linux-PDF-Sichttest und keine verbindliche Rechtsfreigabe für 2029 behauptet.
+
+## M2 Review-Korrekturen und Abgleich mit AGVO / KOE 2026 (26.10.2026)
+
+- Fachliche und technische Korrekturen nach Abgleich mit `docs/Rechtsgrundlage AGVO BW GymAbiPrV_BW_2018.pdf` (Stand 04.02.2025) und `Kursstufen-Organisationserlass (KOE) 2026` (Stand 05.02.2026):
+  - **Sportbefreiung & Sportersatz (`ChoiceWorkflow`, `AcademicRules`):** Bei teilweiser oder dauerhafter Sportbefreiung ist Sport nicht als mündliches Prüfungsfach wählbar (`AGVO § 21 Abs. 2 Nr. 6`). Jeder zusätzliche Kurs in anderen Basisfächern aus Pflicht- oder Wahlbereich (`CourseType.Bf` oder `CourseType.Elective`) ersetzt Sport; für die Erfüllung sind mindestens 42 Kurse ohne SIA sowie die entsprechende Anzahl zusätzlicher Kurse maßgeblich (`KOE 2026 Kap. 3.4 S. 7`). Einzelhalbjahreskurse (`AGVO-SEMESTERS`) sind nur im Umfang der befreiten Sport-Halbjahre als Sportersatz zulässig.
+  - **Religion / Ethik (`ChoiceWorkflow`, `AcademicRules`, `ChoiceValidator`):** Als mündliches Prüfungsfach ist regulär nur das bereits in Klasse 10 besuchte Fach (`ReligionEthicsGrade10`) wählbar (`AGVO § 21 Abs. 2 Nr. 4/5`, `KOE 2026 Kap. 8.6.3`). Bei einem Wechsel der Belegung gegenüber Klasse 10 sowie bei abweichender Prüfungsplanung wird über `AGVO-RELIGION` bzw. `PLAN-ORAL` explizit auf die erforderliche Überprüfung/Feststellungsprüfung zu Beginn von HJ 1 hingewiesen (bzw. auf den Ausschluss bei Abmeldung Rel -> Ethik nach `KOE 2026 Kap. 3.3`).
+  - **Mindestanrechnung (`AcademicRules.MinimumCredits`):** Auch bei noch unvollständiger Wahl der ersten Naturwissenschaft oder der zweiten Fremdsprache/Naturwissenschaft werden die 12 Pflichtanrechnungskurse dieses Bereichs (`AGVO § 17 Abs. 1`) in der Mindest-Anrechnung berücksichtigt.
+  - **Wahlassistent Schritt 3 (`ChoiceWorkflow.Tasks`):** `INF-BF` bleibt in `PLAN-AREA-BREADTH` auch dann als gewählt (`ChosenOfferIds`) markiert, wenn die erste Naturwissenschaft (`PLAN-AREA-SCIENCE`) noch offen ist; `firstLanguage` und `firstScience` werden konsistent aus den oberen Teilaufgaben bestimmt.
+  - **Oberfläche & Build (`MainWindow`, `StudentSession`, `GsmKurswahl.StudentApp.csproj`):** Hinweistext in Schritt 1 nennt allgemein fortgeführte Fremdsprachen statt nur Englisch; `Prerequisites` zeigt bestätigte Sprachlaufbahnen, Belegungs-/Prüfungsstatus in Religion/Ethik und dauerhafte Sportbefreiung; `appsettings.json`, `profile-trust.json` und `samples/fachangebot-demo.json` werden in das Ausgabeverzeichnis kopiert.
+- Test- und Buildläufe:
+  - Offline-Restore in der Standard-Sandbox (`dotnet restore GSM-Kurswahl.sln --locked-mode -m:1 -p:NuGetAudit=false --disable-build-servers`): alle 13 Projekte erfolgreich wiederhergestellt.
+  - Erster Release-Build (`dotnet build GSM-Kurswahl.sln -c Release --no-restore -m:1 -p:UseSharedCompilation=false --disable-build-servers`): **0 Warnungen, 0 Fehler**.
+  - Erster Testlauf in der Standard-Sandbox scheiterte erneut an blockierter Loopback-IPC von `vstest.console` (Exit-Code 1 ohne Testausführung).
+  - Erster Testlauf außerhalb der Sandbox: **154/155 bestanden, 1 fehlgeschlagen** (`IncompleteBreadthSelectionDoesNotUnderstateMinimumCredits` erwartete 30 statt 32 Kurse, weil GK als mündliches Prüfungsfach 4 statt 2 Pflichtkurse einbringt). Testerwartung auf 32 korrigiert.
+  - Zweiter Release-Build: **0 Warnungen, 0 Fehler**.
+  - Zweiter Testlauf außerhalb der Sandbox (`dotnet test GSM-Kurswahl.sln -c Release --no-build --no-restore --logger trx --results-directory artifacts/test-results/final`): **155/155 Tests bestanden**, keine übersprungen (Domain 8, Rules 57, Storage 44, ImportExport 3, Application 36, StudentApp 7 inklusive Avalonia-Headless-UI-Smoke-Tests).
+  - JSON-Schemaprüfung (`pwsh -NoProfile -File scripts/Test-Schemas.ps1`): `Schema OK` für alle drei Beispieldateien (`samples/schueler-demo.json`, `samples/fachangebot-demo.json`, `samples/profil-demo-unsigned.json`).
+  - `git diff --check`: erfolgreich.
+- Nachtrag (Entfernung „Mündliche Fächer später festlegen“ auf Nutzerwunsch):
+  - `DeferOralButton` (`MainWindow`) und `DeferOralPlanning` (`StudentSession`) entfernt; `ChoiceValidator` verlangt nun stets zwei geplante mündliche Prüfungsfächer (`PLAN-ORAL`, `invalid` bei leerer oder unvollständiger Planung).
+  - Zwei Zwischen-Testläufe in `LanguageChoiceTests` angepasst (Hilfsmethode `Create` wählt in Schritt 2 zwei mündliche Fächer außerhalb der Sprachen/Naturwissenschaften, damit die Sprach-/NW-Aufgaben in Schritt 3 unvorbelastet geprüft werden).
+  - Abschließender Release-Build (**0 Warnungen, 0 Fehler**), gesamte Testsuite (**155/155 Tests bestanden**: Domain 8, Rules 57, Storage 44, ImportExport 3, Application 36, StudentApp 7), JSON-Schemaprüfung und `git diff --check` erfolgreich.
+- Nachtrag (Tooltips für `klären`- und `Fehler`-Badges im Plan):
+  - `PlanRow` um `IssueText` ergänzt; `MainWindow.BuildPlan` setzt den vollständigen Regel- und Abhilfetext (`Rule.Id: Explanation\nRemedy`) als Tooltip sowohl auf das `klären`-/`Fehler`-Badge als auch auf die Planzeile bzw. den Sprung-Button.
+  - Release-Build (**0 Warnungen, 0 Fehler**), gesamte Testsuite (**155/155 Tests bestanden**, inkl. UI-Prüfung auf den Tooltip in `WindowTests`) und `git diff --check` erfolgreich.

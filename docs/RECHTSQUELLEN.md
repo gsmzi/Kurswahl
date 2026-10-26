@@ -53,3 +53,62 @@ Ab m1-2 werden die Metadaten aller bestehenden Regeln unter dem neuen Regelstand
 `PLAN-AREA-*` und `PLAN-MIN-COURSES` geben den bisher als freie Hinweistexte ausgegebenen offenen Wahlen (Kunst/Musik, Religion/Ethik, Naturwissenschaften, 42 Kurse) eine stabile Regel-ID und eine strukturierte Form (`ChoiceWorkflow.Tasks`): Optionen, bereits durch LF erfüllte Fächer, gewählte Angebote, nicht wählbare Angebote mit Begründung. Inhaltlich kommt keine neue Bedingung hinzu, `Validate` ist unverändert und alle Aufgaben haben den Schweregrad needs_review. Deshalb bleibt der Regelstand `m1-2`, und vorhandene Entwürfe bleiben ladbar.
 
 Die Naturwissenschaftsfrage plant zwei Naturwissenschaften, weil das Demoangebot keine zweite bestätigte fortgeführte Fremdsprache kennt; die Fremdsprachen-Alternative bleibt needs_review. Die Religion/Ethik-Frage prüft keine Konfession oder Zustimmung (§6 Nr.9 bleibt M2).
+
+## M2-Regelkatalog (m2-1, 26.10.2026)
+
+Die vorigen Abschnitte dokumentieren den historischen M1-Stand. M2 verwendet Regelversion `m2-1` und ersetzt `M1-COMPLETENESS` durch `M2-RELEASE`. Alle fortgeführten technischen und PLAN-Regeln tragen ebenfalls m2-1. Alte Entwürfe bleiben unverändert und werden bei abweichender Regel-/Angebotsversion geschützt abgewiesen; keine stille Migration.
+
+Amtliche Recherche am 26.10.2026: [AGVO-Gesamtausgabe, letzte Änderung 04.02.2025](https://www.landesrecht-bw.de/bsbw/document/jlr-GymAbiPrVBW2018V2P26/part/X), [Ministerium: Leitfaden Abitur 2028](https://km.baden-wuerttemberg.de/de/service/publikation/did/leitfaden-fuer-die-gymnasiale-oberstufe-2028), [ZSL: Ratgeber Schulsport](https://zsl-bw.de/ZSL%2CLen/startpage/uebergreifendes/ratgeber-schulsport). Die Landesrecht-Gesamtausgabe war im Suchindex zugänglich, beim direkten Öffnen nur als JavaScript-Hinweis. §17 wurde zusätzlich nur in einer historischen Fassung im Index gefunden: **keine Freigabe der Anrechnung für 2029 daraus ableiten**. Volltextabgleich mit den angeforderten AGVO-/KOE-Dateien und Freigabe für 2029 bleiben offen. Implementierte Bedingungen folgen dem ausdrücklich freigegebenen Pflichtenheft; Quellenangaben benennen den noch abzugleichenden Rechtsbezug.
+
+Geltungsbereich aller folgenden Regeln: GSM-Kurswahl, strukturelle Prüfung unter jahrgangsbezogenem Freigabevorbehalt. Version: m2-1. Die Prüfungsoptionen sind Möglichkeiten aus tatsächlich belegten Kursen, keine verbindlichen Prüfungswahlen. Anrechnung wird über Mengen von Fach/Halbjahr getrennt von der Belegungszahl berechnet; Sonderfälle und Schulversuch bleiben needs_review.
+
+| Regel-ID | Prüfung / Quelle | Schweregrad |
+| --- | --- | --- |
+| `M2-RELEASE` | Fehlende jahrgangsbezogene fachliche Freigabe; Pflichtenheft §§6,18 | needs_review |
+| `AGVO-LF` | Drei verschiedene LF, mindestens zwei Kernfächer; §12 / Pflichtenheft §6 Nr.1 | invalid |
+| `AGVO-COURSES` | 12 LF + mindestens 30 weitere Halbjahreskurse; §§12,13 / Pflichtenheft §6 Nr.2 | invalid |
+| `AGVO-REQUIRED` | Pflichtfächer, LF erfüllt BF-Pflicht, GK/GEO mit/ohne Wirtschaft; §13 / Pflichtenheft §§4,6 | invalid |
+| `AGVO-LANGUAGE-SCIENCE` | Eine Sprache und erste NW, dazu zweite Sprache/NW oder berechtigtes INF; §13 / Pflichtenheft §6 Nr.4–6 | invalid |
+| `AGVO-SEMESTERS` | Reguläre Jahrgangsbelegung; Ausnahme bei bestätigtem Sportersatz zur Prüfung; §10 / Pflichtenheft §6 Nr.12 | invalid |
+| `AGVO-RELIGION` | Zustimmungen/Wechsel ungeklärt; BF Ethik nicht wegen fehlender Vorbildung sperren; §§11,21 / Pflichtenheft §6 Nr.9 | needs_review |
+| `AGVO-SPORT` | Befreiung/Umfang, LF-Sport und administrative Ersatzzuordnung; §13 Abs.5 / Pflichtenheft §6 Nr.10 | needs_review |
+| `AGVO-SPORT-REPLACEMENT` | Zusätzlich zu sonstiger Pflichtbelegung benötigte BF-/Wahlfachkurse; SIA ausgeschlossen; §13 Abs.5 / ZSL Ratgeber | invalid |
+| `AGVO-EXAM` | Aus belegten Kursen mindestens eine Zweierkombination mit D/M und drei Aufgabenfeldern; §21 / Pflichtenheft §6 Nr.11 | invalid |
+| `AGVO-CREDIT` | Vorläufige Pflichtanrechnung, 40-Grenze, keine BLL-Pauschalanerkennung; §§17,21 / Pflichtenheft §6 Nr.11 | needs_review |
+| `AGVO-ELECTION` | Wahlphase/Endwahltermin noch nicht freigegeben; §14 / Pflichtenheft §6 Nr.13 | needs_review |
+| `PLAN-HOURS` | Durchschnittliche Wochenstunden, Hinweis bei unter 32; Pflichtenheft §6 | needs_review |
+| `PLAN-AREA-BREADTH` | Zweite bestätigte Sprache als Alternative zur zweiten NW; Pflichtenheft §6 Nr.4–6 | needs_review |
+
+`AcademicRulesTests` deckt Belegungszahl, Kern-LF, Pflichtfächer, Sprachlaufbahn/Italienisch, INF nur als zweite NW, Sportersatz trotz 42 Kursen, SIA-Ausschluss, Sport-LF, Religion/Ethik-Prüfungsfreigabe, Semester, Kombinationen und getrennte Anrechnung ab. Technische Profilablehnungen haben Status profile_invalid und führen über PROFILE-TRUST zur Klärung; Kryptoprüfung ist keine Rechtsregel. Englische Sprachlaufbahn ist weiterhin eine explizite Annahme des synthetischen Demoangebots; weitere Sprachen werden nur aus administrativ signierten Laufbahnbestätigungen berücksichtigt.
+
+| `AGVO-LANGUAGE-REVIEW` | Ungeklärte persönliche Sprachlaufbahn oder INF-Alternative nicht als falsch werten; §13 / Pflichtenheft §6 Nr.4–6 | needs_review |
+
+### Korrektur Sprach-/Naturwissenschaftsplanung (26.10.2026)
+
+`PLAN-AREA-LANGUAGE`: mindestens eine geeignete fortgeführte Fremdsprache für HJ 1–4; Pflichtenheft §6 Nr.3,4,6; Schweregrad needs_review im Assistenten, fehlende Belegung wird fachlich separat invalid. PLAN-AREA-SCIENCE plant nur die erste Naturwissenschaft BIO/CH/PH. PLAN-AREA-BREADTH bietet immer zweite Fremdsprache oder zweite Naturwissenschaft an, unabhängig davon, ob ein signiertes Profil vorliegt. INF bleibt nur zweite NW, Italienisch benötigt zusätzlich die bestätigte Sprachlaufbahn. Englisch, Französisch und Latein sind nach Nutzerbestätigung die regulären Sprachangebote; F/L jeweils LF/BF im Standardkatalog. Die tatsächliche persönliche Laufbahn ist vor Produktivbetrieb administrativ abzugleichen. Keine automatische Festlegung auf Englisch bei fehlendem Sprach-LF.
+
+### Aktualisierung m2-2 (26.10.2026)
+
+Alle Regelmetadaten tragen jetzt m2-2; neu/berichtigend PLAN-AREA-LANGUAGE und die immer sichtbare Alternative PLAN-AREA-BREADTH. F/L im regulären GSM-Sprachkanon nach Nutzerbestätigung. Die erste Sprache wird nicht mehr automatisch auf Englisch festgelegt. `LanguageChoiceTests` prüft fehlende Fremdsprache, F/L oder CH als gleichwertige zweite Belegung, Wechsel CH -> F ohne Verlust der ersten NW, zwei Sprachen ohne NW und zwei NW ohne Sprache.
+
+### Abgleich mit AGVO (Stand 04.02.2025) und KOE 2026 (Stand 05.02.2026) am 26.10.2026
+
+Die vollständige **AGVO** (`docs/Rechtsgrundlage AGVO BW GymAbiPrV_BW_2018.pdf`, Stand 04.02.2025), die **Allgemeinen Hinweise Abitur 2025 (AOE)** sowie der **Kursstufen-Organisationserlass (KOE) 2026** (RP Stuttgart, Stand 05.02.2026) wurden im Volltext geprüft und mit der Regelimplementierung abgeglichen:
+
+- **Sportersatzkurse (`AGVO-SPORT`, `AGVO-SPORT-REPLACEMENT`, `AGVO-SEMESTERS`):**
+  - Rechtsquelle: **AGVO § 13 Abs. 5**, **KOE 2026 Kap. 2.1 (S. 2), Kap. 2.3 (S. 4) und Kap. 3.4 (S. 7)**.
+  - Jeder zusätzliche Kurs in anderen Basisfächern aus dem **Pflicht- oder Wahlbereich** (`CourseType.Bf` und `CourseType.Elective`, z. B. auch Psychologie) kann befreite Sportkurse ersetzen; insgesamt müssen mindestens **42 Kurse ohne Seminarkurs (SIA)** erreicht werden. Der Seminarkurs ist kein Basiskurs im Sinne der AGVO und kann nicht als Sportersatz eingebracht werden (KOE Kap. 3.4 S. 7, Kap. 3.8.1 S. 8).
+  - Ersatzkurse müssen nicht in denselben Halbjahren besucht werden, in denen die Sportbefreiung vorliegt, und dürfen ausnahmsweise als **Einzelhalbjahreskurse** belegt werden (KOE Kap. 2.1 S. 2, Kap. 2.3 S. 4, Kap. 3.4 S. 7). `AGVO-SEMESTERS` erlaubt Einzelhalbjahre daher genau bis zur Anzahl der bestätigten Sportbefreiungs-Halbjahre.
+  - Bei auch nur teilweiser Sportbefreiung entfällt Sport sowohl als Leistungsfach (**AGVO § 12 Abs. 3 Satz 5**) als auch als mündliches Prüfungsfach (**AGVO § 21 Abs. 2 Nr. 6**; in `ChoiceWorkflow.OralCandidates` gesperrt).
+- **Religion und Ethik (`AGVO-RELIGION`, `PLAN-ORAL`):**
+  - Rechtsquelle: **AGVO § 11 Abs. 2–3, § 12 Abs. 3 Satz 4, § 13 Abs. 1 Nr. 7 & Abs. 4, § 21 Abs. 2 Nr. 4–5**, **KOE 2026 Kap. 3.3 (S. 6) und Kap. 8.6.3 (S. 35)**.
+  - Als mündliches Prüfungsfach kann regulär nur das bereits in der Einführungsphase (Klasse 10, zumindest 2. Halbjahr mit Zeugnisnote) besuchte Fach (`ReligionEthicsGrade10`) gewählt werden.
+  - Wechselt eine Schülerin oder ein Schüler gegenüber Klasse 10 das Fach in der Kursstufe oder plant ein in Klasse 10 nicht besuchtes Fach (`ETH`, `ER`, `KR`) als mündliches Prüfungsfach, weist `AGVO-RELIGION` bzw. `PLAN-ORAL` explizit darauf hin, dass für eine mündliche Prüfung eine **Überprüfung/Feststellungsprüfung zu Beginn des 1. Schulhalbjahres** erforderlich ist (bzw. bei Abmeldung von Religionslehre zu Ethik in der Kursstufe nach KOE Kap. 3.3 weder Religionslehre noch Ethik als mündliches Prüfungsfach gewählt werden kann).
+- **Gemeinschaftskunde, Geographie und Wirtschaft (`AGVO-REQUIRED`, `AGVO-EXAM`, `AGVO-CREDIT`):**
+  - Rechtsquelle: **AGVO § 10 Abs. 3–4, § 13 Abs. 1 Nr. 6 & Abs. 2 Satz 3, § 17 Abs. 1 Nr. 2 g & Nr. 3, § 21 Abs. 2 Nr. 2**, **KOE 2026 Kap. 3.2 (S. 5–6) und Kap. 8.6.2 (S. 34–35)** sowie **AOE 2025 Ziff. 4.19–4.20 (S. 23)**.
+  - Die frühere Kombinationsprüfung GEO/GK ist entfallen. Bei LF Wirtschaft ist in GK und GEO jeweils nur der zuerst unterrichtete Pflichtkurs (am GSM: GK HJ 1, GEO HJ 3) beleg- und anrechnungspflichtig; für die mündliche Prüfung in GK genügen dieser Pflichtkurs und die beiden Wahlkurse (HJ 1, 3, 4 = 3 anzurechnende Kurse).
+- **Informatik und Naturwissenschaften (`AGVO-LANGUAGE-SCIENCE`, `CATALOG-INF`):**
+  - Rechtsquelle: **AGVO § 13 Abs. 1, § 21 Abs. 2 Nr. 7**, **KOE 2026 Kap. 3.6–3.7 (S. 8)**.
+  - Bestätigt: Das 3-stündige Basisfach Informatik im Schulversuch ersetzt die 2. Naturwissenschaft auch dann, wenn die 1. Naturwissenschaft nur als Basisfach belegt ist; für die mündliche Prüfung in Informatik genügt Brückenkurs Kl. 10 oder IMP Kl. 8–10 in Verbindung mit 4 Halbjahren BF Informatik.
+- **Vorbehalt für Abitur 2029 (`M2-RELEASE`):**
+  - Da KOE 2026 formell für das Abitur 2026 gilt, bleibt der jahrgangsbezogene Freigabevorbehalt (`M2-RELEASE`, `needs_review`) für den ersten Einsatzjahrgang 2029 bestehen.

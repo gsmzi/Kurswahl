@@ -14,7 +14,7 @@ public sealed record StudentSettings(int SchemaVersion, string HomeDirectory, st
             ?? throw new JsonException("Leere Anwendungskonfiguration.");
         if (settings.SchemaVersion != 1 || string.IsNullOrWhiteSpace(settings.DemoStudentId)
             || !settings.DemoStudentId.StartsWith("demo-", StringComparison.Ordinal))
-            throw new ArgumentException("M1 benötigt Schema 1 und eine synthetische demo-Schüler-ID.");
+            throw new ArgumentException("Der Demonstrator benötigt Schema 1 und eine synthetische demo-Schüler-ID.");
         return settings;
     }
 
@@ -45,8 +45,13 @@ public sealed record StudentSettings(int SchemaVersion, string HomeDirectory, st
     public string ResolveCatalogPath(string settingsFile) => Path.GetFullPath(CatalogPath, Path.GetDirectoryName(Path.GetFullPath(settingsFile))!);
 }
 
-// OS account is informative only. School account/profile binding is deliberately not claimed in M1.
+// OS identity alone grants nothing; SignedProfileReader verifies it against signed administrative binding.
 public sealed class OperatingSystemIdentityProvider : ICurrentIdentityProvider
 {
-    public CurrentIdentity GetCurrent() => new(Environment.UserDomainName + "\\" + Environment.UserName, null);
+    public CurrentIdentity GetCurrent()
+    {
+        if (!OperatingSystem.IsWindows()) return new(Environment.UserName, null);
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        return new(identity.Name, identity.User?.Value);
+    }
 }

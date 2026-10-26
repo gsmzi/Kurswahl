@@ -21,7 +21,7 @@ public static class TestData
         new(id, subject, type, CourseVariant.Normal, OfferStatus.Offered,
             [new(1, 3), new(2, 3), new(3, 3), new(4, 3)], []);
     public static OfferCatalog Catalog => new(1, "demo-2029-v1", 2029, true, [new("D", "Deutsch")], [Offer()]);
-    public static CourseChoice Choice => new(2, Guid.NewGuid(), "demo-001", 2029, "demo-2029-v1", "m1-2",
+    public static CourseChoice Choice => new(2, Guid.NewGuid(), "demo-001", 2029, "demo-2029-v1", "m2-2",
         1, DateTimeOffset.Parse("2026-10-25T12:00:00Z"), DateTimeOffset.Parse("2026-10-25T12:00:00Z"),
         SubmissionStatus.Draft, ElectionPhase.Preliminary, [], []);
     public static CourseSelection Select(CourseOffer offer) => new(offer.Id, offer.SubjectId, offer.Type,

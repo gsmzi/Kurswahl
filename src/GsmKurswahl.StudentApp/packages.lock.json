@@ -180,6 +180,14 @@
       "gsmkurswahl.domain": {
         "type": "Project"
       },
+      "gsmkurswahl.importexport": {
+        "type": "Project",
+        "dependencies": {
+          "GsmKurswahl.Domain": "[1.0.0, )",
+          "SkiaSharp": "[2.88.9, )",
+          "SkiaSharp.NativeAssets.Linux": "[2.88.9, )"
+        }
+      },
       "gsmkurswahl.rules": {
         "type": "Project",
         "dependencies": {

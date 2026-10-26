@@ -7,10 +7,10 @@ public sealed record Availability(bool CanSelect, ReviewStatus Status, string Ex
 
 public sealed class ChoiceValidator
 {
-    public const string Version = "m1-2";
+    public const string Version = "m2-2";
     public static readonly ImmutableArray<RuleDefinition> Definitions =
     [
-        new("M1-COMPLETENESS", "Unvollständige fachliche Prüfung", "Pflichtenheft §§6,17 (M2)", "Alle M1-Wahlen", Version, ReviewStatus.NeedsReview),
+        .. AcademicRules.Definitions,
         new("PROFILE-TRUST", "Vertrauenswürdiges Einzelprofil fehlt", "Pflichtenheft §5a", "Alle Schülerwahlen", Version, ReviewStatus.NeedsReview),
         new("OFFER-VERSION", "Jahrgang und Angebots-/Regelversion", "Pflichtenheft §§4,8", "Alle Wahlen", Version, ReviewStatus.Invalid),
         new("OFFER-SELECTION", "Angebot, Variante und Halbjahre", "Pflichtenheft §§4,8", "Jede Belegung", Version, ReviewStatus.Invalid),
@@ -28,7 +28,11 @@ public sealed class ChoiceValidator
             return new(false, ReviewStatus.Invalid, $"{violation.Rule.Id}: {violation.Explanation} Bitte an die Oberstufenberatung wenden.");
         if (offer.Status is not (OfferStatus.Offered or OfferStatus.Established))
             return new(false, ReviewStatus.Invalid, "Dieses Angebot ist geplant oder nicht zustande gekommen und nicht freigegeben.");
-        if (offer.Requirements.IsEmpty) return new(true, ReviewStatus.NeedsReview, "Vorläufig wählbar; vollständige Rechtsprüfung folgt in M2.");
+        if (offer.SubjectId == "SP" && offer.Type == CourseType.Lf
+            && (profile.Status != ProfileStatus.Verified || profile.Prerequisites.PermanentSportExemption != Knowledge.No
+                || profile.Prerequisites.SportExemptSemesters is not { Length: 0 }))
+            return new(false, ReviewStatus.NeedsReview, "LF Sport erfordert bestätigte Auskunft ohne dauerhafte oder teilweise Befreiung; Sonderfall mit Oberstufenberatung klären.");
+        if (offer.Requirements.IsEmpty) return new(true, ReviewStatus.NeedsReview, "Vorläufig wählbar; fachliche Freigabe für den Jahrgang steht aus.");
         if (profile.Status != ProfileStatus.Verified)
             return new(false, ReviewStatus.NeedsReview, "Persönliche Voraussetzung ungeprüft. Bitte an die Oberstufenberatung wenden.");
         var states = offer.Requirements.Select(r => r switch
@@ -50,9 +54,9 @@ public sealed class ChoiceValidator
         var messages = ImmutableArray.CreateBuilder<RuleMessage>();
         void Add(string id, string explanation, string remedy, string? subject = null, ImmutableArray<int> semesters = default) =>
             messages.Add(new(Definitions.Single(d => d.Id == id), subject is null ? [] : [subject], semesters.IsDefault ? [] : semesters, explanation, remedy));
-        Add("M1-COMPLETENESS", "Fachlich zu klären (needs_review): M1 prüft noch keine vollständige AGVO-Belegung oder Prüfungsfachkombination.", "Nur als Entwurf verwenden; Regelprüfung in M2 und schulische Freigabe abwarten.");
+        messages.AddRange(AcademicRules.Check(choice, catalog, profile));
         if (profile.Status != ProfileStatus.Verified)
-            Add("PROFILE-TRUST", "Kein verifiziertes persönliches Profil; Profilstatus: " + profile.Status, "Oberstufenberatung kontaktieren. M1 arbeitet ausschließlich mit synthetischen Entwürfen.");
+            Add("PROFILE-TRUST", "Kein verifiziertes persönliches Profil; Profilstatus: " + profile.Status, "Oberstufenberatung kontaktieren. Entwurf bleibt vorläufig.");
         if (choice.GraduationYear != catalog.GraduationYear || choice.OfferVersion != catalog.Version || choice.RuleVersion != Version)
             Add("OFFER-VERSION", "Jahrgang, Angebotsversion oder Regelversion weicht ab.", "Vorhandenen Entwurf erhalten und Version durch Oberstufenberatung klären lassen.");
         foreach (var selection in choice.Selections)
@@ -75,13 +79,20 @@ public sealed class ChoiceValidator
                     availability.Explanation, "Angebot/Vorbildung mit der Oberstufenberatung klären.", selection.SubjectId, selection.Semesters);
         }
         var oralCandidates = ChoiceWorkflow.OralCandidates(choice, catalog, profile);
-        if (!choice.PlannedOralSubjects.IsEmpty && (choice.PlannedOralSubjects.Any(s => !oralCandidates.Contains(s))
-            || (choice.PlannedOralSubjects.Length == 2 && ChoiceWorkflow.OralError(choice, catalog, profile) is not null)))
+        if (choice.PlannedOralSubjects.Length != 2 || choice.PlannedOralSubjects.Any(s => !oralCandidates.Contains(s))
+            || ChoiceWorkflow.OralError(choice, catalog, profile) is not null)
+        {
+            var switchedRelOral = choice.PlannedOralSubjects.FirstOrDefault(s => s is "ETH" or "ER" or "KR"
+                && profile.Status == ProfileStatus.Verified && profile.Prerequisites.ReligionEthicsGrade10 is { } g10 && g10 != s
+                && profile.Prerequisites.ReligionEthicsExamPermission != Knowledge.Yes);
+            var explanation = switchedRelOral is not null
+                ? $"{switchedRelOral} wurde in Klasse 10 nicht besucht ({profile.Prerequisites.ReligionEthicsGrade10}): Mündliche Prüfung erfordert eine Überprüfung/Feststellungsprüfung zu Beginn des 1. Schulhalbjahres (AGVO § 21 Abs. 2 Nr. 4/5; bei Abmeldung Rel -> Ethik nach KOE Kap. 3.3 keine mündliche Prüfung möglich)."
+                : ChoiceWorkflow.OralError(choice, catalog, profile) ?? "Mündliche Prüfungsplanung passt nicht zu LF, Angebot oder persönlichen Voraussetzungen.";
             messages.Add(new(Definitions.Single(d => d.Id == "PLAN-ORAL"), choice.PlannedOralSubjects, [],
-                ChoiceWorkflow.OralError(choice, catalog, profile) ?? "Mündliche Prüfungsplanung passt nicht zu LF oder Angebot.",
-                "Zwei zulässige Basisfächer für die mündliche Prüfung planen."));
+                explanation, "Zwei zulässige Basisfächer für die mündliche Prüfung planen oder Feststellungsprüfung mit der Oberstufenberatung klären."));
+        }
         foreach (var duplicate in choice.Selections.GroupBy(s => s.SubjectId).Where(g => g.Count() > 1))
-            Add("SUBJECT-DUPLICATE", "Dasselbe Fach wurde mehrfach als Kursart oder Variante gewählt.", "Eine eindeutige Fachbelegung wählen; Sonderfälle sind in M1 nicht freigegeben.", duplicate.Key);
+            Add("SUBJECT-DUPLICATE", "Dasselbe Fach wurde mehrfach als Kursart oder Variante gewählt.", "Eine eindeutige Fachbelegung wählen; Sonderfälle administrativ klären.", duplicate.Key);
         return new(messages.Any(m => m.Rule.Severity == ReviewStatus.Invalid) ? ReviewStatus.Invalid : ReviewStatus.NeedsReview, messages.ToImmutable());
     }
 

@@ -6,7 +6,7 @@ namespace GsmKurswahl.Application;
 
 // One line of the permanent plan overview. OpenTaskId/missing rows are placeholders, never selections.
 public sealed record PlanRow(string Label, string? OfferId, CourseType? Type, CourseVariant Variant,
-    ImmutableArray<int> Semesters, bool IsAutomatic, bool IsOral, ReviewStatus? Issue, bool IsOpen, int Step);
+    ImmutableArray<int> Semesters, bool IsAutomatic, bool IsOral, ReviewStatus? Issue, bool IsOpen, int Step, string? IssueText = null);
 
 // Read-only view of one personal prerequisite. Values come only from the trusted profile, never from the choice file.
 public sealed record PrerequisiteInfo(string Id, string Label, string Value, string Effect, bool IsVerified);
@@ -17,8 +17,7 @@ public sealed class StudentSession
     private readonly ChoiceValidator validator = new();
     private string? contentToken;
     public OfferCatalog Catalog { get; }
-    // M1 has no signed profile (Pflichtenheft §5a, M2); every prerequisite therefore stays unverified.
-    public ProfileContext Profile { get; } = ProfileContext.Missing;
+    public ProfileContext Profile { get; }
     public CourseChoice Choice { get; private set; }
     public bool IsDirty { get; private set; }
     public bool IsBusy { get; private set; }
@@ -37,13 +36,14 @@ public sealed class StudentSession
     public ImmutableArray<string> PlanningNotes => ChoiceWorkflow.Remaining(Choice, Catalog, Profile);
     public ImmutableArray<ChoiceTask> Tasks => ChoiceWorkflow.Tasks(Choice, Catalog, Profile);
     public int CountedCourses => ChoiceWorkflow.CountedCourses(Choice);
+    public ImmutableArray<ExamOption> ExamOptions => AcademicRules.ExamOptions(Choice, Catalog, Profile);
     public string AutomaticMessage { get; private set; } = "";
 
     public string ProfileStatusText => Profile.Status switch
     {
-        ProfileStatus.Verified => "Profil geprüft – vollständige Rechtsprüfung steht aus.",
-        ProfileStatus.ProfileInvalid => "Profil ungültig (profile_invalid) – bitte an die Oberstufenberatung wenden.",
-        _ => "Kein geprüftes persönliches Profil – alle Angaben ungeprüft (needs_review). Die Profilprüfung folgt in M2."
+        ProfileStatus.Verified => $"Profil geprüft · Revision {Profile.Revision} · Stand {Profile.IssuedAt:dd.MM.yyyy HH:mm} · {Profile.Detail}",
+        ProfileStatus.ProfileInvalid => "Profil ungültig (profile_invalid) – bitte an die Oberstufenberatung wenden. " + Profile.Detail,
+        _ => "Kein geprüftes persönliches Profil – alle Angaben ungeprüft (needs_review). " + Profile.Detail
     };
 
     public ImmutableArray<PrerequisiteInfo> Prerequisites
@@ -64,12 +64,16 @@ public sealed class StudentSession
             [
                 new("INF", "Informatik: Brückenkurs Klasse 10 / IMP",
                     $"{Value(p.InformaticsBridge)} / {Value(p.InformaticsImp)}", Offers(Requirement.Informatics, "Im Angebot nicht vorhanden."), verified),
-                new("I", "Italienisch als dritte Fremdsprache (Profil)", Value(p.ItalianProfile), Offers(Requirement.ItalianProfile, "Im Angebot nicht vorhanden."), verified),
+                new("I", "Italienisch als dritte Fremdsprache (Profil)",
+                    verified ? $"{Value(p.ItalianProfile)}" + (p.ContinuedLanguages.IsEmpty ? "" : $" · bestätigte Sprachlaufbahn: {string.Join(", ", p.ContinuedLanguages)}") : "ungeprüft",
+                    Offers(Requirement.ItalianProfile, "Im Angebot nicht vorhanden."), verified),
                 new("BILI", "Durchgängig bilingualer Bildungsgang", Value(p.ContinuousBilingual), Offers(Requirement.ContinuousBilingual, "Im Angebot nicht vorhanden."), verified),
-                new("REL", "Religion/Ethik in Klasse 10", verified && p.ReligionEthicsGrade10 is { } subject ? SubjectName(subject) : "ungeprüft",
-                    "Betrifft vor allem die mündliche Prüfung in Religion/Ethik; die Basisfachwahl wird nicht pauschal gesperrt.", verified),
-                new("SP", "Sportbefreiung", verified && p.SportExemptSemesters is { } semesters ? (semesters.IsEmpty ? "keine" : "HJ " + string.Join(", ", semesters)) : "ungeprüft",
-                    "Bei Befreiung sind Ersatzkurse nötig; Prüfung durch die Oberstufenberatung.", verified)
+                new("REL", "Religion/Ethik in Klasse 10",
+                    verified && p.ReligionEthicsGrade10 is { } subject ? $"{SubjectName(subject)} (Belegung/Prüfung: {Value(p.ReligionEthicsPermission)} / {Value(p.ReligionEthicsExamPermission)})" : "ungeprüft",
+                    "Betrifft vor allem die mündliche Prüfung in Religion/Ethik (bei Wechsel Feststellungsprüfung nötig); die Basisfachwahl wird nicht pauschal gesperrt.", verified),
+                new("SP", "Sportbefreiung",
+                    verified && p.SportExemptSemesters is { } semesters ? (semesters.IsEmpty ? "keine" : "HJ " + string.Join(", ", semesters)) + $" (dauerhaft: {Value(p.PermanentSportExemption)})" : "ungeprüft",
+                    "Bei Befreiung sind Ersatzkurse nötig und Sport entfällt als LF/mündliches Prüfungsfach; Prüfung durch die Oberstufenberatung.", verified)
             ];
         }
     }
@@ -94,13 +98,13 @@ public sealed class StudentSession
         var selection = Choice.Selections.FirstOrDefault(s => s.OfferId == offerId);
         if (selection is null) return [];
         if (selection.Type == CourseType.Lf) return selection.Semesters;
-        var locked = ChoiceWorkflow.Required(Choice).Where(r => r.SubjectId == selection.SubjectId).SelectMany(r => r.Semesters);
+        var locked = ChoiceWorkflow.Required(Choice, Profile).Where(r => r.SubjectId == selection.SubjectId).SelectMany(r => r.Semesters);
         var task = Tasks.FirstOrDefault(t => t.ChosenOfferIds.Contains(offerId));
         if (task is not null) locked = locked.Concat(task.Semesters);
         return [.. locked.Distinct().Order()];
     }
 
-    public bool IsRequiredSubject(string subjectId) => ChoiceWorkflow.Required(Choice).Any(r => r.SubjectId == subjectId);
+    public bool IsRequiredSubject(string subjectId) => ChoiceWorkflow.Required(Choice, Profile).Any(r => r.SubjectId == subjectId);
 
     public ImmutableArray<CourseOffer> LfOffers => [.. Catalog.Offers.Where(o => o.Type == CourseType.Lf && Availability(o).CanSelect)];
 
@@ -139,24 +143,31 @@ public sealed class StudentSession
         get
         {
             var tasks = Tasks;
-            var required = ChoiceWorkflow.Required(Choice);
+            var required = ChoiceWorkflow.Required(Choice, Profile);
             var messages = Validation.Messages;
-            ReviewStatus? Issue(string subject)
+            (ReviewStatus? Status, string? Text) Issue(string subject)
             {
                 var relevant = messages.Where(m => m.SubjectIds.Contains(subject)).ToArray();
-                return relevant.Any(m => m.Rule.Severity == ReviewStatus.Invalid) ? ReviewStatus.Invalid
-                    : relevant.Length > 0 ? ReviewStatus.NeedsReview : null;
+                var status = relevant.Any(m => m.Rule.Severity == ReviewStatus.Invalid) ? ReviewStatus.Invalid
+                    : relevant.Length > 0 ? ReviewStatus.NeedsReview : (ReviewStatus?)null;
+                var text = relevant.Length == 0 ? null : string.Join("\n\n", relevant.Select(m => $"{m.Rule.Id}: {m.Explanation}\n{m.Remedy}"));
+                return (status, text);
             }
             int Order(CourseSelection s) => s.Type == CourseType.Lf ? 0
                 : required.Any(r => r.SubjectId == s.SubjectId) ? 1 : tasks.Any(t => t.ChosenOfferIds.Contains(s.OfferId)) ? 2 : 3;
             var rows = Choice.Selections.OrderBy(Order).ThenBy(s => Catalog.Offers.ToList().FindIndex(o => o.Id == s.OfferId))
-                .Select(s => new PlanRow(SubjectName(s.SubjectId), s.OfferId, s.Type, s.Variant, s.Semesters,
-                    Order(s) == 1, Choice.PlannedOralSubjects.Contains(s.SubjectId), Issue(s.SubjectId), false,
-                    Order(s) switch { 0 => 1, 3 => 4, _ => 3 })).ToList();
+                .Select(s =>
+                {
+                    var issue = Issue(s.SubjectId);
+                    return new PlanRow(SubjectName(s.SubjectId), s.OfferId, s.Type, s.Variant, s.Semesters,
+                        Order(s) == 1, Choice.PlannedOralSubjects.Contains(s.SubjectId), issue.Status, false,
+                        Order(s) switch { 0 => 1, 3 => 4, _ => 3 }, issue.Text);
+                }).ToList();
             if (Step >= 3)
                 rows.AddRange(required.Where(r => !Choice.Selections.Any(s => s.SubjectId == r.SubjectId))
-                    .Select(r => new PlanRow(SubjectName(r.SubjectId) + " – Angebot klären", null, null, CourseVariant.Normal, r.Semesters, true, false, ReviewStatus.NeedsReview, true, 3)));
-            rows.AddRange(tasks.Where(t => !t.IsSatisfied).Select(t => new PlanRow(t.Title, null, null, CourseVariant.Normal, t.Semesters, false, false, null, true, 3)));
+                    .Select(r => new PlanRow(SubjectName(r.SubjectId) + " – Angebot klären", null, null, CourseVariant.Normal, r.Semesters, true, false, ReviewStatus.NeedsReview, true, 3,
+                        $"PLAN-REQUIRED: {SubjectName(r.SubjectId)} benötigt HJ {string.Join(", ", r.Semesters)}; kein eindeutiges verfügbares BF im Angebot.")));
+            rows.AddRange(tasks.Where(t => !t.IsSatisfied).Select(t => new PlanRow(t.Title, null, null, CourseVariant.Normal, t.Semesters, false, false, null, true, 3, t.Hint)));
             return [.. rows];
         }
     }
@@ -202,7 +213,7 @@ public sealed class StudentSession
     {
         var selections = Choice.Selections;
         var notes = new List<string>();
-        foreach (var required in ChoiceWorkflow.Required(Choice))
+        foreach (var required in ChoiceWorkflow.Required(Choice, Profile))
         {
             var existing = selections.FirstOrDefault(s => s.SubjectId == required.SubjectId);
             var offers = Catalog.Offers.Where(o => o.SubjectId == required.SubjectId && o.Type == CourseType.Bf
@@ -223,12 +234,13 @@ public sealed class StudentSession
         AutomaticMessage = string.Join("\n", notes);
     }
 
-    public StudentSession(OfferCatalog catalog, string demoStudentId, IChoiceStore store)
+    public StudentSession(OfferCatalog catalog, string demoStudentId, IChoiceStore store, ProfileContext? profile = null)
     {
         ModelGuard.Catalog(catalog);
         if (!catalog.IsDemo || !demoStudentId.StartsWith("demo-", StringComparison.Ordinal))
-            throw new ArgumentException("M1 unterstützt nur ausdrücklich synthetische Demoangebote und demo-Schüler-IDs.");
+            throw new ArgumentException("Der Demonstrator unterstützt nur ausdrücklich synthetische Demoangebote und demo-Schüler-IDs.");
         Catalog = catalog;
+        Profile = profile ?? ProfileContext.Missing;
         this.store = store;
         var now = DateTimeOffset.UtcNow;
         Choice = new(2, Guid.NewGuid(), demoStudentId, catalog.GraduationYear, catalog.Version, ChoiceValidator.Version,
@@ -292,7 +304,7 @@ public sealed class StudentSession
                 if (candidate.StudentId != Choice.StudentId || candidate.GraduationYear != Catalog.GraduationYear
                     || candidate.OfferVersion != Catalog.Version || candidate.RuleVersion != ChoiceValidator.Version
                     || candidate.SubmissionStatus != SubmissionStatus.Draft || candidate.Phase != ElectionPhase.Preliminary)
-                    throw new InvalidOperationException("Datei gehört zu anderer Demo-ID, anderem Jahrgang/Versionsstand oder ist kein M1-Vorwahlentwurf. Bestand bleibt erhalten.");
+                    throw new InvalidOperationException("Datei gehört zu anderer Demo-ID, anderem Jahrgang/Versionsstand oder ist kein unterstützter Vorwahlentwurf. Bestand bleibt erhalten.");
                 // Preserve even now-invalid selections; never silently discard unknown or restricted offers.
                 Choice = candidate;
                 Step = 1;

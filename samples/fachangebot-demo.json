@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "demo-2029-v1",
+  "version": "demo-2029-v3",
   "graduationYear": 2029,
   "isDemo": true,
   "subjects": [
@@ -83,6 +83,14 @@
     {
       "name": "Schüler-Ingenieur-Akademie",
       "id": "SIA"
+    },
+    {
+      "id": "F",
+      "name": "Französisch"
+    },
+    {
+      "id": "L",
+      "name": "Latein"
     }
   ],
   "offers": [
@@ -685,7 +693,7 @@
       "subjectId": "GK",
       "type": "lf",
       "variant": "normal",
-      "status": "planned",
+      "status": "offered",
       "schedule": [
         {
           "weeklyHours": 5,
@@ -711,7 +719,7 @@
       "subjectId": "GEO",
       "type": "lf",
       "variant": "normal",
-      "status": "planned",
+      "status": "offered",
       "schedule": [
         {
           "weeklyHours": 5,
@@ -737,7 +745,7 @@
       "subjectId": "W",
       "type": "lf",
       "variant": "normal",
-      "status": "planned",
+      "status": "offered",
       "schedule": [
         {
           "weeklyHours": 5,
@@ -763,7 +771,7 @@
       "subjectId": "SP",
       "type": "lf",
       "variant": "normal",
-      "status": "planned",
+      "status": "offered",
       "schedule": [
         {
           "weeklyHours": 5,
@@ -872,6 +880,188 @@
         {
           "weeklyHours": 3,
           "semester": 2
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "G-LF",
+      "subjectId": "G",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "semester": 1,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 2,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 3,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 4,
+          "weeklyHours": 5
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "BK-LF",
+      "subjectId": "BK",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "semester": 1,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 2,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 3,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 4,
+          "weeklyHours": 5
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "MU-LF",
+      "subjectId": "MU",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "semester": 1,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 2,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 3,
+          "weeklyHours": 5
+        },
+        {
+          "semester": 4,
+          "weeklyHours": 5
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "F-BF",
+      "subjectId": "F",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "F-LF",
+      "subjectId": "F",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "L-BF",
+      "subjectId": "L",
+      "type": "bf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 3,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 3,
+          "semester": 4
+        }
+      ],
+      "requirements": []
+    },
+    {
+      "id": "L-LF",
+      "subjectId": "L",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "weeklyHours": 5,
+          "semester": 1
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 2
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 3
+        },
+        {
+          "weeklyHours": 5,
+          "semester": 4
         }
       ],
       "requirements": []

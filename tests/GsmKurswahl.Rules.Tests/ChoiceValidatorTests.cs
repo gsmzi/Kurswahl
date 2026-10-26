@@ -6,7 +6,7 @@ namespace GsmKurswahl.Rules.Tests;
 public class ChoiceValidatorTests
 {
     private readonly ChoiceValidator validator = new();
-    [Fact] public void EvenEmptyDraftCannotBecomeGreen() => Assert.Equal(ReviewStatus.NeedsReview,
+    [Fact] public void EvenEmptyDraftCannotBecomeGreen() => Assert.Equal(ReviewStatus.Invalid,
         validator.Validate(TestData.Choice, TestData.Catalog, ProfileContext.Missing).Status);
     [Fact] public void UnverifiedYesDoesNotGrantPermission()
     {
@@ -111,7 +111,7 @@ public class ChoiceValidatorTests
     {
         var offer = TestData.Offer() with { Requirements = [Requirement.Informatics] };
         var result = validator.Validate(TestData.Choice with { Selections = [TestData.Select(offer)] }, TestData.Catalog with { Offers = [offer] }, ProfileContext.Missing);
-        Assert.Equal(ReviewStatus.NeedsReview, result.Status);
+        Assert.Equal(ReviewStatus.Invalid, result.Status);
         Assert.Contains(result.Messages, m => m.Rule.Id == "PROFILE-TRUST");
         Assert.Contains(result.Messages, m => m.Rule.Id == "PREREQUISITE-UNKNOWN" && m.SubjectIds.Contains("D"));
     }
@@ -123,7 +123,7 @@ public class ChoiceValidatorTests
         Assert.Equal(ReviewStatus.Invalid, result.Status);
         Assert.Contains(result.Messages, m => m.Rule.Id == "PREREQUISITE-NO");
         Assert.DoesNotContain(result.Messages, m => m.Rule.Id == "PROFILE-TRUST");
-        Assert.Contains(result.Messages, m => m.Rule.Id == "M1-COMPLETENESS");
+        Assert.Contains(result.Messages, m => m.Rule.Id == "M2-RELEASE");
     }
     [Fact] public void ValidateReportsCancelledOfferAsInvalid()
     {

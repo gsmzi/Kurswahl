@@ -34,17 +34,31 @@ public sealed record PriorEducation(Knowledge ItalianProfile, Knowledge Informat
     Knowledge InformaticsImp, Knowledge ContinuousBilingual, string? ReligionEthicsGrade10,
     ImmutableArray<int>? SportExemptSemesters)
 {
+    // Administrative confirmations, never inferred from a student choice or language name.
+    public ImmutableArray<string> ContinuedLanguages { get; init; } = [];
+    public Knowledge ReligionEthicsPermission { get; init; } = Knowledge.Unknown;
+    public Knowledge ReligionEthicsExamPermission { get; init; } = Knowledge.Unknown;
+    public Knowledge PermanentSportExemption { get; init; } = Knowledge.Unknown;
     public static PriorEducation Unknown { get; } = new(Knowledge.Unknown, Knowledge.Unknown,
         Knowledge.Unknown, Knowledge.Unknown, null, null);
 }
 
 // Model for M2; signature verification and account binding must precede use as trusted evidence.
 public sealed record StudentProfile(int SchemaVersion, int ProfileRevision, string StudentId,
-    string WindowsUsername, int GraduationYear, DateTimeOffset IssuedAt, string KeyId, PriorEducation Prerequisites);
+    string WindowsUsername, int GraduationYear, DateTimeOffset IssuedAt, string KeyId, PriorEducation Prerequisites,
+    string AccountId);
 public sealed record ProfileContext(ProfileStatus Status, PriorEducation Prerequisites)
 {
+    public int? Revision { get; init; }
+    public DateTimeOffset? IssuedAt { get; init; }
+    public string Detail { get; init; } = "";
     public static ProfileContext Missing { get; } = new(ProfileStatus.Missing, PriorEducation.Unknown);
 }
+public sealed record ProfileSignature(int SchemaVersion, string KeyId, string Algorithm, string Signature);
+// Installed by school administration in the protected application directory, never in a pupil home.
+public sealed record TrustedProfileKey(string KeyId, string SubjectPublicKeyInfo);
+public sealed record ProfileTrust(int SchemaVersion, ImmutableArray<TrustedProfileKey> Keys,
+    ImmutableArray<string> AllowedAccountDomains);
 public sealed record CurrentIdentity(string Username, string? AccountId);
 public interface ICurrentIdentityProvider { CurrentIdentity GetCurrent(); }
 
@@ -54,6 +68,7 @@ public sealed record RuleMessage(RuleDefinition Rule, ImmutableArray<string> Sub
     ImmutableArray<int> Semesters, string Explanation, string Remedy);
 public sealed record ValidationResult(ReviewStatus Status, ImmutableArray<RuleMessage> Messages);
 public sealed record SemesterSummary(int Semester, int CourseCount, int WeeklyHours);
+public sealed record ExamOption(string First, string Second, int MinimumCredits, ReviewStatus Status, string Note);
 
 // Protected teacher storage in M3: these are separate from CourseChoice and never written to pupil homes.
 public sealed record ImportOrigin(string SourceId, string ContentHash, string MappingVersion,

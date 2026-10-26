@@ -43,7 +43,7 @@ public sealed class MainWindow : Window
     public MainWindow(StudentSession session, string filePath, string account)
     {
         this.session = session;
-        Title = "GSM-Kurswahl | Schülerprogramm · M1 Demo";
+        Title = "GSM-Kurswahl | Schülerprogramm · M2 Demo";
         Width = 1440; Height = 900; MinWidth = 900; MinHeight = 600;
         WindowState = WindowState.Maximized;
         Background = Page;
@@ -56,7 +56,7 @@ public sealed class MainWindow : Window
         var badge = Pill("Vorläufig · needs_review · nicht eingereicht", WarnSoft, Warn);
         badge.VerticalAlignment = VerticalAlignment.Center;
         badge.Margin = new Thickness(12, 4, 0, 4);
-        ToolTip.SetTip(badge, "Kein signiertes Profil, keine verbindliche Abgabe in M1. Demoangebot: Schulische Freigabe und "
+        ToolTip.SetTip(badge, "Keine verbindliche Abgabe; Profilstatus siehe Fußzeile. Demoangebot: Schulische Freigabe und "
             + "vollständige Rechtsprüfung stehen aus. Eingeschränkte Fächer erfordern ein geprüftes Profil.");
         titleLine.Children.Add(badge);
         title.Children.Add(titleLine);
@@ -209,7 +209,7 @@ public sealed class MainWindow : Window
 
     private Control LfStep()
     {
-        var panel = Step("Wähle drei Leistungsfächer", "Mindestens zwei davon aus Deutsch, Mathematik, Englisch oder einer Naturwissenschaft. Leistungsfächer laufen immer über HJ 1–4.");
+        var panel = Step("Wähle drei Leistungsfächer", "Mindestens zwei davon aus Deutsch, Mathematik, einer fortgeführten Fremdsprache oder einer Naturwissenschaft. Leistungsfächer laufen immer über HJ 1–4.");
         var chosen = session.Choice.Selections.Where(s => s.Type == CourseType.Lf).ToArray();
         panel.Children.Add(Text(chosen.Length < 3 ? $"{chosen.Length} von 3 gewählt – noch {3 - chosen.Length}" : $"{chosen.Length} von 3 gewählt", 15, FontWeight.SemiBold));
         if (chosen.Length >= 3 && session.StepError is { } stepError) panel.Children.Add(Notice(stepError, WarnSoft, Warn));
@@ -269,7 +269,7 @@ public sealed class MainWindow : Window
         foreach (var task in tasks)
         {
             if (task.Id == expanded && task.Choose > 0) { panel.Children.Add(TaskCard(task)); continue; }
-            var answer = task.FulfilledBySubjects.Select(s => "LF " + session.SubjectName(s))
+            var answer = task.FulfilledBySubjects.Select(session.SubjectName)
                 .Concat(task.ChosenOfferIds.Select(id => session.SubjectName(session.Catalog.Offers.Single(o => o.Id == id).SubjectId))).ToArray();
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
             row.Children.Add(Text(task.IsSatisfied ? $"✓ {task.Title}: {string.Join(", ", answer)}" : $"○ {task.Title} – offen", 14, color: task.IsSatisfied ? Done : Warn));
@@ -291,7 +291,7 @@ public sealed class MainWindow : Window
         card.Children.Add(Text(task.IsSatisfied ? "Antwort ändern" : $"Offene Frage · noch {open} offen", 12, color: Muted));
         card.Children.Add(Text(task.Title + (task.Choose > 1 ? $" – wähle {task.Choose}" : ""), 18, FontWeight.SemiBold));
         if (task.FulfilledBySubjects.Length > 0)
-            card.Children.Add(Text("Bereits durch LF: " + string.Join(", ", task.FulfilledBySubjects.Select(session.SubjectName)), 13, color: Done));
+            card.Children.Add(Text("Bereits belegt: " + string.Join(", ", task.FulfilledBySubjects.Select(session.SubjectName)), 13, color: Done));
         card.Children.Add(Text(task.Hint, 13, color: Muted));
         var hasLockedChoice = task.ChosenOfferIds.Any(id => session.IsRequiredSubject(session.Catalog.Offers.Single(o => o.Id == id).SubjectId));
         foreach (var offerId in task.OptionOfferIds.Union(task.ChosenOfferIds))
@@ -386,6 +386,29 @@ public sealed class MainWindow : Window
             Cell(table, $"HJ {summary[i].Semester}", i, 0); Cell(table, $"{summary[i].CourseCount} Kurse", i, 1); Cell(table, $"{summary[i].WeeklyHours} Wochenstunden", i, 2);
         }
         panel.Children.Add(table);
+        var export = new Button { Content = "Kontrollbogen als _PDF exportieren", Name = "ControlSheetButton" };
+        export.Click += async (_, _) => await RunFileAction(async () =>
+        {
+            var file = await StorageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+            {
+                Title = "Kontrollbogen speichern", SuggestedFileName = "kurswahl-kontrollbogen.pdf", DefaultExtension = "pdf",
+                FileTypeChoices = [new("PDF-Kontrollbogen") { Patterns = ["*.pdf"] }], ShowOverwritePrompt = true
+            });
+            if (file is null) return;
+            if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Kontrollbögen müssen als .pdf gespeichert werden; Wahl- und Profildateien bleiben geschützt.");
+            var pdf = GsmKurswahl.ImportExport.ControlSheet.Render(session.Choice, session.Catalog,
+                session.Profile, session.Validation, session.Summary, session.ExamOptions);
+            await using var stream = await file.OpenWriteAsync();
+            stream.SetLength(0);
+            await stream.WriteAsync(pdf);
+        });
+        panel.Children.Add(export);
+        panel.Children.Add(Text("PDF-Export mit dem aktuellen Entwurf und allen Prüfhinweisen.", 12, color: Muted));
+        panel.Children.Add(Text("Mögliche mündliche Kombinationen aus deiner Belegung", 15, FontWeight.SemiBold));
+        foreach (var exam in session.ExamOptions)
+            panel.Children.Add(Text($"{session.SubjectName(exam.First)} + {session.SubjectName(exam.Second)} · Mindestanrechnung {exam.MinimumCredits} · needs_review", 13));
+        if (session.ExamOptions.IsEmpty) panel.Children.Add(Text("Noch keine passende Kombination aus den belegten Kursen. Pflichtbelegung und offene Punkte prüfen.", 13));
         panel.Children.Add(Text("Noch zu erledigen oder zu klären", 15, FontWeight.SemiBold));
         foreach (var note in session.PlanningNotes) panel.Children.Add(Text("• " + note, 13));
         var messages = session.Validation.Messages;
@@ -416,8 +439,9 @@ public sealed class MainWindow : Window
                 if (row.Variant == CourseVariant.Bilingual) label.Children.Add(Badge("bili", Empty, Muted));
                 if (row.IsAutomatic && !row.IsOpen) label.Children.Add(Badge("Pflicht", Empty, Muted));
                 if (row.IsOral) label.Children.Add(Badge("mündl.", AccentSoft, Accent));
-                if (row.Issue == ReviewStatus.Invalid) label.Children.Add(Badge("Fehler", Brush("#FCEBEB"), Danger));
-                else if (row.Issue == ReviewStatus.NeedsReview && !row.IsOpen) label.Children.Add(Badge("klären", WarnSoft, Warn));
+                if (row.Issue == ReviewStatus.Invalid) label.Children.Add(Badge("Fehler", Brush("#FCEBEB"), Danger, row.IssueText));
+                else if (row.Issue == ReviewStatus.NeedsReview && !row.IsOpen) label.Children.Add(Badge("klären", WarnSoft, Warn, row.IssueText));
+                if (row.IssueText is { Length: > 0 }) ToolTip.SetTip(label, row.IssueText);
                 foreach (var item in label.Children) item.Margin = new Thickness(0, 2, 5, 2);
                 Control jump = label;
                 if (!session.IsBusy && row.Step < session.Step)
@@ -429,7 +453,7 @@ public sealed class MainWindow : Window
                         HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left
                     };
                     button.Click += (_, _) => Edit(() => { expandedTask = null; session.GoToStep(target); });
-                    ToolTip.SetTip(button, $"Zu Schritt {target} springen");
+                    ToolTip.SetTip(button, row.IssueText is { Length: > 0 } ? $"{row.IssueText}\n\nKlicken, um zu Schritt {target} zu springen." : $"Zu Schritt {target} springen");
                     jump = button;
                 }
                 else label.Margin = new Thickness(3, 2);
@@ -554,8 +578,13 @@ public sealed class MainWindow : Window
     private static Border Pill(string text, IBrush background, IBrush foreground) => new()
     { Child = Text(text, 12, FontWeight.SemiBold, foreground), Background = background, CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 3) };
 
-    private static Border Badge(string text, IBrush background, IBrush foreground) => new()
-    { Child = Text(text, 10, FontWeight.SemiBold, foreground), Background = background, CornerRadius = new CornerRadius(3), Padding = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center };
+    private static Border Badge(string text, IBrush background, IBrush foreground, string? tooltip = null)
+    {
+        var border = new Border
+        { Child = Text(text, 10, FontWeight.SemiBold, foreground), Background = background, CornerRadius = new CornerRadius(3), Padding = new Thickness(4, 0), VerticalAlignment = VerticalAlignment.Center };
+        if (!string.IsNullOrWhiteSpace(tooltip)) ToolTip.SetTip(border, tooltip);
+        return border;
+    }
 
     private static void Cell(Grid grid, string text, int row, int column, bool center = false)
     {

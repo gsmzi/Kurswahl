@@ -1,6 +1,6 @@
 # Dauerhafte Entwicklungsanweisungen
 
-- Zuerst `docs/GSM_Kurswahl_Anforderungen_Codex.md` vollständig lesen. M1 bis M5 in dieser Reihenfolge bearbeiten; aktueller Umfang: M1.
+- Zuerst `docs/GSM_Kurswahl_Anforderungen_Codex.md` vollständig lesen. M1 bis M5 in dieser Reihenfolge bearbeiten; M1 abgenommen, aktueller Umfang: M2 (Nutzerauftrag 26.10.2026).
 - C#/.NET 10 LTS, Avalonia. Domain ohne UI/Dateisystem; Rules nur auf Domain; Storage und ImportExport nur auf Domain; Application auf Domain/Rules. Beide Desktopprogramme nutzen diese gemeinsamen Komponenten. Keine Rechtsregeln in UI oder Importadaptern.
 - Ausschließlich synthetische Personen und Accounts in Code, Tests, Samples und Protokollen. Keine Signierschlüssel, Echtdaten, Diagnosen oder konkreten Schulnetzpfade einchecken.
 - Unbekannt ist nicht falsch und nicht erfüllt: explizit `needs_review`. M1 darf niemals verbindlich grün oder eingereicht melden. Vorbildung aus Wahl-JSON ist keine Vertrauensquelle. Profilprüfung folgt in M2, administrative Signierung in M3.

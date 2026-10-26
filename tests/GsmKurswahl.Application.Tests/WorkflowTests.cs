@@ -46,7 +46,7 @@ public class WorkflowTests
         await loaded.LoadAsync();
         Assert.Equal(new[] { "D", "M" }, loaded.Choice.PlannedOralSubjects);
         Assert.Equal(1, loaded.Step);
-        Assert.Equal(ReviewStatus.NeedsReview, loaded.Validation.Status);
+        Assert.Equal(ReviewStatus.Invalid, loaded.Validation.Status);
     }
 
     [Fact]
@@ -98,8 +98,10 @@ public class WorkflowTests
         var session = Create("E", "BIO", "W");
         session.NextStep(); session.NextStep();
         var tasks = session.Tasks.ToDictionary(t => t.Id);
-        Assert.All(tasks.Values, t => Assert.False(t.IsSatisfied));
-        Assert.Equal(1, tasks["PLAN-AREA-SCIENCE"].Choose);
+        Assert.All(tasks.Values.Where(t => t.Id is "PLAN-AREA-ART" or "PLAN-AREA-RELIGION" or "PLAN-AREA-BREADTH"), t => Assert.False(t.IsSatisfied));
+        Assert.True(tasks["PLAN-AREA-LANGUAGE"].IsSatisfied);
+        Assert.True(tasks["PLAN-AREA-SCIENCE"].IsSatisfied);
+        Assert.Equal(0, tasks["PLAN-AREA-SCIENCE"].Choose);
         Assert.Equal(new[] { "BIO" }, tasks["PLAN-AREA-SCIENCE"].FulfilledBySubjects);
         Assert.DoesNotContain("BIO-BF", tasks["PLAN-AREA-SCIENCE"].OptionOfferIds);
         Assert.Equal(new[] { "BK-BF", "MU-BF" }, tasks["PLAN-AREA-ART"].OptionOfferIds);
@@ -114,18 +116,18 @@ public class WorkflowTests
     }
 
     [Fact]
-    public void ScienceTaskWithoutScienceLfAllowsTwoAndKeepsRequiredOralScience()
+    public void FirstScienceAndBreadthAreSeparateAndKeepRequiredOralScience()
     {
         var session = Create("D", "M", "E");
         session.NextStep();
         session.SetOral("BIO", true); session.SetOral("GK", true);
         session.NextStep();
         var science = session.Tasks.Single(t => t.Id == "PLAN-AREA-SCIENCE");
-        Assert.Equal(2, science.Choose);
-        Assert.Equal(1, science.Open);
+        Assert.Equal(1, science.Choose);
+        Assert.Equal(0, science.Open);
         Assert.Contains("BIO-BF", science.ChosenOfferIds);
         Assert.Throws<InvalidOperationException>(() => session.ChooseTaskOption("PLAN-AREA-SCIENCE", "BIO-BF", false));
-        session.ChooseTaskOption("PLAN-AREA-SCIENCE", "CH-BF", true);
+        session.ChooseTaskOption("PLAN-AREA-BREADTH", "CH-BF", true);
         Assert.True(session.Tasks.Single(t => t.Id == "PLAN-AREA-SCIENCE").IsSatisfied);
         Assert.Contains(session.Choice.Selections, s => s.SubjectId == "BIO");
         Assert.Equal(new[] { 1, 2, 3, 4 }, session.LockedSemesters("BIO-BF"));
@@ -140,10 +142,10 @@ public class WorkflowTests
         session.NextStep();
         session.SetOral("BIO", true); session.SetOral("G", true);
         session.NextStep();
-        var science = session.Tasks.Single(t => t.Id == "PLAN-AREA-SCIENCE");
+        var science = session.Tasks.Single(t => t.Id == "PLAN-AREA-BREADTH");
         Assert.True(science.IsExclusive);
         Assert.True(science.IsSatisfied);
-        session.ChooseTaskOption("PLAN-AREA-SCIENCE", "PH-BF", true);
+        session.ChooseTaskOption("PLAN-AREA-BREADTH", "PH-BF", true);
         Assert.Contains(session.Choice.Selections, s => s.SubjectId == "BIO");
         Assert.Contains(session.Choice.Selections, s => s.SubjectId == "PH");
     }
@@ -155,7 +157,7 @@ public class WorkflowTests
         var catalog = TestData.WorkflowCatalog;
         var inf = TestData.Offer("INF-BF", "INF") with { Requirements = [Requirement.Informatics] };
         var session = new StudentSession(catalog with { Offers = catalog.Offers.Add(inf), Subjects = catalog.Subjects.Add(new("INF", "Informatik")) }, "demo-001", new MemoryStore());
-        var science = session.Tasks.Single(t => t.Id == "PLAN-AREA-SCIENCE");
+        var science = session.Tasks.Single(t => t.Id == "PLAN-AREA-BREADTH");
         Assert.DoesNotContain("INF-BF", science.OptionOfferIds);
         Assert.Contains(science.Restricted, r => r.OfferId == "INF-BF" && r.Explanation.Contains("ungeprüft"));
         Assert.Contains(session.RestrictedOffers(lf: false), o => o.Id == "INF-BF");

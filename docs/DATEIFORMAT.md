@@ -19,3 +19,15 @@ Konfiguration: `appsettings.json` neben der Schüler-EXE, alternativ absolute Da
 ## Wahl-Schema v2 (25.10.2026)
 
 Aktuelles Schema: `schemas/course-choice.v2.schema.json`; Katalog und Einstellungen bleiben v1. Das neue erforderliche Feld `plannedOralSubjects` enthält null bis zwei verschiedene Fachkennungen als JSON-Array (leer: noch keine Planung), keine verbindliche Prüfungsanmeldung. Schema v1 bleibt zur Dokumentation erhalten, wird vom neuen Editor aber wie unbekannte Versionen abgewiesen. Keine automatische Migration; der Ladefehler sperrt Speichern und erhält die vorhandene Datei. Für neue Demoentwürfe einen neuen Dateinamen konfigurieren; alte Dateien aufbewahren.
+
+## M2 (26.10.2026): neue Profilgrenze, unveränderte Wahlschemas
+
+Wahlschema v2 und Katalogschema v1 bleiben strukturell unverändert. Geänderter Regelstand `m2-1`, Kataloginhalt `demo-2029-v2`: bisherige Wahlentwürfe werden bei Versionsabweichung weiterhin geschützt abgewiesen. Es gibt keine automatische Migration, kein Zurücksetzen vorhandener Dateien und keine Änderung fremder Home-Dateien. Das aktualisierte Sample in einem separaten Testordner verwenden.
+
+Neu: `student-profile.v1.schema.json` und `profile-signature.v1.schema.json`. Profilv1 ist erstmals implementiert; die englischen JSON-Feldnamen entsprechen dem bestehenden C#-Modell, nicht dem unverbindlichen deutschen Beispiel im Pflichtenheft. SID (`accountId`) ist für die Windows-Vertrauensprüfung zusätzlich verpflichtend. Weitere Details, Algorithmus und Schlüsselrotation: [PROFILE.md](PROFILE.md). Keine Vorbildung im Wahl-JSON; unbekannte Mitglieder werden weiterhin abgewiesen.
+
+Der HTML-Kontrollbogen ist ein abgeleiteter Export ohne Rückimport. Er enthält keine Signatur und keine Berechtigungswirkung. Zeitstempel verwenden im Bogen ISO-8601 mit Offset.
+
+### Nachfolgende Nutzerkorrektur: PDF-only / Sprachen
+
+Der oben beschriebene HTML-Export ist ersetzt: ausschließlich direkte PDF-Datei, kein HTML und keine Druckfunktion. Kataloginhalt `demo-2029-v3` enthält Französisch und Latein LF/BF; Regelversion `m2-2`. JSON-Struktur bleibt unverändert. PDF ist ein abgeleiteter Export ohne Rückimport oder Berechtigungswirkung.
