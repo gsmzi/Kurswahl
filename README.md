@@ -47,9 +47,9 @@ Die GitHub-Actions-Konfiguration prüft Windows und Linux. Der lokale Teststand 
 ## Bedienung und Konfiguration
 
 1. Schülerprogramm starten. Es zeigt ausschließlich die synthetische ID `demo-001`, Abitur 2029 und den Status **vorläufig / needs_review**. Die angezeigte Betriebssystemkennung wird nicht als Schulberechtigung interpretiert oder in die Wahl geschrieben.
-2. Fach und Kursart auswählen; LF belegen alle vier Halbjahre. Bei BF/Wahlfächern lassen sich angebotene Halbjahre anpassen. Die rechtliche Zulässigkeit dieser Kombinationen wird erst in M2 vollständig geprüft. Vor einem Kursartwechsel das bisherige Angebot abwählen; keine automatische Ersetzung.
+2. Den vierstufigen Assistenten durchlaufen: drei LF mit sofortiger Teilprüfung, zwei vorläufige mündliche Fächer, automatisch ergänzte Pflicht-BF und weitere Wahlen. Deutsch/Mathematik werden ohne entsprechendes LF mündlich vorausgewählt. Details stehen unter „Neuer vierstufiger Wahlablauf“.
 3. Geplante Angebote sowie INF, Italienisch und bilinguale Varianten ohne verifiziertes Profil bleiben deaktiviert, mit Begründung. BF Ethik wird nicht wegen unbekannter Klasse-10-Vorbildung pauschal gesperrt.
-4. Halbjahreskurse, Wochenstunden und Prüfhinweise rechts prüfen. Die vollständigen Pflichtbelegungen und Prüfungsoptionen fehlen in M1; es gibt keine Schaltfläche zur verbindlichen Abgabe.
+4. Halbjahreskurse, Wochenstunden und Prüfhinweise rechts prüfen. Eindeutige Pflichtbelegungen werden ergänzt, Alternativen und Sonderfälle bleiben sichtbar offen. Vollständige Rechtsprüfung folgt in M2; es gibt keine Schaltfläche zur verbindlichen Abgabe.
 5. **Entwurf speichern** schreibt JSON. Automatisches Zwischenspeichern erfolgt nach 1,5 Sekunden ohne weitere Änderung und ist abschaltbar. **Entwurf laden** verlangt bei ungespeicherten Änderungen eine Bestätigung. Auch Schließen schützt einen ungespeicherten Entwurf durch Rückfrage.
 
 Die mitgelieferte `appsettings.json` wird beim Build neben die EXE kopiert. Standardziel ist `{HOME}/GSM-Kurswahl-Demo/aktuell.json`, ausdrücklich ein Demoordner im persönlichen Home, kein Schulnetzpfad. `homeDirectory`, `choiceDirectory`, `choiceFileName` und `catalogPath` sind konfigurierbar. Eine externe Konfiguration lässt sich über `GSM_KURSWAHL_SETTINGS` angeben. Details und Schemata: [Dateiformat](docs/DATEIFORMAT.md).
@@ -85,3 +85,12 @@ dotnet publish src/GsmKurswahl.TeacherApp -c Release --self-contained false -p:R
 M1 ist ein lauffähiger Demonstrator. Vollständige AGVO-Prüfung, signierte Profile, verbindliche Abgabe, PDF, Lehrerdatenbank, reale Importadapter und Planung sind **noch nicht implementiert**. Die Lehrer-App zeigt den vorgesehenen Ausbau an. ImportExport enthält ausschließlich den Vorschauvertrag und einen entsprechenden Vertragstest, keinen CSV-/XLSX-Parser. Die Domain enthält vorbereitende Versions-/Planungsmodelle, keine vorgetäuschte Historienpersistenz.
 
 [Offene Punkte](docs/OFFENE_PUNKTE.md), [Quellenstand](docs/RECHTSQUELLEN.md), [Abhängigkeiten](docs/ABHAENGIGKEITEN.md) und [Entwicklungsanweisungen](AGENTS.md) sind Bestandteil der Übergabe. Das Quellcode-Repository ist [gsmzi/Kurswahl](https://github.com/gsmzi/Kurswahl). Build-Ausgaben und lokale Testartefakte sind durch `.gitignore` ausgeschlossen.
+
+### Neuer vierstufiger Wahlablauf
+
+1. Drei LF wählen. Die unmittelbare Teilprüfung kontrolliert Anzahl, Demo-Kernfächer und ob eine Prüfungsplanung mit D/M und allen Aufgabenfeldern möglich ist.
+2. Zwei mündliche Fächer unverbindlich planen. Deutsch/Mathematik ohne entsprechendes LF sind vorausgewählt und fest. Weitere Fächer auswählen; GEO wird nicht angeboten.
+3. Pflicht-BF und Prüfungsbelegungen werden automatisch ergänzt. Die Übersicht nennt Ergänzungen, fehlende Angebote und offene Alternativen.
+4. Weitere Fächer und Halbjahre wählen: insbesondere Kunst/Musik, Religion/Ethik und Naturwissenschaften. Offene Pflichtbelegungen bleiben sichtbar.
+
+Zurück erlaubt Änderungen; zusätzliche vorhandene Belegungen bleiben erhalten. Ein schon belegtes BF kann in Schritt 1 bewusst abgewählt werden, bevor dasselbe Fach als LF gewählt wird. Vorläufige mündliche Planung wird mitgespeichert; Laden startet zur erneuten Prüfung bei Schritt 1. Wahl-Schema ist jetzt v2, v1-Dateien werden geschützt abgewiesen (siehe DATEIFORMAT.md). Vollständige Rechtsprüfung und verbindliche Abgabe bleiben außerhalb M1.

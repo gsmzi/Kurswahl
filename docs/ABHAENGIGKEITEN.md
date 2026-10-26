@@ -25,3 +25,7 @@ dotnet list GSM-Kurswahl.sln package --include-transitive --no-restore
 Ergebnisse dieses Laufs siehe Testprotokoll. Ein Paket-Audit ist keine vollständige Sicherheitsprüfung. Vor Echtdatenbetrieb: aktuelle .NET-Patches, Schlüsselverwaltung, signierte Profile, Schulnetz-ACLs, Backup-/Aufbewahrungskonzept und M2–M5 erfüllen. Private Schlüssel gehören niemals in dieses Repository.
 
 Die transitive Laufzeit enthält unter anderem Avalonia (MIT), SkiaSharp/native Skia (MIT/BSD-Familie), HarfBuzzSharp/native HarfBuzz (MIT-Familie) und MicroCom.Runtime (MIT). Lizenztexte/Notices der tatsächlich ausgelieferten Pakete sind vor endgültiger Veröffentlichung beizulegen. Es wurde keine Lizenz für den eigenen Anwendungscode festgelegt; diese Entscheidung liegt beim Projektträger.
+
+## Wahlassistent 25.10.2026
+
+Keine neuen Pakete oder Paketversionsänderungen; bestehende Lockdateien bleiben unverändert. Lokales SDK 10.0.403. Der abschließende Restore verwendet den vorhandenen Paketcache, `--locked-mode`, `--ignore-failed-sources` und `-p:NuGetAudit=false`, weil Onlinezugriff in dieser Ausführungsumgebung gesperrt ist. Dies ist kein neuer Sicherheits-Audit; der zuvor dokumentierte Lizenz-/Sicherheitsstand bleibt maßgeblich.

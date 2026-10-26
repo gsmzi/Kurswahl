@@ -11,3 +11,11 @@
 - Schlüsselverwahrung/-rotation, Lehrerberechtigungen, Aufbewahrung, Löschung, Backup, Kontrollbogen/Unterschrift und Nachwahlfristen vor Echtdatenbetrieb klären.
 - SMB-Atomizität, Stromausfallverhalten, AppLocker/SmartScreen und Start aus Freigabe müssen im Schulnetzpilot geprüft werden. Lokale Tests ersetzen diesen Pilot nicht.
 - Selbstenthaltender Windows-Publish lokal durch fehlende/online nicht abrufbare .NET-10.0.11-Runtimepakete blockiert. Frameworkabhängige Ausgabe benötigt .NET 10. Standalone-Erstellung und Test auf einem Rechner ohne SDK vor Verteilung nachholen.
+
+## Wahlassistent – Grenzen der Vorplanung (25.10.2026)
+
+- Vier Schritte gemäß Nutzerwunsch: LF, mündliche Planung, automatische Pflicht-BF, restliche Wahl. Die mündlichen Fächer sind ausdrücklich unverbindliche Planungsangaben.
+- Englisch ist die einzige bekannte fortgeführte Fremdsprache des Demoangebots. Weitere Sprachen, NwT und persönliche Alternativen erfordern bestätigte Fach-/Laufbahnkonfiguration in M2.
+- Kunst/Musik, Religion/Ethik und Naturwissenschafts-Alternativen werden nicht willkürlich automatisch entschieden; sie erscheinen als offene Wahlen. Sport wird vorläufig ergänzt, Befreiung und Ersatz bleiben needs_review.
+- Nach LF-/Prüfungswechsel bleiben zusätzliche vorhandene Kurse erhalten und können bewusst abgewählt werden. Fehlende oder mehrdeutige Pflichtangebote werden gemeldet.
+- Wahl-Schema v2 speichert plannedOralSubjects. v1 wird ohne Migration abgewiesen und vor Überschreiben geschützt; eine explizite Migration ist nicht implementiert.

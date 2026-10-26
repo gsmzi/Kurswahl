@@ -16,6 +16,12 @@ public sealed class MainWindow : Window
     private readonly TextBlock summary = Text("", 16);
     private readonly TextBlock error = Text("", 15);
     private readonly StackPanel offerRows = new() { Spacing = 8 };
+    private readonly StackPanel oralRows = new() { Spacing = 8 };
+    private readonly TextBlock stepTitle = Text("", 20, FontWeight.Bold);
+    private readonly TextBlock stepInfo = Text("", 14);
+    private readonly Button previous = new() { Content = "_Zurück", Name = "PreviousStep" };
+    private readonly Button next = new() { Content = "_Weiter", Name = "NextStep" };
+    private readonly Dictionary<string, Control> rows = [];
     private readonly Button save = new() { Content = "Entwurf _speichern", Name = "SaveButton" };
     private readonly Button load = new() { Content = "Entwurf _laden", Name = "LoadButton" };
     private readonly CheckBox autosave = new() { Content = "Automatisch zwischenspeichern", IsChecked = true };
@@ -46,12 +52,18 @@ public sealed class MainWindow : Window
 
         var body = new Grid { ColumnDefinitions = new ColumnDefinitions("3*,2*") };
         var left = new StackPanel { Spacing = 8, Margin = new Thickness(0, 0, 20, 0) };
-        left.Children.Add(Text("1 · Fächer und Halbjahre auswählen", 20, FontWeight.Bold));
+        left.Children.Add(stepTitle);
+        left.Children.Add(Text("1 Leistungsfächer → 2 Mündliche Fächer → 3 Pflichtbasisfächer → 4 Weitere Wahlen", 13));
+        left.Children.Add(stepInfo);
+        var navigation = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        navigation.Children.Add(previous); navigation.Children.Add(next);
+        left.Children.Add(navigation);
+        left.Children.Add(oralRows);
         left.Children.Add(Text("LF = Leistungsfach · BF = Basisfach · WF = Wahlfach · SK = Seminarkurs\nEin Fach nur in einer Kursart/Variante. LF immer HJ 1–4.", 13));
         left.Children.Add(offerRows);
         body.Children.Add(new ScrollViewer { Content = left });
         var right = new StackPanel { Spacing = 14 };
-        right.Children.Add(Text("2 · Belegung prüfen", 20, FontWeight.Bold));
+        right.Children.Add(Text("Belegung im Überblick", 20, FontWeight.Bold));
         right.Children.Add(summary);
         right.Children.Add(Text("Belegungszahlen und Wochenstunden sind keine Anrechnungs- oder Zulassungsbestätigung.", 14));
         right.Children.Add(validation);
@@ -84,13 +96,17 @@ public sealed class MainWindow : Window
             }
             row.Children.Add(semesterPanel);
             if (!availability.CanSelect) row.Children.Add(Text(availability.Explanation, 12));
-            offerRows.Children.Add(new Border { Background = Brushes.White, CornerRadius = new CornerRadius(6), Padding = new Thickness(10), Child = row });
+            var container = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(6), Padding = new Thickness(10), Child = row };
+            offerRows.Children.Add(container);
+            rows.Add(offer.Id, container);
             boxes.Add(offer.Id, (selected, semesterBoxes));
             selected.IsCheckedChanged += (_, _) =>
             {
                 if (!refreshing) Edit(() => session.SetSelection(offer.Id, selected.IsChecked == true ? offer.Schedule.Select(h => h.Semester) : []));
             };
         }
+        previous.Click += (_, _) => Edit(session.PreviousStep);
+        next.Click += (_, _) => Edit(session.NextStep);
         save.Click += async (_, _) => await RunFileAction(() => session.SaveAsync());
         load.Click += async (_, _) =>
         {
@@ -144,16 +160,54 @@ public sealed class MainWindow : Window
         refreshing = true;
         try
         {
+            stepTitle.Text = session.Step switch
+            {
+                1 => "1 · Drei Leistungsfächer wählen",
+                2 => "2 · Zwei mündliche Prüfungsfächer planen",
+                3 => "3 · Automatisch ergänzte Pflichtbasisfächer",
+                _ => "4 · Weitere Wahlen und Halbjahre ergänzen"
+            };
+            stepInfo.Text = session.Step switch
+            {
+                1 => session.StepError ?? "LF-Teilprüfung ohne erkannten Fehler. Vorläufig: Persönliche Voraussetzungen und vollständige Rechtsprüfung bleiben needs_review.",
+                2 => "Deutsch und Mathematik werden ohne entsprechendes LF automatisch festgelegt. Die Planung ist unverbindlich.\n"
+                    + (session.StepError ?? "Planung deckt D/M und Aufgabenfelder ab; Zulassung und Anrechnung bleiben needs_review."),
+                3 => session.AutomaticMessage + "\n\n" + string.Join("\n", session.PlanningNotes),
+                _ => string.Join("\n", session.PlanningNotes)
+            };
+            previous.IsEnabled = !session.IsBusy && session.Step > 1;
+            next.IsVisible = session.Step < 4;
+            next.IsEnabled = !session.IsBusy && session.StepError is null;
+            next.Content = session.Step == 2 ? "Pflichtbasisfächer _ergänzen" : "_Weiter";
+            oralRows.Children.Clear();
+            oralRows.IsVisible = session.Step == 2;
+            if (session.Step == 2)
+                foreach (var subject in session.OralCandidates.Union(session.Choice.PlannedOralSubjects))
+                {
+                    var box = new CheckBox
+                    {
+                        Name = "Oral_" + subject,
+                        Content = (session.Catalog.Subjects.FirstOrDefault(s => s.Id == subject)?.Name ?? subject)
+                            + (session.ForcedOral.Contains(subject) ? " · automatisch erforderlich" : ""),
+                        IsChecked = session.Choice.PlannedOralSubjects.Contains(subject),
+                        IsEnabled = !session.IsBusy && !session.ForcedOral.Contains(subject)
+                    };
+                    box.IsCheckedChanged += (_, _) => { if (!refreshing) Edit(() => session.SetOral(subject, box.IsChecked == true)); };
+                    oralRows.Children.Add(box);
+                }
             foreach (var offer in session.Catalog.Offers)
             {
                 var (selected, semesters) = boxes[offer.Id];
                 var choice = session.Choice.Selections.FirstOrDefault(s => s.OfferId == offer.Id);
+                rows[offer.Id].IsVisible = session.Step == 1 ? offer.Type == CourseType.Lf || choice is not null
+                    : session.Step == 3 ? choice is not null && offer.Type != CourseType.Lf
+                    : session.Step == 4 && offer.Type != CourseType.Lf;
                 selected.IsChecked = choice is not null;
-                selected.IsEnabled = !session.IsBusy && (choice is not null || session.Availability(offer).CanSelect);
+                selected.IsEnabled = !session.IsBusy && session.Step != 3 && (choice is not null || session.Availability(offer).CanSelect);
                 foreach (var box in semesters)
                 {
                     box.IsChecked = choice?.Semesters.Contains((int)box.Tag!) == true;
-                    box.IsEnabled = !session.IsBusy && choice is not null && offer.Type != CourseType.Lf && session.Availability(offer).CanSelect;
+                    box.IsEnabled = !session.IsBusy && session.Step == 4 && choice is not null && offer.Type != CourseType.Lf && session.Availability(offer).CanSelect;
                 }
             }
             save.IsEnabled = !session.IsBusy && !session.LoadFailed;

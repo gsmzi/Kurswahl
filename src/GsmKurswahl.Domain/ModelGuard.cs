@@ -5,7 +5,10 @@ public static class ModelGuard
     public static void Choice(CourseChoice value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        Require(value.SchemaVersion == 1, "Nicht unterstützte Wahl-Schemaversion.");
+        Require(value.SchemaVersion == 2, "Nicht unterstützte Wahl-Schemaversion. Version 2 erforderlich; keine automatische Migration.");
+        Require(!value.PlannedOralSubjects.IsDefault && value.PlannedOralSubjects.Length <= 2
+            && value.PlannedOralSubjects.All(s => !string.IsNullOrWhiteSpace(s))
+            && value.PlannedOralSubjects.Distinct().Count() == value.PlannedOralSubjects.Length, "Ungültige mündliche Prüfungsplanung.");
         Require(value.DocumentId != Guid.Empty && !string.IsNullOrWhiteSpace(value.StudentId), "Wahl-/Schüler-ID fehlt.");
         Require(value.GraduationYear is >= 2000 and <= 2200, "Ungültiger Abiturjahrgang.");
         Require(!string.IsNullOrWhiteSpace(value.OfferVersion) && !string.IsNullOrWhiteSpace(value.RuleVersion), "Versionsangaben fehlen.");

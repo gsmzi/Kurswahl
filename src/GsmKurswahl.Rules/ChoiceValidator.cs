@@ -7,7 +7,7 @@ public sealed record Availability(bool CanSelect, ReviewStatus Status, string Ex
 
 public sealed class ChoiceValidator
 {
-    public const string Version = "m1-1";
+    public const string Version = "m1-2";
     public static readonly ImmutableArray<RuleDefinition> Definitions =
     [
         new("M1-COMPLETENESS", "Unvollständige fachliche Prüfung", "Pflichtenheft §§6,17 (M2)", "Alle M1-Wahlen", Version, ReviewStatus.NeedsReview),
@@ -17,7 +17,8 @@ public sealed class ChoiceValidator
         new("SUBJECT-DUPLICATE", "Keine doppelte Fachbelegung", "Pflichtenheft §6 Nr.1,7", "Alle Fächer/Varianten", Version, ReviewStatus.Invalid),
         new("PREREQUISITE-NO", "Persönliche Voraussetzung nicht erfüllt", "Pflichtenheft §§4,5", "INF/I/bilingual", Version, ReviewStatus.Invalid),
         new("PREREQUISITE-UNKNOWN", "Persönliche Voraussetzung ungeklärt", "Pflichtenheft §§5,5a", "INF/I/bilingual", Version, ReviewStatus.NeedsReview),
-        .. CatalogRules.Definitions
+        .. CatalogRules.Definitions,
+        .. ChoiceWorkflow.Definitions
     ];
 
     public Availability GetAvailability(CourseOffer offer, ProfileContext profile)

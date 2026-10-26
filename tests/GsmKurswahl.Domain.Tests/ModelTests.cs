@@ -11,7 +11,7 @@ public class ModelTests
         ModelGuard.Catalog(TestData.Catalog);
     }
     [Fact] public void UnknownPrerequisitesAreNotNoOrYes() => Assert.Equal(Knowledge.Unknown, PriorEducation.Unknown.InformaticsImp);
-    [Fact] public void FutureSchemaIsRejected() => Assert.Throws<ArgumentException>(() => ModelGuard.Choice(TestData.Choice with { SchemaVersion = 2 }));
+    [Fact] public void FutureSchemaIsRejected() => Assert.Throws<ArgumentException>(() => ModelGuard.Choice(TestData.Choice with { SchemaVersion = 99 }));
     [Theory] [InlineData(0)] [InlineData(5)]
     public void InvalidSemestersRejected(int semester) => Assert.Throws<ArgumentException>(() => ModelGuard.Choice(TestData.Choice with
     { Selections = [TestData.Select(TestData.Offer()) with { Semesters = [semester] }] }));

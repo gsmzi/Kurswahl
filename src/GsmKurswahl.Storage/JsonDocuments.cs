@@ -25,6 +25,11 @@ public static class JsonDocuments
 
     public static CourseChoice ReadChoice(byte[] bytes)
     {
+        using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 32 });
+        if (document.RootElement.ValueKind == JsonValueKind.Object
+            && document.RootElement.TryGetProperty("schemaVersion", out var schema)
+            && schema.ValueKind == JsonValueKind.Number && schema.TryGetInt32(out var version) && version != 2)
+            throw new ArgumentException("Nicht unterstützte Wahl-Schemaversion. Version 2 erforderlich; alte Datei bleibt erhalten, keine automatische Migration.");
         var choice = JsonSerializer.Deserialize<CourseChoice>(bytes, Options) ?? throw new JsonException("Leere Wahl-Datei.");
         ModelGuard.Choice(choice);
         return choice;

@@ -55,3 +55,24 @@ Umgebung: Windows 11 x64, .NET SDK 10.0.400, Bash-Aufrufe der Einzelbefehle aus 
 ## Grenzen der Prüfung
 
 Kein Schulnetz/SMB-Ausfalltest, keine echten Profile, kein AGVO-Volltest, kein realer CSV-/XLSX-/ASV-Import. Headless-Tests ersetzen keine Sicht-/Tastatur-/DPI-Prüfung auf dem Schulgerät. GitHub-CI wurde vorbereitet, aber nicht remote ausgeführt. macOS wurde hier nicht ausgeführt.
+
+## Schritt 7 – Wahlassistent, erster Zwischenlauf (25.10.2026)
+
+- `dotnet test GSM-Kurswahl.sln -c Release --no-restore`: Domain 8/8, Rules 32/33, Storage 24/24, ImportExport 1/1, Application 10/10 bestanden. Regel-Dokumentationstest scheiterte an den drei noch nicht dokumentierten PLAN-IDs; Dokumentation anschließend ergänzt.
+- StudentApp konnte in diesem Lauf wegen MSB4018 / fehlendem Schreibzugriff der AvaloniaStatsTask auf deren Log außerhalb des Arbeitsverzeichnisses nicht gebaut werden. UI-Tests liefen deshalb nicht. Für weitere Läufe wird wie im Testskript AVALONIA_TELEMETRY_OPTOUT=1 gesetzt.
+
+- Zweiter Zwischenlauf mit deaktivierter Build-Telemetrie: **86/86 Tests bestanden**, keine übersprungen (Domain 8, Rules 33, Storage 24, ImportExport 1, Application 18, StudentApp 2). Der UI-Test durchläuft alle vier Schritte und prüft D/M-Automatik, Pflichtkurse, zusätzliche Wahl und JSON-Roundtrip. Anschließend explizite Schema-v1-Fehlermeldung, zwei Storage-Regressionstests und Regelstand m1-2 ergänzt.
+
+- Abschließendes Standardskript zunächst beim Restore gescheitert: Zugriff auf benutzerweite NuGet.Config verweigert. Mit prozesslokal auf artifacts/build-appdata gesetztem APPDATA danach NU1301 (NuGet-Netzwerkzugriff gesperrt); dieser Lauf wurde beendet. Keine Tests dieses Skriptlaufs als Erfolg gewertet.
+- Restore anschließend erfolgreich für alle 13 Projekte: vorhandener Paketcache über NUGET_PACKAGES, `--locked-mode --ignore-failed-sources -p:NuGetAudit=false`. Keine Lockdatei-/Paketänderung, kein neuer Online-Sicherheits-Audit.
+
+- Release-Build: 0 Warnungen, 0 Fehler. Erster Abschluss-Testlauf: 85/88 bestanden, drei Storage-Tests fehlgeschlagen. Die neue vorgelagerte Schemaprüfung liefert bei v1 ArgumentException; beschädigtes JSON liefert die JsonException-Unterklasse JsonReaderException. Testannahmen entsprechend präzisiert; Test für fehlende Pflichtfelder auf aktuelle Schema-v2-Version aktualisiert. Dateischutz blieb wirksam. Schemaprüfung wurde wegen des Testabbruchs in diesem Lauf nicht ausgeführt.
+
+### Abschluss (26.10.2026)
+
+- Release-Build erfolgreich: **0 Warnungen, 0 Fehler**.
+- Gesamte Testsuite: **88/88 bestanden**, keine übersprungen: Domain 8, Rules 33, Storage 26, ImportExport 1, Application 18, StudentApp 2.
+- Verfügbarer UI-Smoke-Test (Avalonia headless) bestanden: alle vier Schritte, automatische mündliche D/M-Planung, Pflichtkurse, ergänzende Wahl, Speichern/Laden mit echtem JSON-Store; eingeschränktes LF deaktiviert.
+- Beide JSON-Schemaprüfungen erfolgreich (Schülerwahl v2, Katalog v1).
+- `git diff --check` ohne Fehler. Keine neuen Pakete, keine Änderungen an Lockdateien.
+- Kein nativer Sicht-/DPI-Test, kein Publish/Deployment, kein Online-Sicherheits-Audit. Fachliche Vollprüfung und verbindliche Freigabe bleiben M2.

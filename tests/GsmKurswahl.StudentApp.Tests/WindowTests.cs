@@ -30,23 +30,36 @@ public class WindowTests
     {
         var directory = Path.Combine(Path.GetTempPath(), "gsm-ui-" + Guid.NewGuid());
         var path = Path.Combine(directory, "aktuell.json");
-        var session = new StudentSession(TestData.Catalog, "demo-001", new JsonChoiceStore(path));
+        var session = new StudentSession(TestData.WorkflowCatalog, "demo-001", new JsonChoiceStore(path));
         var window = new MainWindow(session, path, "demo-account");
         try
         {
             window.Show();
-            var choice = window.GetVisualDescendants().OfType<CheckBox>().Single(b => b.Name == "Offer_D_BF");
-            choice.IsChecked = true;
-            Assert.Single(session.Choice.Selections);
+            CheckBox Box(string name) => window.GetVisualDescendants().OfType<CheckBox>().Single(b => b.Name == name);
+            var next = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "NextStep");
+            Assert.False(next.IsEnabled);
+            foreach (var subject in new[] { "E", "BIO", "W" }) Box("Offer_" + subject + "_LF").IsChecked = true;
+            Assert.True(next.IsEnabled);
+            next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.True(Box("Oral_D").IsChecked);
+            Assert.False(Box("Oral_D").IsEnabled);
+            Assert.True(Box("Oral_M").IsChecked);
+            next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(3, session.Step);
+            Assert.False(Box("Offer_G_BF").IsEnabled);
+            next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(4, session.Step);
+            Box("Offer_BK_BF").IsChecked = true;
             var save = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "SaveButton");
             save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             for (var i = 0; i < 200 && session.IsBusy; i++) await Task.Delay(10);
             Assert.False(session.IsBusy);
             Assert.False(session.IsDirty);
             Assert.True(File.Exists(path));
-            var second = new StudentSession(TestData.Catalog, "demo-001", new JsonChoiceStore(path));
+            var second = new StudentSession(TestData.WorkflowCatalog, "demo-001", new JsonChoiceStore(path));
             await second.LoadAsync();
-            Assert.Single(second.Choice.Selections);
+            Assert.Equal(session.Choice.Selections.Length, second.Choice.Selections.Length);
+            Assert.Equal(new[] { "D", "M" }, second.Choice.PlannedOralSubjects);
             Assert.Equal(ReviewStatus.NeedsReview, second.Validation.Status);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("nicht eingereicht") == true);
         }
@@ -56,12 +69,12 @@ public class WindowTests
     [AvaloniaFact]
     public void RestrictedOfferIsDisabledAndReasonVisible()
     {
-        var offer = TestData.Offer() with { Variant = CourseVariant.Bilingual, Requirements = [Requirement.ContinuousBilingual] };
+        var offer = TestData.Offer("D-LF", type: CourseType.Lf) with { Variant = CourseVariant.Bilingual, Requirements = [Requirement.ContinuousBilingual] };
         var window = new MainWindow(new StudentSession(TestData.Catalog with { Offers = [offer] }, "demo-001", new EmptyStore()), "demo.json", "demo-account");
         try
         {
             window.Show();
-            Assert.False(window.GetVisualDescendants().OfType<CheckBox>().Single(b => b.Name == "Offer_D_BF").IsEnabled);
+            Assert.False(window.GetVisualDescendants().OfType<CheckBox>().Single(b => b.Name == "Offer_D_LF").IsEnabled);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Persönliche Voraussetzung ungeprüft") == true);
         }
         finally { window.Close(); }

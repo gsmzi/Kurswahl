@@ -27,7 +27,8 @@ public sealed record CourseSelection(string OfferId, string SubjectId, CourseTyp
 // This document is an untrusted student draft, never a source of eligibility or administrative truth.
 public sealed record CourseChoice(int SchemaVersion, Guid DocumentId, string StudentId, int GraduationYear,
     string OfferVersion, string RuleVersion, int Revision, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    SubmissionStatus SubmissionStatus, ElectionPhase Phase, ImmutableArray<CourseSelection> Selections);
+    SubmissionStatus SubmissionStatus, ElectionPhase Phase, ImmutableArray<CourseSelection> Selections,
+    ImmutableArray<string> PlannedOralSubjects);
 
 public sealed record PriorEducation(Knowledge ItalianProfile, Knowledge InformaticsBridge,
     Knowledge InformaticsImp, Knowledge ContinuousBilingual, string? ReligionEthicsGrade10,

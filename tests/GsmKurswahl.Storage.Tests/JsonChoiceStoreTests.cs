@@ -7,6 +7,25 @@ namespace GsmKurswahl.Storage.Tests;
 
 public sealed class JsonChoiceStoreTests : IDisposable
 {
+    [Fact] public async Task LegacySchemaIsRejectedAndFileRemainsUntouched()
+    {
+        Directory.CreateDirectory(directory);
+        var legacy = Encoding.UTF8.GetString(JsonDocuments.WriteChoice(TestData.Choice))
+            .Replace("\"schemaVersion\": 2", "\"schemaVersion\": 1");
+        await File.WriteAllTextAsync(FilePath, legacy);
+        var store = new JsonChoiceStore(FilePath);
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => store.LoadAsync());
+        Assert.Contains("Version 2 erforderlich", error.Message);
+        await Assert.ThrowsAsync<ArgumentException>(() => store.SaveAsync(TestData.Choice, null));
+        Assert.Equal(legacy, await File.ReadAllTextAsync(FilePath));
+    }
+
+    [Fact] public void MissingOralPlanningFieldIsRejected()
+    {
+        var json = Encoding.UTF8.GetString(JsonDocuments.WriteChoice(TestData.Choice));
+        json = json.Replace(",\r\n  \"plannedOralSubjects\": []", "").Replace(",\n  \"plannedOralSubjects\": []", "");
+        Assert.Throws<JsonException>(() => JsonDocuments.ReadChoice(Encoding.UTF8.GetBytes(json)));
+    }
     private readonly string directory = Path.Combine(Path.GetTempPath(), "gsm-tests-" + Guid.NewGuid());
     private string FilePath => Path.Combine(directory, "aktuell.json");
     public void Dispose() { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
@@ -63,16 +82,16 @@ public sealed class JsonChoiceStoreTests : IDisposable
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(FilePath, "{broken");
         var store = new JsonChoiceStore(FilePath);
-        await Assert.ThrowsAsync<JsonException>(() => store.LoadAsync());
-        await Assert.ThrowsAsync<JsonException>(() => store.SaveAsync(TestData.Choice, null));
+        await Assert.ThrowsAnyAsync<JsonException>(() => store.LoadAsync());
+        await Assert.ThrowsAnyAsync<JsonException>(() => store.SaveAsync(TestData.Choice, null));
         Assert.Equal("{broken", await File.ReadAllTextAsync(FilePath));
     }
     [Fact] public void FutureSchemaRejected() => Assert.Throws<ArgumentException>(() => JsonDocuments.ReadChoice(
-        Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(JsonDocuments.WriteChoice(TestData.Choice)).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 2"))));
-    [Theory] [InlineData("{}")] [InlineData("null")] [InlineData("{\"schemaVersion\":1}")]
+        Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(JsonDocuments.WriteChoice(TestData.Choice)).Replace("\"schemaVersion\": 2", "\"schemaVersion\": 99"))));
+    [Theory] [InlineData("{}")] [InlineData("null")] [InlineData("{\"schemaVersion\":2}")]
     public void MissingFieldsRejected(string json) => Assert.Throws<JsonException>(() => JsonDocuments.ReadChoice(Encoding.UTF8.GetBytes(json)));
     [Fact] public void UnknownFieldsRejected() => Assert.Throws<JsonException>(() => JsonDocuments.ReadChoice(
-        Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(JsonDocuments.WriteChoice(TestData.Choice)).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 1, \"valid\": true"))));
+        Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(JsonDocuments.WriteChoice(TestData.Choice)).Replace("\"schemaVersion\": 2", "\"schemaVersion\": 2, \"valid\": true"))));
     [Fact] public async Task DifferentIdentityCannotReplaceExistingDocument()
     {
         var store = new JsonChoiceStore(FilePath);

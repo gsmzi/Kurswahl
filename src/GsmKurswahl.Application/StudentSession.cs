@@ -18,6 +18,81 @@ public sealed class StudentSession
     public ValidationResult Validation => validator.Validate(Choice, Catalog, ProfileContext.Missing);
     public ImmutableArray<SemesterSummary> Summary => ChoiceValidator.Summarize(Choice, Catalog);
     public event Action? Changed;
+    public int Step { get; private set; } = 1;
+    public string? StepError => Step == 1 ? ChoiceWorkflow.LfError(Choice, Catalog)
+        : Step == 2 ? ChoiceWorkflow.OralError(Choice, Catalog) : null;
+    public ImmutableArray<string> OralCandidates => ChoiceWorkflow.OralCandidates(Choice, Catalog);
+    public ImmutableArray<string> ForcedOral => ChoiceWorkflow.ForcedOral(Choice);
+    public ImmutableArray<string> PlanningNotes => ChoiceWorkflow.Remaining(Choice);
+    public string AutomaticMessage { get; private set; } = "";
+
+    public void PreviousStep()
+    {
+        if (IsBusy || Step == 1) return;
+        Step--; Changed?.Invoke();
+    }
+
+    public void NextStep()
+    {
+        if (IsBusy) throw new InvalidOperationException("Dateivorgang läuft; bitte warten.");
+        if (StepError is { } error) throw new InvalidOperationException(error);
+        if (Step == 1)
+        {
+            var forced = ForcedOral;
+            var oral = forced.Concat(Choice.PlannedOralSubjects.Where(s => OralCandidates.Contains(s))).Distinct().Take(2).ToImmutableArray();
+            if (!oral.SequenceEqual(Choice.PlannedOralSubjects))
+            {
+                Choice = Choice with { PlannedOralSubjects = oral, UpdatedAt = DateTimeOffset.UtcNow };
+                IsDirty = true;
+            }
+        }
+        if (Step == 2) ApplyRequired();
+        Step = Math.Min(4, Step + 1);
+        if (IsDirty) Message = "Ungespeicherte Änderungen – vorläufig, nicht eingereicht.";
+        Changed?.Invoke();
+    }
+
+    public void SetOral(string subject, bool selected)
+    {
+        if (IsBusy || Step != 2) throw new InvalidOperationException("Mündliche Planung ist in Schritt 2 möglich.");
+        if (!selected && ForcedOral.Contains(subject)) throw new InvalidOperationException("Deutsch/Mathematik ist ohne entsprechendes LF mündlich erforderlich.");
+        var oral = Choice.PlannedOralSubjects.Remove(subject);
+        if (selected)
+        {
+            if (!OralCandidates.Contains(subject)) throw new InvalidOperationException("Fach ist für diese Planung nicht verfügbar.");
+            if (oral.Length == 2) throw new InvalidOperationException("Zuerst ein mündliches Fach abwählen.");
+            oral = oral.Add(subject);
+        }
+        Choice = Choice with { PlannedOralSubjects = oral, UpdatedAt = DateTimeOffset.UtcNow };
+        IsDirty = true;
+        Message = "Ungespeicherte Änderungen – vorläufig, nicht eingereicht.";
+        Changed?.Invoke();
+    }
+
+    private void ApplyRequired()
+    {
+        var selections = Choice.Selections;
+        var notes = new List<string>();
+        foreach (var required in ChoiceWorkflow.Required(Choice))
+        {
+            var existing = selections.FirstOrDefault(s => s.SubjectId == required.SubjectId);
+            var offers = Catalog.Offers.Where(o => o.SubjectId == required.SubjectId && o.Type == CourseType.Bf
+                && Availability(o).CanSelect && required.Semesters.All(h => o.Schedule.Any(s => s.Semester == h))).ToArray();
+            var offer = existing is null ? (offers.Length == 1 ? offers[0] : null) : offers.FirstOrDefault(o => o.Id == existing.OfferId);
+            if (offer is null) { notes.Add($"{required.SubjectId}: needs_review – kein eindeutiges verfügbares BF; vorhandene Wahl bleibt erhalten."); continue; }
+            var semesters = (existing?.Semesters ?? []).Union(required.Semesters).Order().ToImmutableArray();
+            if (existing is not null && existing.Semesters.SequenceEqual(semesters)) continue;
+            selections = selections.Where(s => s.OfferId != offer.Id).ToImmutableArray()
+                .Add(new(offer.Id, offer.SubjectId, offer.Type, offer.Variant, semesters));
+            notes.Add($"{required.SubjectId}: HJ {string.Join(", ", semesters)} automatisch ergänzt.");
+        }
+        if (!selections.SequenceEqual(Choice.Selections))
+        {
+            Choice = Choice with { Selections = selections, UpdatedAt = DateTimeOffset.UtcNow };
+            IsDirty = true;
+        }
+        AutomaticMessage = string.Join("\n", notes.Prepend("Pflichtbasisfächer und mündliche Planungsfächer ergänzt. Bestehende zusätzliche Kurse bleiben erhalten."));
+    }
 
     public StudentSession(OfferCatalog catalog, string demoStudentId, IChoiceStore store)
     {
@@ -27,8 +102,8 @@ public sealed class StudentSession
         Catalog = catalog;
         this.store = store;
         var now = DateTimeOffset.UtcNow;
-        Choice = new(1, Guid.NewGuid(), demoStudentId, catalog.GraduationYear, catalog.Version, ChoiceValidator.Version,
-            1, now, now, SubmissionStatus.Draft, ElectionPhase.Preliminary, []);
+        Choice = new(2, Guid.NewGuid(), demoStudentId, catalog.GraduationYear, catalog.Version, ChoiceValidator.Version,
+            1, now, now, SubmissionStatus.Draft, ElectionPhase.Preliminary, [], []);
     }
 
     public Availability Availability(CourseOffer offer) => validator.GetAvailability(offer, ProfileContext.Missing);
@@ -86,6 +161,8 @@ public sealed class StudentSession
                     throw new InvalidOperationException("Datei gehört zu anderer Demo-ID, anderem Jahrgang/Versionsstand oder ist kein M1-Vorwahlentwurf. Bestand bleibt erhalten.");
                 // Preserve even now-invalid selections; never silently discard unknown or restricted offers.
                 Choice = candidate;
+                Step = 1;
+                AutomaticMessage = "";
                 contentToken = loaded.ContentToken;
                 IsDirty = false;
                 Message = $"Entwurf geladen (Revision {Choice.Revision}). Weiterhin fachlich zu klären.";

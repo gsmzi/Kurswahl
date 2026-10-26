@@ -29,3 +29,17 @@ Alle Regeln sind in `GsmKurswahl.Rules` definiert (`ChoiceValidator.Definitions`
 | `CATALOG-BILINGUAL` | Bilinguale Variante nur mit Bili-Vorbildungsprüfung | Pflichtenheft §4, §6 Nr.7 | Bilinguale Angebote | invalid |
 
 `CATALOG-*`-Regeln prüfen die Angebotskonfiguration. Ein Verstoß sperrt das betroffene Angebot mit sichtbarer Regel-ID und macht eine Wahl dieses Angebots `invalid`; der übrige Katalog bleibt nutzbar. Diese Regeln waren zuvor als Strukturprüfung im Domain-`ModelGuard` hinterlegt und haben den gesamten Katalog abgewiesen. Inhaltlich sind die Grenzen unverändert, deshalb bleibt die Regelversion `m1-1` und bestehende Entwürfe bleiben ladbar.
+
+## Wahlassistent (25.10.2026, Regelversion m1-2)
+
+Die ergänzenden PLAN-Regeln steuern ausschließlich die vom Nutzer gewünschte vorläufige Planung. Vollständige AGVO-/Profil-/Anrechnungsprüfung bleibt M2; der Gesamtstatus bleibt needs_review. Die bisherige technische Validate-Prüfung bleibt unverändert, der Assistent ruft die Teilprüfungen separat auf.
+
+| Regel-ID | Kurzbeschreibung | Quelle | Geltungsbereich | Schweregrad |
+| --- | --- | --- | --- | --- |
+| `PLAN-LF` | Genau drei LF, mindestens zwei Demo-Kernfächer | Pflichtenheft §6 Nr.1; Nutzerablauf 25.10.2026 | M1-Demo-Assistent | invalid |
+| `PLAN-ORAL` | Zwei unterschiedliche BF-Prüfungsplanungen; D/M und drei Aufgabenfelder; GEO ausgeschlossen | Pflichtenheft §6 Nr.8,11 | M1-Demo-Prüfungsplanung | invalid |
+| `PLAN-REQUIRED` | Eindeutige Pflichtkurse ergänzen; Wahlalternativen anzeigen | Pflichtenheft §4; §6 Nr.3,4,8,10 | M1-Demo-Belegungsplanung | needs_review |
+
+Die Demo-Zuordnung kennt Englisch als einzige bestätigte fortgeführte Sprache im Demo-Katalog. Weitere Sprachkennungen werden nicht geraten. Religion/Ethik und Sport bleiben auch bei vorläufiger Auswahl ungeklärt. Alle Aufgabenfelder sind nur eine notwendige Teilbedingung, keine Aussage zur Zulassung oder 40-Kurs-Anrechnung.
+
+Ab m1-2 werden die Metadaten aller bestehenden Regeln unter dem neuen Regelstand geführt; fachlich hinzugekommen sind die oben aufgeführten PLAN-Regeln. Neue Entwürfe tragen m1-2, abweichende Regelstände bleiben beim Laden geschützt gesperrt.
