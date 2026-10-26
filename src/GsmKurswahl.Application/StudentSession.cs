@@ -8,18 +8,23 @@ namespace GsmKurswahl.Application;
 public sealed record PlanRow(string Label, string? OfferId, CourseType? Type, CourseVariant Variant,
     ImmutableArray<int> Semesters, bool IsAutomatic, bool IsOral, ReviewStatus? Issue, bool IsOpen, int Step);
 
+// Read-only view of one personal prerequisite. Values come only from the trusted profile, never from the choice file.
+public sealed record PrerequisiteInfo(string Id, string Label, string Value, string Effect, bool IsVerified);
+
 public sealed class StudentSession
 {
     private readonly IChoiceStore store;
     private readonly ChoiceValidator validator = new();
     private string? contentToken;
     public OfferCatalog Catalog { get; }
+    // M1 has no signed profile (Pflichtenheft §5a, M2); every prerequisite therefore stays unverified.
+    public ProfileContext Profile { get; } = ProfileContext.Missing;
     public CourseChoice Choice { get; private set; }
     public bool IsDirty { get; private set; }
     public bool IsBusy { get; private set; }
     public bool LoadFailed { get; private set; }
     public string Message { get; private set; } = "Neuer vorläufiger Entwurf – noch nicht gespeichert.";
-    public ValidationResult Validation => validator.Validate(Choice, Catalog, ProfileContext.Missing);
+    public ValidationResult Validation => validator.Validate(Choice, Catalog, Profile);
     public ImmutableArray<SemesterSummary> Summary => ChoiceValidator.Summarize(Choice, Catalog);
     public event Action? Changed;
     public const int LastStep = 5;
@@ -29,10 +34,45 @@ public sealed class StudentSession
     public ImmutableArray<string> OralCandidates => ChoiceWorkflow.OralCandidates(Choice, Catalog);
     public ImmutableArray<string> ForcedOral => ChoiceWorkflow.ForcedOral(Choice);
     public ImmutableArray<string> UsefulOralCandidates => ChoiceWorkflow.UsefulOralCandidates(Choice, Catalog);
-    public ImmutableArray<string> PlanningNotes => ChoiceWorkflow.Remaining(Choice, Catalog, ProfileContext.Missing);
-    public ImmutableArray<ChoiceTask> Tasks => ChoiceWorkflow.Tasks(Choice, Catalog, ProfileContext.Missing);
+    public ImmutableArray<string> PlanningNotes => ChoiceWorkflow.Remaining(Choice, Catalog, Profile);
+    public ImmutableArray<ChoiceTask> Tasks => ChoiceWorkflow.Tasks(Choice, Catalog, Profile);
     public int CountedCourses => ChoiceWorkflow.CountedCourses(Choice);
     public string AutomaticMessage { get; private set; } = "";
+
+    public string ProfileStatusText => Profile.Status switch
+    {
+        ProfileStatus.Verified => "Profil geprüft – vollständige Rechtsprüfung steht aus.",
+        ProfileStatus.ProfileInvalid => "Profil ungültig (profile_invalid) – bitte an die Oberstufenberatung wenden.",
+        _ => "Kein geprüftes persönliches Profil – alle Angaben ungeprüft (needs_review). Die Profilprüfung folgt in M2."
+    };
+
+    public ImmutableArray<PrerequisiteInfo> Prerequisites
+    {
+        get
+        {
+            var p = Profile.Prerequisites;
+            var verified = Profile.Status == ProfileStatus.Verified;
+            string Value(Knowledge k) => k switch { Knowledge.Yes => "ja", Knowledge.No => "nein", _ => "ungeprüft" };
+            string Offers(Requirement requirement, string fallback)
+            {
+                var names = Catalog.Offers.Where(o => o.Requirements.Contains(requirement))
+                    .Select(o => SubjectName(o.SubjectId) + (o.Type == CourseType.Lf ? " LF" : "") + (o.Variant == CourseVariant.Bilingual ? " bilingual" : ""))
+                    .Distinct().ToArray();
+                return names.Length == 0 ? fallback : "Nötig für: " + string.Join(", ", names) + ".";
+            }
+            return
+            [
+                new("INF", "Informatik: Brückenkurs Klasse 10 / IMP",
+                    $"{Value(p.InformaticsBridge)} / {Value(p.InformaticsImp)}", Offers(Requirement.Informatics, "Im Angebot nicht vorhanden."), verified),
+                new("I", "Italienisch als dritte Fremdsprache (Profil)", Value(p.ItalianProfile), Offers(Requirement.ItalianProfile, "Im Angebot nicht vorhanden."), verified),
+                new("BILI", "Durchgängig bilingualer Bildungsgang", Value(p.ContinuousBilingual), Offers(Requirement.ContinuousBilingual, "Im Angebot nicht vorhanden."), verified),
+                new("REL", "Religion/Ethik in Klasse 10", p.ReligionEthicsGrade10 is { } subject ? SubjectName(subject) : "ungeprüft",
+                    "Betrifft vor allem die mündliche Prüfung in Religion/Ethik; die Basisfachwahl wird nicht pauschal gesperrt.", verified),
+                new("SP", "Sportbefreiung", p.SportExemptSemesters is { } semesters ? (semesters.IsEmpty ? "keine" : "HJ " + string.Join(", ", semesters)) : "ungeprüft",
+                    "Bei Befreiung sind Ersatzkurse nötig; Prüfung durch die Oberstufenberatung.", verified)
+            ];
+        }
+    }
 
     public string SubjectName(string subjectId) => Catalog.Subjects.FirstOrDefault(s => s.Id == subjectId)?.Name ?? subjectId;
 
@@ -191,7 +231,7 @@ public sealed class StudentSession
             1, now, now, SubmissionStatus.Draft, ElectionPhase.Preliminary, [], []);
     }
 
-    public Availability Availability(CourseOffer offer) => validator.GetAvailability(offer, ProfileContext.Missing);
+    public Availability Availability(CourseOffer offer) => validator.GetAvailability(offer, Profile);
 
     public void SetSelection(string offerId, IEnumerable<int> semesters)
     {

@@ -92,3 +92,9 @@ Kein Schulnetz/SMB-Ausfalltest, keine echten Profile, kein AGVO-Volltest, kein r
 - UI-Smoke-Test (Avalonia headless) bestanden: LF-Wahl, gesetzte D/M-Prüfung als Information, Pflichtbereiche als Einzelfragen mit Radio-Ersetzung und „Ändern“, Pflicht-Halbjahr gesperrt, zusätzliches Halbjahr und Kurs ergänzt, Speichern/Laden mit echtem JSON-Store; eingeschränktes LF nur in eingeklappter Liste mit Begründung.
 - Schemaprüfung: `Schema OK` für `schueler-demo.json` und `fachangebot-demo.json`. `git diff --check` ohne Fehler.
 - Nicht ausgeführt: Publish, Online-Sicherheits-Audit, Test auf Schulgeräten.
+
+## Schritt 9 – Anzeige der persönlichen Voraussetzungen (26.10.2026)
+
+- `StudentSession.Prerequisites`/`ProfileStatusText` und schreibgeschützter Bereich „Deine Voraussetzungen“ im Schülerprogramm (Informatik, Italienisch, Bili, Religion/Ethik Klasse 10, Sportbefreiung, jeweils mit betroffenen Angeboten).
+- Erster Lauf: Build-Fehler CS0246 im UI-Test (Typ `InputElement` nicht importiert); die dabei ausgegebenen Testergebnisse stammten noch vom alten Build und wurden nicht gewertet. Zweiter Lauf: 94/95, UI-Test erwartete „D LF bilingual“, der Testkatalog heißt das Fach aber „Deutsch“. Testerwartung korrigiert.
+- Abschlusslauf: Release-Build **0 Warnungen, 0 Fehler**; **95/95 bestanden** (Domain 8, Rules 33, Storage 26, ImportExport 1, Application 25, StudentApp 2). Headless-Screenshot von Schritt 1 mit Demoangebot gesichtet. Kein Restore-Neulauf (Pakete unverändert), keine Schemaänderung.

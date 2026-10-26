@@ -26,3 +26,5 @@
 - Bei Fragen mit genau einer Antwort ersetzt eine neue Antwort die vorherige, außer diese ist durch Prüfungsplanung oder Pflicht gesetzt. Wer zusätzlich Kunst und Musik belegen möchte, ergänzt das zweite Fach in „Weitere Kurse“.
 - Offene Pflichtbereiche blockieren den Weiter-Schritt nicht, damit fehlende Angebote nicht festsetzen; sie bleiben sichtbar. Ob vor einer späteren Abgabe blockiert werden soll, entscheidet M2.
 - Reihenfolge und Formulierung der Fragen sind ein Entwurf und mit der Beratungspraxis abzustimmen. Kein Sicht-, DPI- oder Screenreader-Test auf Schulgeräten.
+- Voraussetzungsanzeige: In M1 zeigt sie mangels signiertem Profil überall „ungeprüft“. Selbstangaben der Schüler sind bewusst nicht vorgesehen (Pflichtenheft §5). Darstellung von Profilrevision/-stand, `profile_invalid` und Identitätsabweichung folgt mit der Profilprüfung in M2.
+- Zweite Fremdsprache statt zweiter Naturwissenschaft (Pflichtenheft §6 Nr.4): in M2 die Frage `PLAN-AREA-SCIENCE` aufteilen in „eine Naturwissenschaft“ und „zweite Naturwissenschaft oder zweite fortgeführte Fremdsprache“, mit Sprachkennzeichnung im Katalog und Freigabe über das Profil.

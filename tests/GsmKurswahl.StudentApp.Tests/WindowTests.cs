@@ -98,8 +98,15 @@ public class WindowTests
             window.Show();
             // Restricted offers are not shown as options, but their reason stays reachable in a collapsed list.
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<CheckBox>(), b => b.Name == "Offer_D_LF");
-            var restricted = window.GetVisualDescendants().OfType<Expander>().Single();
+            var restricted = window.GetVisualDescendants().OfType<Expander>().Single(e => e.Name != "Prerequisites");
             Assert.Contains(restricted.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Persönliche Voraussetzung ungeprüft") == true);
+            // Pflichtenheft §7: prerequisites are shown before the LF choice, read-only and marked unverified.
+            var prerequisites = window.GetVisualDescendants().OfType<Expander>().Single(e => e.Name == "Prerequisites");
+            Assert.True(prerequisites.IsExpanded);
+            var texts = prerequisites.GetLogicalDescendants().OfType<TextBlock>().Select(t => t.Text).ToArray();
+            Assert.Contains(texts, t => t?.Contains("Nötig für: Deutsch LF bilingual") == true);
+            Assert.Contains(texts, t => t?.Contains("Religion/Ethik in Klasse 10") == true);
+            Assert.DoesNotContain(prerequisites.GetLogicalDescendants().OfType<Control>(), c => c is ToggleButton or TextBox);
         }
         finally { window.Close(); }
     }

@@ -197,6 +197,23 @@ public class WorkflowTests
         Assert.Equal(1, session.Step);
     }
 
+    [Fact]
+    public void PrerequisitesAreListedUnverifiedWithAffectedOffers()
+    {
+        // Pflichtenheft §5, §5a, §7: shown from the profile only; without a signed profile everything stays unverified.
+        var catalog = TestData.WorkflowCatalog;
+        var inf = TestData.Offer("INF-BF", "INF") with { Requirements = [Requirement.Informatics] };
+        var session = new StudentSession(catalog with { Offers = catalog.Offers.Add(inf), Subjects = catalog.Subjects.Add(new("INF", "Informatik")) }, "demo-001", new MemoryStore());
+        var items = session.Prerequisites.ToDictionary(p => p.Id);
+        Assert.Equal(new[] { "INF", "I", "BILI", "REL", "SP" }, session.Prerequisites.Select(p => p.Id));
+        Assert.All(items.Values, p => Assert.False(p.IsVerified));
+        Assert.Equal("ungeprüft / ungeprüft", items["INF"].Value);
+        Assert.Contains("Informatik", items["INF"].Effect);
+        Assert.Equal("Im Angebot nicht vorhanden.", items["I"].Effect);
+        Assert.Equal("ungeprüft", items["REL"].Value);
+        Assert.Contains("needs_review", session.ProfileStatusText);
+    }
+
     private sealed class MemoryStore : IChoiceStore
     {
         private StoredChoice? stored;

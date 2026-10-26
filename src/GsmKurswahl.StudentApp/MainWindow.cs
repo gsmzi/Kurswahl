@@ -37,6 +37,7 @@ public sealed class MainWindow : Window
     private readonly CheckBox autosave = new() { Content = "Automatisch zwischenspeichern", IsChecked = true };
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1.5) };
     private string? expandedTask;
+    private bool? prerequisitesExpanded;
     private bool closeConfirmed;
     private bool closePromptOpen;
 
@@ -375,6 +376,7 @@ public sealed class MainWindow : Window
     private void BuildPlan()
     {
         plan.Children.Clear();
+        plan.Children.Add(PrerequisitePanel());
         plan.Children.Add(Text("Dein Plan", 18, FontWeight.Bold));
         var rows = session.Plan;
         if (rows.IsEmpty) { plan.Children.Add(Text("Noch nichts gewählt. Beginne mit deinen Leistungsfächern.", 13, color: Muted)); }
@@ -435,6 +437,34 @@ public sealed class MainWindow : Window
         plan.Children.Add(new ProgressBar { Minimum = 0, Maximum = ChoiceWorkflow.MinimumCourses, Value = Math.Min(session.CountedCourses, ChoiceWorkflow.MinimumCourses), Height = 8 });
         plan.Children.Add(Text(string.Join(" · ", session.Summary.Select(s => $"HJ {s.Semester}: {s.WeeklyHours} h")), 12, color: Muted));
         plan.Children.Add(Text("Belegungszahlen und Wochenstunden sind keine Anrechnungs- oder Zulassungsbestätigung.", 11, color: Muted));
+    }
+
+    // Shown read-only: students cannot declare prerequisites themselves (Pflichtenheft §5, §5a).
+    private Control PrerequisitePanel()
+    {
+        var list = new StackPanel { Spacing = 6 };
+        list.Children.Add(Notice(session.ProfileStatusText, WarnSoft, Warn));
+        foreach (var item in session.Prerequisites)
+        {
+            var row = new StackPanel { Spacing = 1 };
+            var line = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+            line.Children.Add(Text(item.Label, 13));
+            var value = Badge(item.Value, item.IsVerified ? DoneSoft : WarnSoft, item.IsVerified ? Done : Warn);
+            Grid.SetColumn(value, 1); line.Children.Add(value);
+            row.Children.Add(line);
+            row.Children.Add(Text(item.Effect, 11, color: Muted));
+            list.Children.Add(row);
+        }
+        list.Children.Add(Text("Fehlt oder stimmt eine Angabe nicht, wende dich an die Oberstufenberatung. Du kannst sie hier nicht selbst ändern.", 11, color: Muted));
+        var expander = new Expander
+        {
+            Name = "Prerequisites", Header = "Deine Voraussetzungen" + (session.Profile.Status == ProfileStatus.Verified ? "" : " · ungeprüft"),
+            Content = list, HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsExpanded = prerequisitesExpanded ?? session.Step == 1
+        };
+        expander.Expanded += (_, _) => prerequisitesExpanded = true;
+        expander.Collapsed += (_, _) => prerequisitesExpanded = false;
+        return expander;
     }
 
     private string Progress()
