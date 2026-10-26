@@ -39,7 +39,17 @@ Die ergänzenden PLAN-Regeln steuern ausschließlich die vom Nutzer gewünschte 
 | `PLAN-LF` | Genau drei LF, mindestens zwei Demo-Kernfächer | Pflichtenheft §6 Nr.1; Nutzerablauf 25.10.2026 | M1-Demo-Assistent | invalid |
 | `PLAN-ORAL` | Zwei unterschiedliche BF-Prüfungsplanungen; D/M und drei Aufgabenfelder; GEO ausgeschlossen | Pflichtenheft §6 Nr.8,11 | M1-Demo-Prüfungsplanung | invalid |
 | `PLAN-REQUIRED` | Eindeutige Pflichtkurse ergänzen; Wahlalternativen anzeigen | Pflichtenheft §4; §6 Nr.3,4,8,10 | M1-Demo-Belegungsplanung | needs_review |
+| `PLAN-AREA-ART` | Kunst oder Musik mit HJ 1–4 planen | Pflichtenheft §6 Nr.3 | M1-Demo-Belegungsplanung | needs_review |
+| `PLAN-AREA-RELIGION` | Religion oder Ethik mit HJ 1–4 planen; Konfession/Zustimmung offen | Pflichtenheft §6 Nr.3,9 | M1-Demo-Belegungsplanung | needs_review |
+| `PLAN-AREA-SCIENCE` | Zwei Naturwissenschaften mit HJ 1–4 planen; INF zählt nur als zweite | Pflichtenheft §6 Nr.3,4,5 | M1-Demo-Belegungsplanung | needs_review |
+| `PLAN-MIN-COURSES` | Planungsziel mindestens 42 Halbjahreskurse | Pflichtenheft §6 Nr.2 | M1-Demo-Belegungsplanung, keine Anrechnung | needs_review |
 
 Die Demo-Zuordnung kennt Englisch als einzige bestätigte fortgeführte Sprache im Demo-Katalog. Weitere Sprachkennungen werden nicht geraten. Religion/Ethik und Sport bleiben auch bei vorläufiger Auswahl ungeklärt. Alle Aufgabenfelder sind nur eine notwendige Teilbedingung, keine Aussage zur Zulassung oder 40-Kurs-Anrechnung.
 
 Ab m1-2 werden die Metadaten aller bestehenden Regeln unter dem neuen Regelstand geführt; fachlich hinzugekommen sind die oben aufgeführten PLAN-Regeln. Neue Entwürfe tragen m1-2, abweichende Regelstände bleiben beim Laden geschützt gesperrt.
+
+### Aufgabenmodell (26.10.2026)
+
+`PLAN-AREA-*` und `PLAN-MIN-COURSES` geben den bisher als freie Hinweistexte ausgegebenen offenen Wahlen (Kunst/Musik, Religion/Ethik, Naturwissenschaften, 42 Kurse) eine stabile Regel-ID und eine strukturierte Form (`ChoiceWorkflow.Tasks`): Optionen, bereits durch LF erfüllte Fächer, gewählte Angebote, nicht wählbare Angebote mit Begründung. Inhaltlich kommt keine neue Bedingung hinzu, `Validate` ist unverändert und alle Aufgaben haben den Schweregrad needs_review. Deshalb bleibt der Regelstand `m1-2`, und vorhandene Entwürfe bleiben ladbar.
+
+Die Naturwissenschaftsfrage plant zwei Naturwissenschaften, weil das Demoangebot keine zweite bestätigte fortgeführte Fremdsprache kennt; die Fremdsprachen-Alternative bleibt needs_review. Die Religion/Ethik-Frage prüft keine Konfession oder Zustimmung (§6 Nr.9 bleibt M2).

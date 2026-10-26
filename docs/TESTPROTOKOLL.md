@@ -76,3 +76,19 @@ Kein Schulnetz/SMB-Ausfalltest, keine echten Profile, kein AGVO-Volltest, kein r
 - Beide JSON-Schemaprüfungen erfolgreich (Schülerwahl v2, Katalog v1).
 - `git diff --check` ohne Fehler. Keine neuen Pakete, keine Änderungen an Lockdateien.
 - Kein nativer Sicht-/DPI-Test, kein Publish/Deployment, kein Online-Sicherheits-Audit. Fachliche Vollprüfung und verbindliche Freigabe bleiben M2.
+
+## Schritt 8 – Aufgabenmodell und geführte Oberfläche (26.10.2026)
+
+- Aufgabenmodell `ChoiceWorkflow.Tasks` (Regeln `PLAN-AREA-ART`, `PLAN-AREA-RELIGION`, `PLAN-AREA-SCIENCE`, `PLAN-MIN-COURSES`), `UsefulOralCandidates`, `StudentSession.Plan`/`ChooseTaskOption`/`GoToStep`; Schülerprogramm auf fünf Schritte mit dauerhaftem Planraster umgebaut.
+- Zwischenläufe Application-Tests: erster Lauf 20/24, vier Fehler durch Testannahmen (Vergleich Array gegen `ImmutableArray`, fehlendes PH-Angebot bzw. PH-Fach im Testkatalog). Tests präzisiert, danach 24/24.
+- Erster UI-Testlauf 1/2: Test erwartete nach der Antwort auf „Kunst oder Musik“ weiterhin beide Optionen; die Frage klappt aber wie vorgesehen zu. Test nutzt jetzt „Ändern“; danach 2/2.
+- Sichtprüfung über headless gerenderte Skia-Screenshots (temporäres Hilfsprogramm außerhalb des Repositorys, Demo-Katalog, alle fünf Schritte). Dabei deaktivierte, grau wirkende Buttons für nicht anklickbare Planzeilen und künftige Schritte gefunden und durch einfache Beschriftungen ersetzt. Kein nativer Fenster-, DPI- oder Screenreader-Test.
+
+### Abschluss
+
+- Restore `--locked-mode --ignore-failed-sources -p:NuGetAudit=false` aus dem lokalen Paketcache: alle Projekte wiederhergestellt, keine Lockdatei-Änderung.
+- Release-Build: **0 Warnungen, 0 Fehler**.
+- Gesamte Testsuite: **94/94 bestanden**, keine übersprungen: Domain 8, Rules 33, Storage 26, ImportExport 1, Application 24, StudentApp 2.
+- UI-Smoke-Test (Avalonia headless) bestanden: LF-Wahl, gesetzte D/M-Prüfung als Information, Pflichtbereiche als Einzelfragen mit Radio-Ersetzung und „Ändern“, Pflicht-Halbjahr gesperrt, zusätzliches Halbjahr und Kurs ergänzt, Speichern/Laden mit echtem JSON-Store; eingeschränktes LF nur in eingeklappter Liste mit Begründung.
+- Schemaprüfung: `Schema OK` für `schueler-demo.json` und `fachangebot-demo.json`. `git diff --check` ohne Fehler.
+- Nicht ausgeführt: Publish, Online-Sicherheits-Audit, Test auf Schulgeräten.

@@ -4,17 +4,33 @@ using GsmKurswahl.Domain;
 namespace GsmKurswahl.Rules;
 
 public sealed record RequiredCourse(string SubjectId, ImmutableArray<int> Semesters);
+public sealed record RestrictedOffer(string OfferId, string Explanation);
+
+// An open planning decision. Choose = how many options the student still decides about beyond
+// what LF already cover; Open = how many are still missing. Only a planning aid, never an admission.
+public sealed record ChoiceTask(string Id, RuleDefinition Rule, string Title, string Hint, ImmutableArray<int> Semesters,
+    int Choose, int Open, ImmutableArray<string> OptionOfferIds, ImmutableArray<string> ChosenOfferIds,
+    ImmutableArray<string> FulfilledBySubjects, ImmutableArray<RestrictedOffer> Restricted)
+{
+    public bool IsSatisfied => Open == 0;
+    public bool IsExclusive => Choose == 1;
+}
 
 // Preliminary planning from the supplied specification, not an admission or crediting decision.
 public static class ChoiceWorkflow
 {
     private static readonly string[] Core = ["D", "M", "E", "BIO", "CH", "PH"];
     private static readonly string[] Sciences = ["BIO", "CH", "PH"];
+    public const int MinimumCourses = 42;
     public static readonly ImmutableArray<RuleDefinition> Definitions =
     [
         new("PLAN-LF", "Drei LF mit mindestens zwei Kernfächern", "Pflichtenheft §6 Nr.1; Nutzerablauf 25.10.2026", "M1-Demo-Wahlassistent", ChoiceValidator.Version, ReviewStatus.Invalid),
         new("PLAN-ORAL", "Zwei mündliche Planungsfächer; D/M und Aufgabenfelder", "Pflichtenheft §6 Nr.8,11", "M1-Demo-Prüfungsplanung, keine Zulassung", ChoiceValidator.Version, ReviewStatus.Invalid),
-        new("PLAN-REQUIRED", "Eindeutige Pflichtbelegung ergänzen, Alternativen offenlassen", "Pflichtenheft §4; §6 Nr.3,4,8,10", "M1-Demo-Belegungsplanung", ChoiceValidator.Version, ReviewStatus.NeedsReview)
+        new("PLAN-REQUIRED", "Eindeutige Pflichtbelegung ergänzen, Alternativen offenlassen", "Pflichtenheft §4; §6 Nr.3,4,8,10", "M1-Demo-Belegungsplanung", ChoiceValidator.Version, ReviewStatus.NeedsReview),
+        new("PLAN-AREA-ART", "Kunst oder Musik mit vier Kursen planen", "Pflichtenheft §6 Nr.3", "M1-Demo-Belegungsplanung", ChoiceValidator.Version, ReviewStatus.NeedsReview),
+        new("PLAN-AREA-RELIGION", "Religion oder Ethik mit vier Kursen planen; Zulässigkeit offen", "Pflichtenheft §6 Nr.3,9", "M1-Demo-Belegungsplanung", ChoiceValidator.Version, ReviewStatus.NeedsReview),
+        new("PLAN-AREA-SCIENCE", "Eine Naturwissenschaft, dazu zweite Naturwissenschaft (INF nur als zweite) planen", "Pflichtenheft §6 Nr.3,4,5", "M1-Demo-Belegungsplanung", ChoiceValidator.Version, ReviewStatus.NeedsReview),
+        new("PLAN-MIN-COURSES", "Planungsziel mindestens 42 Halbjahreskurse", "Pflichtenheft §6 Nr.2", "M1-Demo-Belegungsplanung, keine Anrechnung", ChoiceValidator.Version, ReviewStatus.NeedsReview)
     ];
 
     private static string[] Lf(CourseChoice choice) => choice.Selections.Where(s => s.Type == CourseType.Lf).Select(s => s.SubjectId).ToArray();
@@ -79,19 +95,63 @@ public static class ChoiceWorkflow
         return [.. result.Where(r => !Lf(choice).Contains(r.Key)).Select(r => new RequiredCourse(r.Key, r.Value))];
     }
 
-    public static ImmutableArray<string> Remaining(CourseChoice choice)
+    // Oral candidates that still allow a complete D/M/Aufgabenfeld combination with the current planning.
+    public static ImmutableArray<string> UsefulOralCandidates(CourseChoice choice, OfferCatalog catalog)
     {
-        bool Four(string s) => choice.Selections.Any(c => c.SubjectId == s && c.Semesters.Length == 4);
+        var candidates = OralCandidates(choice, catalog);
+        var planned = choice.PlannedOralSubjects.Where(candidates.Contains).ToArray();
+        if (planned.Length >= 2) return [];
+        return [.. candidates.Where(c => !planned.Contains(c) && (planned.Length == 1
+            ? Combination(choice, [planned[0], c])
+            : candidates.Any(d => d != c && Combination(choice, [c, d]))))];
+    }
+
+    public static int CountedCourses(CourseChoice choice) => choice.Selections.Sum(s => s.Semesters.Length);
+
+    public static ImmutableArray<ChoiceTask> Tasks(CourseChoice choice, OfferCatalog catalog, ProfileContext profile)
+    {
+        var validator = new ChoiceValidator();
+        ImmutableArray<int> four = [1, 2, 3, 4];
+        ChoiceTask Area(string ruleId, string title, string hint, string[] subjects, int needed, Func<string[], int> fulfilled)
+        {
+            var lf = choice.Selections.Where(s => s.Type == CourseType.Lf && subjects.Contains(s.SubjectId)).Select(s => s.SubjectId).ToImmutableArray();
+            var chosen = choice.Selections.Where(s => s.Type != CourseType.Lf && subjects.Contains(s.SubjectId) && four.All(s.Semesters.Contains))
+                .Select(s => s.OfferId).ToImmutableArray();
+            var candidates = catalog.Offers.Where(o => o.Type != CourseType.Lf && subjects.Contains(o.SubjectId) && !lf.Contains(o.SubjectId)
+                && four.All(h => o.Schedule.Any(s => s.Semester == h))).ToArray();
+            var options = candidates.Where(o => chosen.Contains(o.Id) || validator.GetAvailability(o, profile).CanSelect).Select(o => o.Id).ToImmutableArray();
+            var restricted = candidates.Where(o => !options.Contains(o.Id))
+                .Select(o => new RestrictedOffer(o.Id, validator.GetAvailability(o, profile).Explanation)).ToImmutableArray();
+            var have = lf.Concat(choice.Selections.Where(s => chosen.Contains(s.OfferId)).Select(s => s.SubjectId)).ToArray();
+            return new(ruleId, Definitions.Single(d => d.Id == ruleId), title, hint, four, Math.Max(0, needed - lf.Length),
+                Math.Max(0, needed - fulfilled(have)), options, chosen, lf, restricted);
+        }
+        return
+        [
+            Area("PLAN-AREA-ART", "Kunst oder Musik", "Wähle eines der beiden Fächer für HJ 1–4.", ["BK", "MU"], 1, have => have.Length),
+            Area("PLAN-AREA-RELIGION", "Religion oder Ethik", "Wähle ein Fach für HJ 1–4. Ob du es belegen darfst (Konfession, Vorbildung), klärt die Oberstufenberatung – needs_review.",
+                ["ER", "KR", "ETH"], 1, have => have.Length),
+            // INF may replace only the second science (Pflichtenheft §6 Nr.4); a second language alternative stays needs_review.
+            Area("PLAN-AREA-SCIENCE", "Naturwissenschaften", "Du brauchst zwei Naturwissenschaften mit HJ 1–4. Eine zweite fortgeführte Fremdsprache oder Informatik als Alternative klärt die Oberstufenberatung.",
+                [.. Sciences, "INF"], 2, have =>
+                {
+                    var sciences = have.Count(Sciences.Contains);
+                    return sciences == 0 ? 0 : Math.Min(2, sciences + (have.Contains("INF") ? 1 : 0));
+                })
+        ];
+    }
+
+    public static ImmutableArray<string> Remaining(CourseChoice choice, OfferCatalog catalog, ProfileContext profile)
+    {
         var notes = ImmutableArray.CreateBuilder<string>();
         foreach (var required in Required(choice))
             if (!choice.Selections.Any(s => s.SubjectId == required.SubjectId && required.Semesters.All(s.Semesters.Contains)))
                 notes.Add($"PLAN-REQUIRED: {required.SubjectId} benötigt HJ {string.Join(", ", required.Semesters)}; Belegung ergänzen oder Angebot klären.");
-        if (!Four("E")) notes.Add("Fortgeführte Fremdsprache wählen (im Demoangebot Englisch; andere Sprachlaufbahnen klären).");
-        if (!Sciences.Any(Four)) notes.Add("Mindestens eine Naturwissenschaft BIO/CH/PH für HJ 1–4 wählen.");
-        if (Sciences.Count(Four) < 2) notes.Add("Zweite Naturwissenschaft oder zweite geeignete Fremdsprache ergänzen; INF-Alternative erst mit geprüftem Profil.");
-        if (!Four("BK") && !Four("MU")) notes.Add("Kunst oder Musik für HJ 1–4 wählen.");
-        if (!new[] { "ETH", "ER", "KR" }.Any(Four)) notes.Add("Religion/Ethik für HJ 1–4 wählen; persönliche Voraussetzungen bleiben zu klären.");
-        if (choice.Selections.Sum(s => s.Semesters.Length) < 42) notes.Add("Weitere Belegungen ergänzen: Planungsziel mindestens 42 Halbjahreskurse (12 LF + 30 weitere).");
+        foreach (var task in Tasks(choice, catalog, profile).Where(t => !t.IsSatisfied))
+            notes.Add($"{task.Rule.Id}: {task.Title} – noch {task.Open} offen.");
+        var count = CountedCourses(choice);
+        if (count < MinimumCourses)
+            notes.Add($"PLAN-MIN-COURSES: {count} von mindestens {MinimumCourses} Halbjahreskursen (12 LF + 30 weitere) geplant.");
         notes.Add("needs_review: Sportbefreiung/Ersatz, Religion/Ethik, persönliche Voraussetzungen und Anrechnung (höchstens 40) werden erst in M2 vollständig geprüft.");
         return notes.ToImmutable();
     }

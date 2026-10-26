@@ -2,7 +2,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Themes.Fluent;
 using Avalonia.VisualTree;
 using GsmKurswahl.Application;
@@ -26,7 +28,7 @@ public sealed class TestApp : Avalonia.Application
 public class WindowTests
 {
     [AvaloniaFact]
-    public async Task WindowCheckboxSaveAndReloadWorkWithActualJsonStore()
+    public async Task GuidedWorkflowSaveAndReloadWorkWithActualJsonStore()
     {
         var directory = Path.Combine(Path.GetTempPath(), "gsm-ui-" + Guid.NewGuid());
         var path = Path.Combine(directory, "aktuell.json");
@@ -35,21 +37,41 @@ public class WindowTests
         try
         {
             window.Show();
-            CheckBox Box(string name) => window.GetVisualDescendants().OfType<CheckBox>().Single(b => b.Name == name);
+            ToggleButton Box(string name) => window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == name);
+            bool Has(string name) => window.GetVisualDescendants().OfType<Control>().Any(b => b.Name == name);
             var next = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "NextStep");
             Assert.False(next.IsEnabled);
             foreach (var subject in new[] { "E", "BIO", "W" }) Box("Offer_" + subject + "_LF").IsChecked = true;
             Assert.True(next.IsEnabled);
             next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Assert.True(Box("Oral_D").IsChecked);
-            Assert.False(Box("Oral_D").IsEnabled);
-            Assert.True(Box("Oral_M").IsChecked);
+            // D/M are forced and shown as fixed facts, not as disabled checkboxes.
+            Assert.Equal(new[] { "D", "M" }, session.Choice.PlannedOralSubjects);
+            Assert.False(Has("Oral_D"));
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("ist gesetzt") == true);
             next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(3, session.Step);
-            Assert.False(Box("Offer_G_BF").IsEnabled);
+            // Only open decisions are asked; required courses are not offered as controls.
+            Assert.False(Has("Offer_G_BF"));
+            Assert.IsType<RadioButton>(Box("Option_BK_BF"));
+            Box("Option_BK_BF").IsChecked = true;
+            // The answered question collapses and the next open one follows; "Ändern" reopens it.
+            Assert.False(Has("Option_MU_BF"));
+            Assert.True(Has("Option_ETH_BF"));
+            window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "Task_PLAN_AREA_ART").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Box("Option_MU_BF").IsChecked = true;
+            window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "TaskDone").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.DoesNotContain(session.Choice.Selections, s => s.SubjectId == "BK");
+            Box("Option_ETH_BF").IsChecked = true;
+            Box("Option_CH_BF").IsChecked = true;
+            Assert.All(session.Tasks, t => Assert.True(t.IsSatisfied));
+            Assert.True(Has("Plan_0"));
             next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(4, session.Step);
+            Assert.False(Box("Sem_GK_BF_1").IsEnabled);
+            Box("Sem_GK_BF_2").IsChecked = true;
+            Assert.Equal(new[] { 1, 2 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
             Box("Offer_BK_BF").IsChecked = true;
+            Assert.Contains(session.Choice.Selections, s => s.SubjectId == "BK");
             var save = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "SaveButton");
             save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             for (var i = 0; i < 200 && session.IsBusy; i++) await Task.Delay(10);
@@ -67,15 +89,17 @@ public class WindowTests
     }
 
     [AvaloniaFact]
-    public void RestrictedOfferIsDisabledAndReasonVisible()
+    public void RestrictedOfferIsHiddenAndReasonAvailable()
     {
         var offer = TestData.Offer("D-LF", type: CourseType.Lf) with { Variant = CourseVariant.Bilingual, Requirements = [Requirement.ContinuousBilingual] };
         var window = new MainWindow(new StudentSession(TestData.Catalog with { Offers = [offer] }, "demo-001", new EmptyStore()), "demo.json", "demo-account");
         try
         {
             window.Show();
-            Assert.False(window.GetVisualDescendants().OfType<CheckBox>().Single(b => b.Name == "Offer_D_LF").IsEnabled);
-            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Persönliche Voraussetzung ungeprüft") == true);
+            // Restricted offers are not shown as options, but their reason stays reachable in a collapsed list.
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<CheckBox>(), b => b.Name == "Offer_D_LF");
+            var restricted = window.GetVisualDescendants().OfType<Expander>().Single();
+            Assert.Contains(restricted.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Persönliche Voraussetzung ungeprüft") == true);
         }
         finally { window.Close(); }
     }

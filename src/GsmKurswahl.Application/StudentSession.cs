@@ -4,6 +4,10 @@ using GsmKurswahl.Rules;
 
 namespace GsmKurswahl.Application;
 
+// One line of the permanent plan overview. OpenTaskId/missing rows are placeholders, never selections.
+public sealed record PlanRow(string Label, string? OfferId, CourseType? Type, CourseVariant Variant,
+    ImmutableArray<int> Semesters, bool IsAutomatic, bool IsOral, ReviewStatus? Issue, bool IsOpen, int Step);
+
 public sealed class StudentSession
 {
     private readonly IChoiceStore store;
@@ -18,18 +22,99 @@ public sealed class StudentSession
     public ValidationResult Validation => validator.Validate(Choice, Catalog, ProfileContext.Missing);
     public ImmutableArray<SemesterSummary> Summary => ChoiceValidator.Summarize(Choice, Catalog);
     public event Action? Changed;
+    public const int LastStep = 5;
     public int Step { get; private set; } = 1;
     public string? StepError => Step == 1 ? ChoiceWorkflow.LfError(Choice, Catalog)
         : Step == 2 ? ChoiceWorkflow.OralError(Choice, Catalog) : null;
     public ImmutableArray<string> OralCandidates => ChoiceWorkflow.OralCandidates(Choice, Catalog);
     public ImmutableArray<string> ForcedOral => ChoiceWorkflow.ForcedOral(Choice);
-    public ImmutableArray<string> PlanningNotes => ChoiceWorkflow.Remaining(Choice);
+    public ImmutableArray<string> UsefulOralCandidates => ChoiceWorkflow.UsefulOralCandidates(Choice, Catalog);
+    public ImmutableArray<string> PlanningNotes => ChoiceWorkflow.Remaining(Choice, Catalog, ProfileContext.Missing);
+    public ImmutableArray<ChoiceTask> Tasks => ChoiceWorkflow.Tasks(Choice, Catalog, ProfileContext.Missing);
+    public int CountedCourses => ChoiceWorkflow.CountedCourses(Choice);
     public string AutomaticMessage { get; private set; } = "";
+
+    public string SubjectName(string subjectId) => Catalog.Subjects.FirstOrDefault(s => s.Id == subjectId)?.Name ?? subjectId;
 
     public void PreviousStep()
     {
         if (IsBusy || Step == 1) return;
         Step--; Changed?.Invoke();
+    }
+
+    // Only completed steps can be revisited directly; moving forward always runs NextStep's checks.
+    public void GoToStep(int step)
+    {
+        if (IsBusy || step < 1 || step >= Step) return;
+        Step = step; Changed?.Invoke();
+    }
+
+    public ImmutableArray<int> LockedSemesters(string offerId)
+    {
+        var selection = Choice.Selections.FirstOrDefault(s => s.OfferId == offerId);
+        if (selection is null) return [];
+        if (selection.Type == CourseType.Lf) return selection.Semesters;
+        var locked = ChoiceWorkflow.Required(Choice).Where(r => r.SubjectId == selection.SubjectId).SelectMany(r => r.Semesters);
+        var task = Tasks.FirstOrDefault(t => t.ChosenOfferIds.Contains(offerId));
+        if (task is not null) locked = locked.Concat(task.Semesters);
+        return [.. locked.Distinct().Order()];
+    }
+
+    public bool IsRequiredSubject(string subjectId) => ChoiceWorkflow.Required(Choice).Any(r => r.SubjectId == subjectId);
+
+    public ImmutableArray<CourseOffer> LfOffers => [.. Catalog.Offers.Where(o => o.Type == CourseType.Lf && Availability(o).CanSelect)];
+
+    public ImmutableArray<CourseOffer> ExtraOffers => [.. Catalog.Offers.Where(o => o.Type != CourseType.Lf && Availability(o).CanSelect
+        && !Choice.Selections.Any(s => s.SubjectId == o.SubjectId))];
+
+    public ImmutableArray<CourseOffer> RestrictedOffers(bool lf) => [.. Catalog.Offers.Where(o => (o.Type == CourseType.Lf) == lf
+        && !Availability(o).CanSelect && !Choice.Selections.Any(s => s.OfferId == o.Id))];
+
+    public void ChooseTaskOption(string taskId, string offerId, bool selected)
+    {
+        if (IsBusy) throw new InvalidOperationException("Dateivorgang läuft; bitte warten.");
+        var task = Tasks.Single(t => t.Id == taskId);
+        var offer = Catalog.Offers.Single(o => o.Id == offerId);
+        if (!selected)
+        {
+            if (IsRequiredSubject(offer.SubjectId)) throw new InvalidOperationException("Dieses Fach ist durch deine Prüfungsplanung oder als Pflichtfach gesetzt.");
+            SetSelection(offerId, []);
+            return;
+        }
+        if (!task.OptionOfferIds.Contains(offerId)) throw new InvalidOperationException("Dieses Angebot passt nicht zu dieser Frage.");
+        // Single choice replaces the previous answer, but never a course that is required elsewhere.
+        if (task.IsExclusive)
+            foreach (var previous in task.ChosenOfferIds.Where(id => id != offerId))
+                if (!IsRequiredSubject(Catalog.Offers.Single(o => o.Id == previous).SubjectId)) SetSelection(previous, []);
+        var existing = Choice.Selections.FirstOrDefault(s => s.OfferId == offerId)?.Semesters ?? [];
+        SetSelection(offerId, existing.Union(task.Semesters));
+    }
+
+    public ImmutableArray<PlanRow> Plan
+    {
+        get
+        {
+            var tasks = Tasks;
+            var required = ChoiceWorkflow.Required(Choice);
+            var messages = Validation.Messages;
+            ReviewStatus? Issue(string subject)
+            {
+                var relevant = messages.Where(m => m.SubjectIds.Contains(subject)).ToArray();
+                return relevant.Any(m => m.Rule.Severity == ReviewStatus.Invalid) ? ReviewStatus.Invalid
+                    : relevant.Length > 0 ? ReviewStatus.NeedsReview : null;
+            }
+            int Order(CourseSelection s) => s.Type == CourseType.Lf ? 0
+                : required.Any(r => r.SubjectId == s.SubjectId) ? 1 : tasks.Any(t => t.ChosenOfferIds.Contains(s.OfferId)) ? 2 : 3;
+            var rows = Choice.Selections.OrderBy(Order).ThenBy(s => Catalog.Offers.ToList().FindIndex(o => o.Id == s.OfferId))
+                .Select(s => new PlanRow(SubjectName(s.SubjectId), s.OfferId, s.Type, s.Variant, s.Semesters,
+                    Order(s) == 1, Choice.PlannedOralSubjects.Contains(s.SubjectId), Issue(s.SubjectId), false,
+                    Order(s) switch { 0 => 1, 3 => 4, _ => 3 })).ToList();
+            if (Step >= 3)
+                rows.AddRange(required.Where(r => !Choice.Selections.Any(s => s.SubjectId == r.SubjectId))
+                    .Select(r => new PlanRow(SubjectName(r.SubjectId) + " – Angebot klären", null, null, CourseVariant.Normal, r.Semesters, true, false, ReviewStatus.NeedsReview, true, 3)));
+            rows.AddRange(tasks.Where(t => !t.IsSatisfied).Select(t => new PlanRow(t.Title, null, null, CourseVariant.Normal, t.Semesters, false, false, null, true, 3)));
+            return [.. rows];
+        }
     }
 
     public void NextStep()
@@ -47,7 +132,7 @@ public sealed class StudentSession
             }
         }
         if (Step == 2) ApplyRequired();
-        Step = Math.Min(4, Step + 1);
+        Step = Math.Min(LastStep, Step + 1);
         if (IsDirty) Message = "Ungespeicherte Änderungen – vorläufig, nicht eingereicht.";
         Changed?.Invoke();
     }
@@ -79,19 +164,19 @@ public sealed class StudentSession
             var offers = Catalog.Offers.Where(o => o.SubjectId == required.SubjectId && o.Type == CourseType.Bf
                 && Availability(o).CanSelect && required.Semesters.All(h => o.Schedule.Any(s => s.Semester == h))).ToArray();
             var offer = existing is null ? (offers.Length == 1 ? offers[0] : null) : offers.FirstOrDefault(o => o.Id == existing.OfferId);
-            if (offer is null) { notes.Add($"{required.SubjectId}: needs_review – kein eindeutiges verfügbares BF; vorhandene Wahl bleibt erhalten."); continue; }
+            if (offer is null) { notes.Add($"{SubjectName(required.SubjectId)} ({required.SubjectId}): needs_review – kein eindeutiges verfügbares BF; vorhandene Wahl bleibt erhalten."); continue; }
             var semesters = (existing?.Semesters ?? []).Union(required.Semesters).Order().ToImmutableArray();
             if (existing is not null && existing.Semesters.SequenceEqual(semesters)) continue;
             selections = selections.Where(s => s.OfferId != offer.Id).ToImmutableArray()
                 .Add(new(offer.Id, offer.SubjectId, offer.Type, offer.Variant, semesters));
-            notes.Add($"{required.SubjectId}: HJ {string.Join(", ", semesters)} automatisch ergänzt.");
         }
         if (!selections.SequenceEqual(Choice.Selections))
         {
             Choice = Choice with { Selections = selections, UpdatedAt = DateTimeOffset.UtcNow };
             IsDirty = true;
         }
-        AutomaticMessage = string.Join("\n", notes.Prepend("Pflichtbasisfächer und mündliche Planungsfächer ergänzt. Bestehende zusätzliche Kurse bleiben erhalten."));
+        // Successful additions are visible in the plan; only problems need words.
+        AutomaticMessage = string.Join("\n", notes);
     }
 
     public StudentSession(OfferCatalog catalog, string demoStudentId, IChoiceStore store)

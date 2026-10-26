@@ -14,8 +14,15 @@
 
 ## Wahlassistent – Grenzen der Vorplanung (25.10.2026)
 
-- Vier Schritte gemäß Nutzerwunsch: LF, mündliche Planung, automatische Pflicht-BF, restliche Wahl. Die mündlichen Fächer sind ausdrücklich unverbindliche Planungsangaben.
+- Fünf Schritte gemäß Nutzerwunsch (26.10.2026): LF, mündliche Planung, Pflichtbereiche als Einzelfragen, weitere Kurse, Überblick. Die mündlichen Fächer sind ausdrücklich unverbindliche Planungsangaben.
 - Englisch ist die einzige bekannte fortgeführte Fremdsprache des Demoangebots. Weitere Sprachen, NwT und persönliche Alternativen erfordern bestätigte Fach-/Laufbahnkonfiguration in M2.
 - Kunst/Musik, Religion/Ethik und Naturwissenschafts-Alternativen werden nicht willkürlich automatisch entschieden; sie erscheinen als offene Wahlen. Sport wird vorläufig ergänzt, Befreiung und Ersatz bleiben needs_review.
 - Nach LF-/Prüfungswechsel bleiben zusätzliche vorhandene Kurse erhalten und können bewusst abgewählt werden. Fehlende oder mehrdeutige Pflichtangebote werden gemeldet.
 - Wahl-Schema v2 speichert plannedOralSubjects. v1 wird ohne Migration abgewiesen und vor Überschreiben geschützt; eine explizite Migration ist nicht implementiert.
+
+## Geführte Oberfläche (26.10.2026)
+
+- Pflichtenheft §7 nennt für nicht wählbare Fächer „vorzugsweise ausgegraut mit verständlicher Begründung“. Auf Nutzerwunsch stehen sie jetzt mit Begründung in einer eingeklappten Liste je Schritt statt ausgegraut zwischen den Optionen. Mit der Oberstufenberatung bestätigen.
+- Bei Fragen mit genau einer Antwort ersetzt eine neue Antwort die vorherige, außer diese ist durch Prüfungsplanung oder Pflicht gesetzt. Wer zusätzlich Kunst und Musik belegen möchte, ergänzt das zweite Fach in „Weitere Kurse“.
+- Offene Pflichtbereiche blockieren den Weiter-Schritt nicht, damit fehlende Angebote nicht festsetzen; sie bleiben sichtbar. Ob vor einer späteren Abgabe blockiert werden soll, entscheidet M2.
+- Reihenfolge und Formulierung der Fragen sind ein Entwurf und mit der Beratungspraxis abzustimmen. Kein Sicht-, DPI- oder Screenreader-Test auf Schulgeräten.
