@@ -73,10 +73,10 @@ public class ChoiceValidatorTests
     }
     [Theory]
     [InlineData("lf-short", "CATALOG-LF-SEMESTERS")]
-    [InlineData("psy-bf", "CATALOG-PSY")] [InlineData("psy-hj3", "CATALOG-PSY")]
-    [InlineData("sia-2h", "CATALOG-SIA")] [InlineData("geo-hj1", "CATALOG-GEO-BF")]
+    [InlineData("psy-bf", "CATALOG-PSY")] [InlineData("psy-hj3", "CATALOG-PSY")] [InlineData("psy-hj1", "CATALOG-PSY")]
+    [InlineData("sia-2h", "CATALOG-SIA")] [InlineData("geo-hj1", "CATALOG-GEO-BF")] [InlineData("geo-wf", "CATALOG-GEO-BF")]
     [InlineData("inf-no-req", "CATALOG-INF")] [InlineData("inf-2h", "CATALOG-INF")]
-    [InlineData("i-no-req", "CATALOG-I-PROFILE")] [InlineData("bili-no-req", "CATALOG-BILINGUAL")]
+    [InlineData("i-no-req", "CATALOG-I-PROFILE")] [InlineData("i-wf", "CATALOG-I-PROFILE")] [InlineData("bili-no-req", "CATALOG-BILINGUAL")]
     public void CatalogRuleViolationIsReportedAndBlocksOffer(string kind, string ruleId)
     {
         // Pflichtenheft §4/§6: Angebotsgrenzen; Quelle je Regel in CatalogRules.Definitions.
@@ -85,11 +85,14 @@ public class ChoiceValidatorTests
             "lf-short" => TestData.Offer("D-LF", "D", CourseType.Lf) with { Schedule = [new(1, 5), new(2, 5), new(3, 5)] },
             "psy-bf" => TestData.Offer("PSY-BF", "PSY") with { Schedule = [new(1, 2), new(2, 2)] },
             "psy-hj3" => TestData.Offer("PSY-WF", "PSY", CourseType.Elective) with { Schedule = [new(1, 2), new(3, 2)] },
+            "psy-hj1" => TestData.Offer("PSY-WF", "PSY", CourseType.Elective) with { Schedule = [new(1, 2)] },
             "sia-2h" => TestData.Offer("SIA-SK", "SIA", CourseType.Seminar) with { Schedule = [new(1, 2), new(2, 2)] },
             "geo-hj1" => TestData.Offer("GEO-BF", "GEO") with { Schedule = [new(1, 2), new(3, 2), new(4, 2)] },
+            "geo-wf" => TestData.Offer("GEO-WF", "GEO", CourseType.Elective) with { Schedule = [new(3, 2), new(4, 2)] },
             "inf-no-req" => TestData.Offer("INF-BF", "INF"),
             "inf-2h" => TestData.Offer("INF-BF", "INF") with { Schedule = [new(1, 2), new(2, 2), new(3, 2), new(4, 2)], Requirements = [Requirement.Informatics] },
             "i-no-req" => TestData.Offer("I-BF", "I"),
+            "i-wf" => TestData.Offer("I-WF", "I", CourseType.Elective) with { Requirements = [Requirement.ItalianProfile] },
             "bili-no-req" => TestData.Offer("BIO-BF-BILI", "BIO") with { Variant = CourseVariant.Bilingual },
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
@@ -128,5 +131,22 @@ public class ChoiceValidatorTests
         var result = validator.Validate(TestData.Choice with { Selections = [TestData.Select(offer)] }, TestData.Catalog with { Offers = [offer] }, ProfileContext.Missing);
         Assert.Equal(ReviewStatus.Invalid, result.Status);
         Assert.Contains(result.Messages, m => m.Rule.Id == "OFFER-SELECTION");
+    }
+    [Fact] public void ValidateReportsPartialSeminarSelectionAsInvalid()
+    {
+        // Pflichtenheft §4, §6 Nr.12: SIA umfasst zwei Seminarkurs-Halbjahre HJ 1–2.
+        var sia = TestData.Offer("SIA-SK", "SIA", CourseType.Seminar) with { Schedule = [new(1, 3), new(2, 3)] };
+        var catalog = TestData.Catalog with { Subjects = [new("SIA", "SIA")], Offers = [sia] };
+        var choice = TestData.Choice with { Selections = [new("SIA-SK", "SIA", CourseType.Seminar, CourseVariant.Normal, [1])] };
+        var result = validator.Validate(choice, catalog, ProfileContext.Missing);
+        Assert.Equal(ReviewStatus.Invalid, result.Status);
+        Assert.Contains(result.Messages, m => m.Rule.Id == "OFFER-SELECTION");
+    }
+    [Fact] public void ValidateReportsInvalidPlannedOralSubjectAsInvalid()
+    {
+        // Pflichtenheft §6 Nr.8,11: GEO oder bereits als LF belegtes Fach nicht als mündliche Prüfung zulässig.
+        var result = validator.Validate(TestData.Choice with { PlannedOralSubjects = ["GEO"] }, TestData.WorkflowCatalog, ProfileContext.Missing);
+        Assert.Equal(ReviewStatus.Invalid, result.Status);
+        Assert.Contains(result.Messages, m => m.Rule.Id == "PLAN-ORAL");
     }
 }

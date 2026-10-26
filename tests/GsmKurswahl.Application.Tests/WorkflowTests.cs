@@ -214,6 +214,39 @@ public class WorkflowTests
         Assert.Contains("needs_review", session.ProfileStatusText);
     }
 
+    [Fact]
+    public void ExtraCoursesBeyondTaskNeedRemainUnlockedAndRemovable()
+    {
+        var catalog = TestData.WorkflowCatalog;
+        var session = new StudentSession(catalog with { Offers = catalog.Offers.Add(TestData.Offer("PH-BF", "PH")), Subjects = catalog.Subjects.Add(new("PH", "PH")) }, "demo-001", new MemoryStore());
+        foreach (var subject in new[] { "D", "BIO", "CH" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
+        session.NextStep();
+        session.SetOral("G", true);
+        session.NextStep();
+        session.ChooseTaskOption("PLAN-AREA-ART", "MU-BF", true);
+        session.NextStep();
+        session.SetSelection("BK-BF", [1, 2, 3, 4]);
+        session.SetSelection("PH-BF", [1, 2, 3, 4]);
+        Assert.Equal(new[] { 1, 2, 3, 4 }, session.LockedSemesters("MU-BF"));
+        Assert.Empty(session.LockedSemesters("BK-BF"));
+        Assert.Empty(session.LockedSemesters("PH-BF"));
+    }
+
+    [Fact]
+    public void PromotingOralSubjectToLfRemovesItFromPlannedOralSubjects()
+    {
+        var session = Create("D", "M", "E");
+        session.NextStep();
+        session.SetOral("BIO", true); session.SetOral("G", true);
+        session.NextStep();
+        session.GoToStep(1);
+        session.SetSelection("BIO-BF", []);
+        session.SetSelection("E-LF", []);
+        session.SetSelection("BIO-LF", [1, 2, 3, 4]);
+        Assert.DoesNotContain("BIO", session.Choice.PlannedOralSubjects);
+        Assert.False(session.Plan.Single(r => r.OfferId == "BIO-LF").IsOral);
+    }
+
     private sealed class MemoryStore : IChoiceStore
     {
         private StoredChoice? stored;

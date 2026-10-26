@@ -33,15 +33,17 @@ public static class CatalogRules
         }
         Require(offer.Type != CourseType.Lf || semesters.SequenceEqual([1, 2, 3, 4]), "CATALOG-LF-SEMESTERS", "Leistungsfächer benötigen HJ 1–4.");
         Require(offer.Type != CourseType.Lf || !ExcludedLfSubjects.Contains(offer.SubjectId), "CATALOG-LF-EXCLUDED", "Dieses Fach wird am GSM nicht als Leistungsfach angeboten.");
-        Require(offer.SubjectId != "PSY" || (offer.Type == CourseType.Elective && offer.Schedule.All(s => s.Semester <= 2 && s.WeeklyHours == 2)),
+        Require(offer.SubjectId != "PSY" || (offer.Type == CourseType.Elective && semesters.SequenceEqual([1, 2]) && offer.Schedule.All(s => s.WeeklyHours == 2)),
             "CATALOG-PSY", "Psychologie ist ein zweistündiges Wahlfach nur in HJ 1–2.");
         Require(offer.SubjectId != "SIA" || (offer.Type == CourseType.Seminar && semesters.SequenceEqual([1, 2]) && offer.Schedule.All(s => s.WeeklyHours == 3)),
             "CATALOG-SIA", "SIA ist ein dreistündiger Seminarkurs in HJ 1–2.");
-        Require(offer.SubjectId != "GEO" || offer.Type != CourseType.Bf || semesters.All(s => s >= 3), "CATALOG-GEO-BF", "Geographie-BF gibt es nur in HJ 3–4.");
+        Require(offer.SubjectId != "GEO" || offer.Type == CourseType.Lf || (offer.Type == CourseType.Bf && semesters.SequenceEqual([3, 4])),
+            "CATALOG-GEO-BF", "Geographie gibt es außerhalb des LF nur als BF in HJ 3–4 (keine Wahlkurse).");
         Require(offer.SubjectId != "INF" || (offer.Type == CourseType.Bf && semesters.SequenceEqual([1, 2, 3, 4])
             && offer.Schedule.All(s => s.WeeklyHours == 3) && offer.Requirements.Contains(Requirement.Informatics)),
             "CATALOG-INF", "Informatik benötigt BF HJ 1–4, drei Stunden und Vorbildungsprüfung.");
-        Require(offer.SubjectId != "I" || offer.Requirements.Contains(Requirement.ItalianProfile), "CATALOG-I-PROFILE", "Italienisch benötigt die Profilprüfung.");
+        Require(offer.SubjectId != "I" || ((offer.Type is CourseType.Bf or CourseType.Lf) && semesters.SequenceEqual([1, 2, 3, 4]) && offer.Requirements.Contains(Requirement.ItalianProfile)),
+            "CATALOG-I-PROFILE", "Italienisch benötigt HJ 1–4 und die Profilprüfung.");
         Require(offer.Variant != CourseVariant.Bilingual || offer.Requirements.Contains(Requirement.ContinuousBilingual),
             "CATALOG-BILINGUAL", "Bilinguale Angebote benötigen die Bili-Vorbildungsprüfung.");
         return messages.ToImmutable();

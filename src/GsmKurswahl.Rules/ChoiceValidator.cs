@@ -62,7 +62,8 @@ public sealed class ChoiceValidator
             foreach (var violation in catalogViolations) messages.Add(violation with { Semesters = selection.Semesters });
             if (offer is null || offer.SubjectId != selection.SubjectId || offer.Type != selection.Type || offer.Variant != selection.Variant
                 || selection.Semesters.Any(s => !offer.Schedule.Any(h => h.Semester == s))
-                || (offer.Type == CourseType.Lf && selection.Semesters.Length != 4))
+                || (offer.Type == CourseType.Lf && selection.Semesters.Length != 4)
+                || (offer.Type == CourseType.Seminar && !selection.Semesters.Order().SequenceEqual(offer.Schedule.Select(h => h.Semester).Order())))
             {
                 Add("OFFER-SELECTION", "Belegung passt nicht zum konfigurierten Angebot.", "Fach, Kursart, Variante und Halbjahre kontrollieren.", selection.SubjectId, selection.Semesters);
                 continue;
@@ -73,6 +74,12 @@ public sealed class ChoiceValidator
                 Add(offer.Status is not (OfferStatus.Offered or OfferStatus.Established) ? "OFFER-SELECTION" : availability.Status == ReviewStatus.Invalid ? "PREREQUISITE-NO" : "PREREQUISITE-UNKNOWN",
                     availability.Explanation, "Angebot/Vorbildung mit der Oberstufenberatung klären.", selection.SubjectId, selection.Semesters);
         }
+        var oralCandidates = ChoiceWorkflow.OralCandidates(choice, catalog, profile);
+        if (!choice.PlannedOralSubjects.IsEmpty && (choice.PlannedOralSubjects.Any(s => !oralCandidates.Contains(s))
+            || (choice.PlannedOralSubjects.Length == 2 && ChoiceWorkflow.OralError(choice, catalog, profile) is not null)))
+            messages.Add(new(Definitions.Single(d => d.Id == "PLAN-ORAL"), choice.PlannedOralSubjects, [],
+                ChoiceWorkflow.OralError(choice, catalog, profile) ?? "Mündliche Prüfungsplanung passt nicht zu LF oder Angebot.",
+                "Zwei zulässige Basisfächer für die mündliche Prüfung planen."));
         foreach (var duplicate in choice.Selections.GroupBy(s => s.SubjectId).Where(g => g.Count() > 1))
             Add("SUBJECT-DUPLICATE", "Dasselbe Fach wurde mehrfach als Kursart oder Variante gewählt.", "Eine eindeutige Fachbelegung wählen; Sonderfälle sind in M1 nicht freigegeben.", duplicate.Key);
         return new(messages.Any(m => m.Rule.Severity == ReviewStatus.Invalid) ? ReviewStatus.Invalid : ReviewStatus.NeedsReview, messages.ToImmutable());

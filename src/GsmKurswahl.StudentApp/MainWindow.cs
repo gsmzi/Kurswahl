@@ -37,7 +37,6 @@ public sealed class MainWindow : Window
     private readonly CheckBox autosave = new() { Content = "Automatisch zwischenspeichern", IsChecked = true };
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1.5) };
     private string? expandedTask;
-    private bool? prerequisitesExpanded;
     private bool closeConfirmed;
     private bool closePromptOpen;
 
@@ -84,6 +83,7 @@ public sealed class MainWindow : Window
         var footer = new StackPanel { Spacing = 3, Margin = new Thickness(0, 10, 0, 0) };
         error.Foreground = Danger;
         footer.Children.Add(error); footer.Children.Add(fileStatus);
+        footer.Children.Add(PrerequisitePanel());
         footer.Children.Add(Text($"Datei: {filePath} · Betriebssystemkonto: {account} (keine bestätigte Schulzuordnung)", 11, color: Muted));
         Grid.SetRow(footer, 3); root.Children.Add(footer);
         Content = root;
@@ -122,9 +122,10 @@ public sealed class MainWindow : Window
 
     private void Edit(Action edit)
     {
+        timer.Stop();
         try
         {
-            error.Text = ""; edit(); timer.Stop();
+            error.Text = ""; edit();
             if (autosave.IsChecked == true && !session.LoadFailed) timer.Start();
         }
         catch (InvalidOperationException ex) { error.Text = ex.Message; Refresh(); }
@@ -153,7 +154,9 @@ public sealed class MainWindow : Window
         save.IsEnabled = !session.IsBusy && !session.LoadFailed;
         load.IsEnabled = !session.IsBusy;
         fileStatus.Text = session.IsBusy ? "Dateivorgang läuft …" : session.Message;
-        if (focused is not null && content.GetLogicalDescendants().OfType<Control>().Concat(stepper.Children).FirstOrDefault(c => c.Name == focused) is { } target)
+        if (focused is not null && content.GetLogicalDescendants().OfType<Control>()
+            .Concat(plan.GetLogicalDescendants().OfType<Control>())
+            .Concat(stepper.Children).FirstOrDefault(c => c.Name == focused) is { } target)
             target.Focus();
     }
 
@@ -272,12 +275,13 @@ public sealed class MainWindow : Window
         if (task.FulfilledBySubjects.Length > 0)
             card.Children.Add(Text("Bereits durch LF: " + string.Join(", ", task.FulfilledBySubjects.Select(session.SubjectName)), 13, color: Done));
         card.Children.Add(Text(task.Hint, 13, color: Muted));
+        var hasLockedChoice = task.ChosenOfferIds.Any(id => session.IsRequiredSubject(session.Catalog.Offers.Single(o => o.Id == id).SubjectId));
         foreach (var offerId in task.OptionOfferIds.Union(task.ChosenOfferIds))
         {
             var offer = session.Catalog.Offers.Single(o => o.Id == offerId);
             var chosen = task.ChosenOfferIds.Contains(offerId);
             var locked = chosen && session.IsRequiredSubject(offer.SubjectId);
-            CreateToggle(out var toggle, task.IsExclusive, ControlName("Option", offerId), OfferLabel(offer) + (locked ? " · durch Prüfungsplanung gesetzt" : ""), chosen, task.Id);
+            CreateToggle(out var toggle, task.IsExclusive && !hasLockedChoice, ControlName("Option", offerId), OfferLabel(offer) + (locked ? " · durch Prüfungsplanung gesetzt" : ""), chosen, task.Id);
             toggle.IsEnabled = !session.IsBusy && !locked && (chosen || task.OptionOfferIds.Contains(offerId));
             toggle.IsCheckedChanged += (_, _) =>
             {
@@ -342,7 +346,7 @@ public sealed class MainWindow : Window
             var box = new CheckBox
             {
                 Name = ControlName("Sem", offer.Id) + "_" + semester, Content = $"HJ {semester}", FontSize = 12,
-                IsChecked = selection.Semesters.Contains(semester), IsEnabled = !session.IsBusy && !locked.Contains(semester)
+                IsChecked = selection.Semesters.Contains(semester), IsEnabled = !session.IsBusy && offer.Type != CourseType.Seminar && !locked.Contains(semester)
             };
             box.IsCheckedChanged += (_, _) => Edit(() =>
                 session.SetSelection(offer.Id, box.IsChecked == true ? selection.Semesters.Add(semester) : selection.Semesters.Remove(semester)));
@@ -376,7 +380,6 @@ public sealed class MainWindow : Window
     private void BuildPlan()
     {
         plan.Children.Clear();
-        plan.Children.Add(PrerequisitePanel());
         plan.Children.Add(Text("Dein Plan", 18, FontWeight.Bold));
         var rows = session.Plan;
         if (rows.IsEmpty) { plan.Children.Add(Text("Noch nichts gewählt. Beginne mit deinen Leistungsfächern.", 13, color: Muted)); }
@@ -442,28 +445,26 @@ public sealed class MainWindow : Window
     // Shown read-only: students cannot declare prerequisites themselves (Pflichtenheft §5, §5a).
     private Control PrerequisitePanel()
     {
-        var list = new StackPanel { Spacing = 6 };
-        list.Children.Add(Notice(session.ProfileStatusText, WarnSoft, Warn));
+        var list = new StackPanel { Spacing = 3 };
+        list.Children.Add(Text(session.ProfileStatusText, 11, color: Muted));
         foreach (var item in session.Prerequisites)
         {
-            var row = new StackPanel { Spacing = 1 };
-            var line = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-            line.Children.Add(Text(item.Label, 13));
-            var value = Badge(item.Value, item.IsVerified ? DoneSoft : WarnSoft, item.IsVerified ? Done : Warn);
-            Grid.SetColumn(value, 1); line.Children.Add(value);
-            row.Children.Add(line);
-            row.Children.Add(Text(item.Effect, 11, color: Muted));
-            list.Children.Add(row);
+            list.Children.Add(Text($"{item.Label}: {item.Value}.", 11, color: Muted));
         }
-        list.Children.Add(Text("Fehlt oder stimmt eine Angabe nicht, wende dich an die Oberstufenberatung. Du kannst sie hier nicht selbst ändern.", 11, color: Muted));
+        list.Children.Add(Text("Änderungen und Rückfragen: Oberstufenberatung.", 11, color: Muted));
         var expander = new Expander
         {
-            Name = "Prerequisites", Header = "Deine Voraussetzungen" + (session.Profile.Status == ProfileStatus.Verified ? "" : " · ungeprüft"),
-            Content = list, HorizontalAlignment = HorizontalAlignment.Stretch,
-            IsExpanded = prerequisitesExpanded ?? session.Step == 1
+            Name = "Prerequisites",
+            Header = Text(session.Profile.Status switch
+            {
+                ProfileStatus.Verified => "Voraussetzungen · Profil geprüft · Details",
+                ProfileStatus.ProfileInvalid => "Voraussetzungen · Profil ungültig · Oberstufenberatung kontaktieren",
+                _ => "Voraussetzungen ungeprüft · Details bei Bedarf"
+            }, 11, color: Muted),
+            Content = new ScrollViewer { Content = list, MaxHeight = 140 },
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(0), MinHeight = 0, IsExpanded = false
         };
-        expander.Expanded += (_, _) => prerequisitesExpanded = true;
-        expander.Collapsed += (_, _) => prerequisitesExpanded = false;
         return expander;
     }
 

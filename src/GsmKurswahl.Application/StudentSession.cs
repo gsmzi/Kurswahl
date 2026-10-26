@@ -29,11 +29,11 @@ public sealed class StudentSession
     public event Action? Changed;
     public const int LastStep = 5;
     public int Step { get; private set; } = 1;
-    public string? StepError => Step == 1 ? ChoiceWorkflow.LfError(Choice, Catalog)
-        : Step == 2 ? ChoiceWorkflow.OralError(Choice, Catalog) : null;
-    public ImmutableArray<string> OralCandidates => ChoiceWorkflow.OralCandidates(Choice, Catalog);
+    public string? StepError => Step == 1 ? ChoiceWorkflow.LfError(Choice, Catalog, Profile)
+        : Step == 2 ? ChoiceWorkflow.OralError(Choice, Catalog, Profile) : null;
+    public ImmutableArray<string> OralCandidates => ChoiceWorkflow.OralCandidates(Choice, Catalog, Profile);
     public ImmutableArray<string> ForcedOral => ChoiceWorkflow.ForcedOral(Choice);
-    public ImmutableArray<string> UsefulOralCandidates => ChoiceWorkflow.UsefulOralCandidates(Choice, Catalog);
+    public ImmutableArray<string> UsefulOralCandidates => ChoiceWorkflow.UsefulOralCandidates(Choice, Catalog, Profile);
     public ImmutableArray<string> PlanningNotes => ChoiceWorkflow.Remaining(Choice, Catalog, Profile);
     public ImmutableArray<ChoiceTask> Tasks => ChoiceWorkflow.Tasks(Choice, Catalog, Profile);
     public int CountedCourses => ChoiceWorkflow.CountedCourses(Choice);
@@ -52,7 +52,7 @@ public sealed class StudentSession
         {
             var p = Profile.Prerequisites;
             var verified = Profile.Status == ProfileStatus.Verified;
-            string Value(Knowledge k) => k switch { Knowledge.Yes => "ja", Knowledge.No => "nein", _ => "ungeprüft" };
+            string Value(Knowledge k) => !verified ? "ungeprüft" : k switch { Knowledge.Yes => "ja", Knowledge.No => "nein", _ => "ungeprüft" };
             string Offers(Requirement requirement, string fallback)
             {
                 var names = Catalog.Offers.Where(o => o.Requirements.Contains(requirement))
@@ -66,9 +66,9 @@ public sealed class StudentSession
                     $"{Value(p.InformaticsBridge)} / {Value(p.InformaticsImp)}", Offers(Requirement.Informatics, "Im Angebot nicht vorhanden."), verified),
                 new("I", "Italienisch als dritte Fremdsprache (Profil)", Value(p.ItalianProfile), Offers(Requirement.ItalianProfile, "Im Angebot nicht vorhanden."), verified),
                 new("BILI", "Durchgängig bilingualer Bildungsgang", Value(p.ContinuousBilingual), Offers(Requirement.ContinuousBilingual, "Im Angebot nicht vorhanden."), verified),
-                new("REL", "Religion/Ethik in Klasse 10", p.ReligionEthicsGrade10 is { } subject ? SubjectName(subject) : "ungeprüft",
+                new("REL", "Religion/Ethik in Klasse 10", verified && p.ReligionEthicsGrade10 is { } subject ? SubjectName(subject) : "ungeprüft",
                     "Betrifft vor allem die mündliche Prüfung in Religion/Ethik; die Basisfachwahl wird nicht pauschal gesperrt.", verified),
-                new("SP", "Sportbefreiung", p.SportExemptSemesters is { } semesters ? (semesters.IsEmpty ? "keine" : "HJ " + string.Join(", ", semesters)) : "ungeprüft",
+                new("SP", "Sportbefreiung", verified && p.SportExemptSemesters is { } semesters ? (semesters.IsEmpty ? "keine" : "HJ " + string.Join(", ", semesters)) : "ungeprüft",
                     "Bei Befreiung sind Ersatzkurse nötig; Prüfung durch die Oberstufenberatung.", verified)
             ];
         }
@@ -124,8 +124,12 @@ public sealed class StudentSession
         if (!task.OptionOfferIds.Contains(offerId)) throw new InvalidOperationException("Dieses Angebot passt nicht zu dieser Frage.");
         // Single choice replaces the previous answer, but never a course that is required elsewhere.
         if (task.IsExclusive)
+        {
             foreach (var previous in task.ChosenOfferIds.Where(id => id != offerId))
                 if (!IsRequiredSubject(Catalog.Offers.Single(o => o.Id == previous).SubjectId)) SetSelection(previous, []);
+        }
+        else if (task.ChosenOfferIds.Length >= task.Choose && !task.ChosenOfferIds.Contains(offerId))
+            throw new InvalidOperationException("Zuerst eine gewählte Option abwählen oder weitere Kurse in Schritt 4 ergänzen.");
         var existing = Choice.Selections.FirstOrDefault(s => s.OfferId == offerId)?.Semesters ?? [];
         SetSelection(offerId, existing.Union(task.Semesters));
     }
@@ -165,7 +169,7 @@ public sealed class StudentSession
         {
             var forced = ForcedOral;
             var oral = forced.Concat(Choice.PlannedOralSubjects.Where(s => OralCandidates.Contains(s))).Distinct().Take(2).ToImmutableArray();
-            if (!oral.SequenceEqual(Choice.PlannedOralSubjects))
+            if (oral.Length != Choice.PlannedOralSubjects.Length || oral.Any(s => !Choice.PlannedOralSubjects.Contains(s)))
             {
                 Choice = Choice with { PlannedOralSubjects = oral, UpdatedAt = DateTimeOffset.UtcNow };
                 IsDirty = true;
@@ -246,12 +250,17 @@ public sealed class StudentSession
                 throw new InvalidOperationException("Halbjahr wird für dieses Angebot nicht angeboten.");
             if (offer.Type == CourseType.Lf && selected.Length != 4)
                 throw new InvalidOperationException("Leistungsfächer werden für alle vier Halbjahre gewählt.");
+            if (offer.Type == CourseType.Seminar && !selected.SequenceEqual(offer.Schedule.Select(h => h.Semester).Order()))
+                throw new InvalidOperationException("Seminarkurse werden über alle angebotenen Halbjahre gewählt.");
             if (Choice.Selections.Any(s => s.OfferId != offerId && s.SubjectId == offer.SubjectId))
                 throw new InvalidOperationException("Dieses Fach ist bereits gewählt. Vor einem Wechsel die bisherige Kursart/Variante abwählen.");
         }
         var selections = Choice.Selections.Where(s => s.OfferId != offerId).ToImmutableArray();
         if (!selected.IsEmpty) selections = selections.Add(new(offer.Id, offer.SubjectId, offer.Type, offer.Variant, selected));
-        Choice = Choice with { Selections = selections, UpdatedAt = DateTimeOffset.UtcNow };
+        var oral = !selected.IsEmpty && offer.Type == CourseType.Lf
+            ? Choice.PlannedOralSubjects.Remove(offer.SubjectId)
+            : Choice.PlannedOralSubjects;
+        Choice = Choice with { Selections = selections, PlannedOralSubjects = oral, UpdatedAt = DateTimeOffset.UtcNow };
         IsDirty = true;
         Message = "Ungespeicherte Änderungen – vorläufig, nicht eingereicht.";
         Changed?.Invoke();

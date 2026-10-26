@@ -45,10 +45,10 @@ public static class ChoiceWorkflow
     public static ImmutableArray<string> ForcedOral(CourseChoice choice) =>
         [.. new[] { "D", "M" }.Except(Lf(choice))];
 
-    public static ImmutableArray<string> OralCandidates(CourseChoice choice, OfferCatalog catalog) =>
+    public static ImmutableArray<string> OralCandidates(CourseChoice choice, OfferCatalog catalog, ProfileContext? profile = null) =>
         [.. catalog.Offers.Where(o => o.Type == CourseType.Bf && o.SubjectId != "GEO"
             && (Field(o.SubjectId) != 0 || o.SubjectId == "SP") && !Lf(choice).Contains(o.SubjectId)
-            && new ChoiceValidator().GetAvailability(o, ProfileContext.Missing).CanSelect
+            && new ChoiceValidator().GetAvailability(o, profile ?? ProfileContext.Missing).CanSelect
             && OralSemesters(choice, o.SubjectId).All(h => o.Schedule.Any(s => s.Semester == h)))
             .Select(o => o.SubjectId).Distinct()];
 
@@ -58,26 +58,27 @@ public static class ChoiceWorkflow
         return all.Contains("D") && all.Contains("M") && new[] { 1, 2, 3 }.All(f => all.Any(s => Field(s) == f));
     }
 
-    public static string? LfError(CourseChoice choice, OfferCatalog catalog)
+    public static string? LfError(CourseChoice choice, OfferCatalog catalog, ProfileContext? profile = null)
     {
+        var context = profile ?? ProfileContext.Missing;
         var lf = Lf(choice);
         if (lf.Length != 3 || lf.Distinct().Count() != 3) return "PLAN-LF: Bitte genau drei verschiedene Leistungsfächer wählen.";
         if (lf.Any(s => Field(s) == 0 && s != "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Demoangebots klären.";
         if (lf.Count(Core.Contains) < 2) return "PLAN-LF: Mindestens zwei LF aus Deutsch, Mathematik, Englisch oder BIO/CH/PH wählen. Weitere Sprachlaufbahnen: needs_review.";
-        if (new ChoiceValidator().Validate(choice, catalog, ProfileContext.Missing).Messages.Any(m =>
+        if (new ChoiceValidator().Validate(choice, catalog, context).Messages.Any(m =>
             m.Rule.Severity == ReviewStatus.Invalid && m.SubjectIds.Any(lf.Contains)))
             return "PLAN-LF: Angebot oder Belegung der Leistungsfächer korrigieren.";
-        var candidates = OralCandidates(choice, catalog);
+        var candidates = OralCandidates(choice, catalog, context);
         if (!candidates.Any(a => candidates.Any(b => a != b && Combination(choice, [a, b]))))
             return "PLAN-ORAL: Mit diesen LF ist im verfügbaren Demoangebot keine Kombination für Deutsch, Mathematik und alle Aufgabenfelder möglich.";
         return null;
     }
 
-    public static string? OralError(CourseChoice choice, OfferCatalog catalog)
+    public static string? OralError(CourseChoice choice, OfferCatalog catalog, ProfileContext? profile = null)
     {
         var oral = choice.PlannedOralSubjects;
         if (oral.Length != 2 || oral.Distinct().Count() != 2) return "PLAN-ORAL: Zwei verschiedene mündliche Prüfungsfächer planen.";
-        if (oral.Any(s => !OralCandidates(choice, catalog).Contains(s))) return "PLAN-ORAL: Prüfungsplanung passt nicht mehr zu LF oder Angebot. Bitte neu wählen.";
+        if (oral.Any(s => !OralCandidates(choice, catalog, profile).Contains(s))) return "PLAN-ORAL: Prüfungsplanung passt nicht mehr zu LF oder Angebot. Bitte neu wählen.";
         if (!Combination(choice, oral)) return "PLAN-ORAL: Deutsch, Mathematik und alle drei Aufgabenfelder müssen abgedeckt sein.";
         return null;
     }
@@ -96,9 +97,9 @@ public static class ChoiceWorkflow
     }
 
     // Oral candidates that still allow a complete D/M/Aufgabenfeld combination with the current planning.
-    public static ImmutableArray<string> UsefulOralCandidates(CourseChoice choice, OfferCatalog catalog)
+    public static ImmutableArray<string> UsefulOralCandidates(CourseChoice choice, OfferCatalog catalog, ProfileContext? profile = null)
     {
-        var candidates = OralCandidates(choice, catalog);
+        var candidates = OralCandidates(choice, catalog, profile);
         var planned = choice.PlannedOralSubjects.Where(candidates.Contains).ToArray();
         if (planned.Length >= 2) return [];
         return [.. candidates.Where(c => !planned.Contains(c) && (planned.Length == 1
@@ -111,19 +112,25 @@ public static class ChoiceWorkflow
     public static ImmutableArray<ChoiceTask> Tasks(CourseChoice choice, OfferCatalog catalog, ProfileContext profile)
     {
         var validator = new ChoiceValidator();
+        var requiredSubjects = Required(choice).Select(r => r.SubjectId).ToHashSet();
         ImmutableArray<int> four = [1, 2, 3, 4];
         ChoiceTask Area(string ruleId, string title, string hint, string[] subjects, int needed, Func<string[], int> fulfilled)
         {
             var lf = choice.Selections.Where(s => s.Type == CourseType.Lf && subjects.Contains(s.SubjectId)).Select(s => s.SubjectId).ToImmutableArray();
-            var chosen = choice.Selections.Where(s => s.Type != CourseType.Lf && subjects.Contains(s.SubjectId) && four.All(s.Semesters.Contains))
-                .Select(s => s.OfferId).ToImmutableArray();
+            var choose = Math.Max(0, needed - lf.Length);
+            var matching = choice.Selections.Where(s => s.Type != CourseType.Lf && subjects.Contains(s.SubjectId) && four.All(s.Semesters.Contains))
+                .OrderByDescending(s => requiredSubjects.Contains(s.SubjectId))
+                .ThenByDescending(s => Sciences.Contains(s.SubjectId))
+                .Take(choose)
+                .ToArray();
+            var chosen = matching.Select(s => s.OfferId).ToImmutableArray();
             var candidates = catalog.Offers.Where(o => o.Type != CourseType.Lf && subjects.Contains(o.SubjectId) && !lf.Contains(o.SubjectId)
                 && four.All(h => o.Schedule.Any(s => s.Semester == h))).ToArray();
             var options = candidates.Where(o => chosen.Contains(o.Id) || validator.GetAvailability(o, profile).CanSelect).Select(o => o.Id).ToImmutableArray();
             var restricted = candidates.Where(o => !options.Contains(o.Id))
                 .Select(o => new RestrictedOffer(o.Id, validator.GetAvailability(o, profile).Explanation)).ToImmutableArray();
-            var have = lf.Concat(choice.Selections.Where(s => chosen.Contains(s.OfferId)).Select(s => s.SubjectId)).ToArray();
-            return new(ruleId, Definitions.Single(d => d.Id == ruleId), title, hint, four, Math.Max(0, needed - lf.Length),
+            var have = lf.Concat(matching.Select(s => s.SubjectId)).ToArray();
+            return new(ruleId, Definitions.Single(d => d.Id == ruleId), title, hint, four, choose,
                 Math.Max(0, needed - fulfilled(have)), options, chosen, lf, restricted);
         }
         return
@@ -133,11 +140,7 @@ public static class ChoiceWorkflow
                 ["ER", "KR", "ETH"], 1, have => have.Length),
             // INF may replace only the second science (Pflichtenheft §6 Nr.4); a second language alternative stays needs_review.
             Area("PLAN-AREA-SCIENCE", "Naturwissenschaften", "Du brauchst zwei Naturwissenschaften mit HJ 1–4. Eine zweite fortgeführte Fremdsprache oder Informatik als Alternative klärt die Oberstufenberatung.",
-                [.. Sciences, "INF"], 2, have =>
-                {
-                    var sciences = have.Count(Sciences.Contains);
-                    return sciences == 0 ? 0 : Math.Min(2, sciences + (have.Contains("INF") ? 1 : 0));
-                })
+                [.. Sciences, "INF"], 2, have => Math.Min(2, have.Count(Sciences.Contains) + (have.Contains("INF") ? 1 : 0)))
         ];
     }
 

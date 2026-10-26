@@ -100,8 +100,11 @@ public sealed class JsonChoiceStoreTests : IDisposable
     }
     [Theory] [InlineData("../escape", "aktuell.json")] [InlineData("Kurswahl", "../x.json")]
     [InlineData("Kurswahl", "profil.json")] [InlineData("Kurswahl", "x.txt")]
+    [InlineData(".. ", "aktuell.json")] [InlineData("Kurswahl.", "aktuell.json")] [InlineData("Kurswahl", ".json")]
     public void UnsafeRelativePathsRejected(string folder, string name) => Assert.Throws<ArgumentException>(() =>
         new StudentSettings(1, directory, folder, name, "catalog.json", "demo-001").ResolveChoicePath());
+    [Fact] public void RelativeSettingsFilePathRejected() => Assert.Throws<ArgumentException>(() =>
+        StudentSettings.Load("appsettings.json"));
     [Fact] public void ConfigurablePathUsesSpecifiedHome()
     {
         var settings = new StudentSettings(1, directory, "Demo", "wahl.json", "catalog.json", "demo-001");

@@ -8,6 +8,8 @@ public sealed record StudentSettings(int SchemaVersion, string HomeDirectory, st
 {
     public static StudentSettings Load(string file)
     {
+        if (string.IsNullOrWhiteSpace(file) || !Path.IsPathFullyQualified(file))
+            throw new ArgumentException("Konfigurationspfad muss absolut sein.");
         var settings = JsonSerializer.Deserialize<StudentSettings>(File.ReadAllBytes(file), JsonDocuments.Options)
             ?? throw new JsonException("Leere Anwendungskonfiguration.");
         if (settings.SchemaVersion != 1 || string.IsNullOrWhiteSpace(settings.DemoStudentId)
@@ -28,9 +30,12 @@ public sealed record StudentSettings(int SchemaVersion, string HomeDirectory, st
     {
         var home = ResolveHomeDirectory();
         if (string.IsNullOrWhiteSpace(ChoiceDirectory) || Path.IsPathRooted(ChoiceDirectory)
-            || ChoiceDirectory.Split(['/', '\\']).Any(s => s is ".." or "." or ""))
+            || ChoiceDirectory.IndexOfAny(Path.GetInvalidPathChars()) >= 0
+            || ChoiceDirectory.Split(['/', '\\']).Any(s => string.IsNullOrWhiteSpace(s) || s.Trim() is ".." or "." || s != s.Trim() || s.EndsWith('.')))
             throw new ArgumentException("ChoiceDirectory muss ein relativer Unterordner ohne Traversierung sein.");
-        if (string.IsNullOrWhiteSpace(ChoiceFileName) || ChoiceFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+        var stem = Path.GetFileNameWithoutExtension(ChoiceFileName);
+        if (string.IsNullOrWhiteSpace(ChoiceFileName) || string.IsNullOrWhiteSpace(stem) || stem != stem.Trim()
+            || ChoiceFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
             || ChoiceFileName.Contains('/') || ChoiceFileName.Contains('\\') || !ChoiceFileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
             || ChoiceFileName.Equals("profil.json", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Ungültiger Wahldateiname; Profildateien sind geschützt.");

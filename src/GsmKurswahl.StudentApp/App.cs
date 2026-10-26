@@ -16,8 +16,10 @@ public sealed class App : Avalonia.Application
         {
             try
             {
-                var settingsPath = Environment.GetEnvironmentVariable("GSM_KURSWAHL_SETTINGS")
-                    ?? Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+                var configuredSettings = Environment.GetEnvironmentVariable("GSM_KURSWAHL_SETTINGS");
+                var settingsPath = string.IsNullOrWhiteSpace(configuredSettings)
+                    ? Path.Combine(AppContext.BaseDirectory, "appsettings.json")
+                    : configuredSettings;
                 var settings = StudentSettings.Load(settingsPath);
                 var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(settings.ResolveCatalogPath(settingsPath)));
                 var path = settings.ResolveChoicePath();

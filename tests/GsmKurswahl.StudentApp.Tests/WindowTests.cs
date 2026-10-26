@@ -72,6 +72,7 @@ public class WindowTests
             Assert.Equal(new[] { 1, 2 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
             Box("Offer_BK_BF").IsChecked = true;
             Assert.Contains(session.Choice.Selections, s => s.SubjectId == "BK");
+            Assert.True(Has("Offer_BK_BF"));
             var save = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "SaveButton");
             save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             for (var i = 0; i < 200 && session.IsBusy; i++) await Task.Delay(10);
@@ -100,11 +101,13 @@ public class WindowTests
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<CheckBox>(), b => b.Name == "Offer_D_LF");
             var restricted = window.GetVisualDescendants().OfType<Expander>().Single(e => e.Name != "Prerequisites");
             Assert.Contains(restricted.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Persönliche Voraussetzung ungeprüft") == true);
-            // Pflichtenheft §7: prerequisites are shown before the LF choice, read-only and marked unverified.
+            // Compact footer information stays available, read-only and initially collapsed.
             var prerequisites = window.GetVisualDescendants().OfType<Expander>().Single(e => e.Name == "Prerequisites");
-            Assert.True(prerequisites.IsExpanded);
+            Assert.False(prerequisites.IsExpanded);
+            Assert.Contains("ungeprüft", Assert.IsType<TextBlock>(prerequisites.Header).Text);
+            prerequisites.IsExpanded = true;
             var texts = prerequisites.GetLogicalDescendants().OfType<TextBlock>().Select(t => t.Text).ToArray();
-            Assert.Contains(texts, t => t?.Contains("Nötig für: Deutsch LF bilingual") == true);
+            Assert.Contains(texts, t => t?.Contains("Durchgängig bilingualer Bildungsgang: ungeprüft") == true);
             Assert.Contains(texts, t => t?.Contains("Religion/Ethik in Klasse 10") == true);
             Assert.DoesNotContain(prerequisites.GetLogicalDescendants().OfType<Control>(), c => c is ToggleButton or TextBox);
         }
