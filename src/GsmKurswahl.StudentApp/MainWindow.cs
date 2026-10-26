@@ -25,7 +25,7 @@ public sealed class MainWindow : Window
     private static readonly string[] StepNames = ["Leistungsfächer", "Prüfungsfächer", "Pflichtbereiche", "Weitere Kurse", "Überblick"];
 
     private readonly StudentSession session;
-    private readonly StackPanel stepper = new() { Orientation = Orientation.Horizontal, Spacing = 6 };
+    private readonly WrapPanel stepper = new();
     private readonly StackPanel content = new() { Spacing = 12 };
     private readonly StackPanel plan = new() { Spacing = 10 };
     private readonly TextBlock fileStatus = Text("", 13);
@@ -44,26 +44,40 @@ public sealed class MainWindow : Window
     {
         this.session = session;
         Title = "GSM-Kurswahl | Schülerprogramm · M1 Demo";
-        Width = 1200; Height = 860; MinWidth = 900; MinHeight = 620;
+        Width = 1440; Height = 900; MinWidth = 900; MinHeight = 600;
+        WindowState = WindowState.Maximized;
         Background = Page;
-        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"), Margin = new Thickness(20) };
+        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"), Margin = new Thickness(20), MaxWidth = 1760 };
 
-        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(0, 0, 0, 12) };
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), RowDefinitions = new RowDefinitions("Auto,Auto"), Margin = new Thickness(0, 0, 0, 12) };
         var title = new StackPanel { Spacing = 2 };
-        var titleLine = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        var titleLine = new WrapPanel();
         titleLine.Children.Add(Text("GSM-Kurswahl", 26, FontWeight.Bold));
         var badge = Pill("Vorläufig · needs_review · nicht eingereicht", WarnSoft, Warn);
         badge.VerticalAlignment = VerticalAlignment.Center;
+        badge.Margin = new Thickness(12, 4, 0, 4);
         ToolTip.SetTip(badge, "Kein signiertes Profil, keine verbindliche Abgabe in M1. Demoangebot: Schulische Freigabe und "
             + "vollständige Rechtsprüfung stehen aus. Eingeschränkte Fächer erfordern ein geprüftes Profil.");
         titleLine.Children.Add(badge);
         title.Children.Add(titleLine);
         title.Children.Add(Text($"Synthetische Person {session.Choice.StudentId} · Abitur {session.Catalog.GraduationYear} · Demoangebot ohne schulische Freigabe", 13, color: Muted));
         header.Children.Add(title);
-        var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center };
+        var toolbar = new StackPanel { Name = "FileToolbar", Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        title.Name = "WindowHeading";
         toolbar.Children.Add(autosave); toolbar.Children.Add(load); toolbar.Children.Add(save);
         Grid.SetColumn(toolbar, 1); header.Children.Add(toolbar);
         root.Children.Add(header);
+        void AdaptHeader()
+        {
+            var compact = ClientSize.Width < 1450;
+            Grid.SetColumnSpan(title, compact ? 2 : 1);
+            Grid.SetRow(toolbar, compact ? 1 : 0);
+            Grid.SetColumn(toolbar, compact ? 0 : 1);
+            Grid.SetColumnSpan(toolbar, compact ? 2 : 1);
+            toolbar.Margin = new Thickness(0, compact ? 8 : 0, 0, 0);
+        }
+        SizeChanged += (_, _) => AdaptHeader();
+        AdaptHeader();
 
         Grid.SetRow(stepper, 1); stepper.Margin = new Thickness(0, 0, 0, 12); root.Children.Add(stepper);
 
@@ -84,7 +98,11 @@ public sealed class MainWindow : Window
         error.Foreground = Danger;
         footer.Children.Add(error); footer.Children.Add(fileStatus);
         footer.Children.Add(PrerequisitePanel());
-        footer.Children.Add(Text($"Datei: {filePath} · Betriebssystemkonto: {account} (keine bestätigte Schulzuordnung)", 11, color: Muted));
+        var fileDetails = Text($"Datei: {filePath} · Betriebssystemkonto: {account} (keine bestätigte Schulzuordnung)", 11, color: Muted);
+        fileDetails.TextWrapping = TextWrapping.NoWrap;
+        fileDetails.TextTrimming = TextTrimming.CharacterEllipsis;
+        ToolTip.SetTip(fileDetails, fileDetails.Text);
+        footer.Children.Add(fileDetails);
         Grid.SetRow(footer, 3); root.Children.Add(footer);
         Content = root;
 
@@ -176,13 +194,13 @@ public sealed class MainWindow : Window
                 // Not clickable: a plain label, so future steps do not look like disabled buttons.
                 stepper.Children.Add(new Border
                 {
-                    Name = "Step_" + i, Padding = new Thickness(12, 6), CornerRadius = new CornerRadius(4),
+                    Name = "Step_" + i, Padding = new Thickness(12, 6), Margin = new Thickness(0, 0, 6, 4), CornerRadius = new CornerRadius(4),
                     Background = current ? AccentSoft : Brushes.Transparent, BorderBrush = current ? Accent : Line, BorderThickness = new Thickness(current ? 1.5 : 1),
                     Child = Text(text, 14, current ? FontWeight.SemiBold : FontWeight.Normal, current ? Accent : Muted)
                 });
                 continue;
             }
-            var button = new Button { Name = "Step_" + i, Content = text, Background = DoneSoft, Foreground = Done };
+            var button = new Button { Name = "Step_" + i, Content = text, Background = DoneSoft, Foreground = Done, Margin = new Thickness(0, 0, 6, 4) };
             ToolTip.SetTip(button, $"Zurück zu Schritt {step}");
             button.Click += (_, _) => Edit(() => { expandedTask = null; session.GoToStep(step); });
             stepper.Children.Add(button);
@@ -385,21 +403,22 @@ public sealed class MainWindow : Window
         if (rows.IsEmpty) { plan.Children.Add(Text("Noch nichts gewählt. Beginne mit deinen Leistungsfächern.", 13, color: Muted)); }
         else
         {
-            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,34,34,34,34") };
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,40,40,40,40") };
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             for (var h = 1; h <= 4; h++) Cell(grid, $"HJ {h}", 0, h, center: true);
             for (var i = 0; i < rows.Length; i++)
             {
                 var row = rows[i];
                 grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-                var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
-                label.Children.Add(Text(row.Label, 13, color: row.IsOpen ? Warn : null));
+                var label = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+                label.Children.Add(Text(row.Label, 14, color: row.IsOpen ? Warn : null));
                 if (row.Type == CourseType.Lf) label.Children.Add(Badge("LF", LfFill, Brushes.White));
                 if (row.Variant == CourseVariant.Bilingual) label.Children.Add(Badge("bili", Empty, Muted));
                 if (row.IsAutomatic && !row.IsOpen) label.Children.Add(Badge("Pflicht", Empty, Muted));
                 if (row.IsOral) label.Children.Add(Badge("mündl.", AccentSoft, Accent));
                 if (row.Issue == ReviewStatus.Invalid) label.Children.Add(Badge("Fehler", Brush("#FCEBEB"), Danger));
                 else if (row.Issue == ReviewStatus.NeedsReview && !row.IsOpen) label.Children.Add(Badge("klären", WarnSoft, Warn));
+                foreach (var item in label.Children) item.Margin = new Thickness(0, 2, 5, 2);
                 Control jump = label;
                 if (!session.IsBusy && row.Step < session.Step)
                 {
@@ -438,7 +457,14 @@ public sealed class MainWindow : Window
         plan.Children.Add(legend);
         plan.Children.Add(Text(Progress(), 14, FontWeight.SemiBold));
         plan.Children.Add(new ProgressBar { Minimum = 0, Maximum = ChoiceWorkflow.MinimumCourses, Value = Math.Min(session.CountedCourses, ChoiceWorkflow.MinimumCourses), Height = 8 });
-        plan.Children.Add(Text(string.Join(" · ", session.Summary.Select(s => $"HJ {s.Semester}: {s.WeeklyHours} h")), 12, color: Muted));
+        var semesterTotals = new WrapPanel();
+        foreach (var semester in session.Summary)
+        {
+            var total = Text($"HJ {semester.Semester}: {semester.CourseCount} Kurse · {semester.WeeklyHours} Wochenstunden", 14, FontWeight.SemiBold);
+            total.Margin = new Thickness(0, 2, 14, 2);
+            semesterTotals.Children.Add(total);
+        }
+        plan.Children.Add(semesterTotals);
         plan.Children.Add(Text("Belegungszahlen und Wochenstunden sind keine Anrechnungs- oder Zulassungsbestätigung.", 11, color: Muted));
     }
 

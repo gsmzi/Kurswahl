@@ -127,3 +127,19 @@ Kein Schulnetz/SMB-Ausfalltest, keine echten Profile, kein AGVO-Volltest, kein r
 - Release-Build mit `-m:1 -p:UseSharedCompilation=false --disable-build-servers -p:OutputPath=bin/CompactReview/`: **0 Warnungen, 0 Fehler**.
 - Gesamte Testsuite mit demselben OutputPath: **106/106 bestanden**, keine übersprungen (Domain 8, Rules 38, Storage 30, ImportExport 1, Application 27, StudentApp 2 inklusive Avalonia-Headless-UI-Smoke-Test).
 - Beide JSON-Schemaprüfungen bestanden; `git diff --check` ohne Fehler. Kein nativer Sicht-/DPI-Test und kein Deployment durchgeführt.
+
+## Schritt 12 – Full-HD-Darstellung (26.10.2026)
+
+- Schülerfenster startet maximiert, Wiederherstellungsgröße 1440 × 900, Inhalt maximal 1760 logische Pixel breit. Kopfzeile passt sich unter 1450 logischen Pixeln an; Dateiaktionen wechseln in eine eigene Zeile. Schrittleiste und Planbeschriftungen umbrechbar, größere HJ-Spalten und Fachbeschriftung im Plan. Lange Dateiangaben einzeilig mit vollständigem Tooltip. Workflow und kompakte Voraussetzungen bleiben erhalten.
+- Restore `--locked-mode --ignore-failed-sources -p:NuGetAudit=false` aus lokalem Paketcache erfolgreich; keine neuen Pakete oder Lockdateiänderungen, kein Online-Audit.
+- Release-Build mit `-m:1 -p:UseSharedCompilation=false --disable-build-servers -p:OutputPath=bin/FullHd/`: **0 Warnungen, 0 Fehler**. Separater Ausgabeordner vermeidet Konflikte mit geöffneten App-Instanzen.
+- Gesamte Testsuite mit gleichem OutputPath: **109/109 bestanden**, keine übersprungen (Domain 8, Rules 38, Storage 30, ImportExport 1, Application 27, StudentApp 5).
+- Drei neue Headless-Layoutfälle: logische Arbeitsflächen 1920 × 1000, 1536 × 780 und 1280 × 640 als Annäherung an Full HD mit 100/125/150 % Skalierung inklusive Platz für Taskleiste/Fensterrahmen. Prüfen überlappungsfreie Titel-/Dateiaktionen und sichtbare Navigation, Speichern/Laden, letzten Schritt sowie Voraussetzungen. Bestehender kompletter Workflow-Smoke-Test weiterhin bestanden.
+- Beide JSON-Schemaprüfungen und `git diff --check` erfolgreich. Kein nativer DPI-/Monitorwechsel-/Sichttest; Headless-Layouttests sind kein Nachweis echten Windows-DPI-Renderings. Kein Deployment.
+
+## Schritt 13 – Wochenstunden deutlicher anzeigen (26.10.2026)
+
+- Im dauerhaft sichtbaren Plan stehen je Halbjahr Kursanzahl und Wochenstunden nun zusammen in gleicher Schriftgröße (14) und gleichem halbfetten Gewicht. Die bisherige kleine, graue Stundenzeile wurde entfernt. Die bestehende Aussage, dass Belegung und Stunden keine Zulassungsbestätigung sind, bleibt sichtbar.
+- Restore mit `--locked-mode --ignore-failed-sources -p:NuGetAudit=false` aus dem lokalen Paketcache erfolgreich; keine Paket-/Lockdateiänderung, kein Online-Audit.
+- Release-Build im getrennten Ausgabeordner `bin/FullHd/`: **0 Warnungen, 0 Fehler**.
+- Gesamte Testsuite: **109/109 bestanden**, keine übersprungen; darin 5 StudentApp-Tests mit UI-Workflow und drei Layoutgrößen. Beide JSON-Schemaprüfungen bestanden. Kein nativer Windows-Sichttest.

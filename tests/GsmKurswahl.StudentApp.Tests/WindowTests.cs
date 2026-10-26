@@ -27,6 +27,40 @@ public sealed class TestApp : Avalonia.Application
 
 public class WindowTests
 {
+    [AvaloniaTheory]
+    [InlineData(1920, 1000)]
+    [InlineData(1536, 780)]
+    [InlineData(1280, 640)]
+    public void FullHdWorkingAreasKeepHeaderAndNavigationAccessible(int width, int height)
+    {
+        // Logical client areas approximating Full HD at 100/125/150%, after window chrome/taskbar.
+        // This checks layout constraints, not native DPI rendering.
+        var window = new MainWindow(new StudentSession(TestData.WorkflowCatalog, "demo-001", new EmptyStore()), "demo.json", "demo-account")
+        { WindowState = WindowState.Normal, Width = width, Height = height };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            Control Find(string name) => window.GetVisualDescendants().OfType<Control>().Single(c => c.Name == name);
+            Rect Area(Control control)
+            {
+                var origin = control.TranslatePoint(default, window);
+                Assert.NotNull(origin);
+                return new Rect(origin.Value, control.Bounds.Size);
+            }
+            var heading = Area(Find("WindowHeading"));
+            var toolbar = Area(Find("FileToolbar"));
+            Assert.False(heading.Intersects(toolbar));
+            foreach (var name in new[] { "SaveButton", "LoadButton", "PreviousStep", "NextStep", "Step_5", "Prerequisites" })
+            {
+                var area = Area(Find(name));
+                Assert.True(area.Width > 0 && area.Height > 0, name);
+                Assert.True(area.Left >= 0 && area.Top >= 0 && area.Right <= window.ClientSize.Width + 1 && area.Bottom <= window.ClientSize.Height + 1, name);
+            }
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public async Task GuidedWorkflowSaveAndReloadWorkWithActualJsonStore()
     {

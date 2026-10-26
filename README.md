@@ -99,3 +99,7 @@ Die Fußzeile zeigt die Voraussetzungen als kleine Statusinformation. Bei Bedarf
 5. Überblick: Halbjahressummen, offene Punkte mit Regel-ID und die Prüfhinweise der Regelprüfung.
 
 Die Fragen stammen aus dem Aufgabenmodell `ChoiceWorkflow.Tasks` (Regeln `PLAN-AREA-*`) und `StudentSession.Plan`; die Oberfläche enthält keine eigenen Fachregeln. Zurück erlaubt Änderungen; zusätzliche vorhandene Belegungen bleiben erhalten. Ein schon belegtes BF wird in Schritt 1 eigens angezeigt und kann dort bewusst abgewählt werden, bevor dasselbe Fach als LF gewählt wird. Vorläufige mündliche Planung wird mitgespeichert; Laden startet zur erneuten Prüfung bei Schritt 1. Wahl-Schema ist jetzt v2, v1-Dateien werden geschützt abgewiesen (siehe DATEIFORMAT.md). Vollständige Rechtsprüfung und verbindliche Abgabe bleiben außerhalb M1.
+
+### Darstellung auf Full HD
+
+Die Schüler-App startet maximiert und nutzt die Bildschirmarbeitsfläche (Taskleiste bleibt verfügbar). Wiederhergestellt beträgt die Fenstergröße 1440 × 900 logische Pixel. Der Inhalt ist für gute Lesbarkeit auf 1760 logische Pixel begrenzt. Bei schmalerer Arbeitsfläche, etwa durch 125/150 % Windows-Skalierung, stehen die Dateiaktionen unter dem Titel. Schrittleiste und Planbeschriftungen können umbrechen; Navigation bleibt außerhalb der scrollbaren Wahlfläche. Voraussetzungen bleiben klein und eingeklappt in der Fußzeile. Lange Dateiangaben werden gekürzt und vollständig als Tooltip angezeigt.
