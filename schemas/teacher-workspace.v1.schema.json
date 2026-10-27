@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lokale Lehrer-Jahrgangsverwaltung v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "activeYear", "years"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "activeYear": { "type": ["integer", "null"], "minimum": 2000, "maximum": 2200 },
+    "years": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["catalog", "databasePath", "step", "actor", "certificateThumbprint", "keyId"],
+        "properties": {
+          "catalog": { "$ref": "offer-catalog.v1.schema.json" },
+          "databasePath": { "type": "string", "minLength": 1 },
+          "step": { "enum": ["offer", "import", "mapping", "review", "complete"] },
+          "actor": { "type": "string", "minLength": 1 },
+          "certificateThumbprint": { "type": "string" },
+          "keyId": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -6,6 +6,26 @@ namespace GsmKurswahl.ImportExport.Tests;
 public class StudentTableImportTests
 {
     private static ImportOrigin Origin => new("demo.csv", "synthetic-hash", "v1", DateTimeOffset.UtcNow, "demo-beratung");
+    [Theory]
+    [InlineData("accountId", "S-1-5-21-100-200-300-1")]
+    [InlineData("home", "10a/Muster.Demo")]
+    public void DuplicateAccountIdsAndDirectoriesAreExcludedFromBatch(string field, string value)
+    {
+        var table = StudentTableImport.Csv($"studentId;name;class;year;username;{field}\ndemo-001;Demo Eins;10a;2029;DEMO\\test1;{value}\ndemo-002;Demo Zwei;10a;2029;DEMO\\test2;{value}");
+        var rows = StudentTableImport.Preview(table, table.Headers.ToDictionary(h => h, h => h), Origin, "demo-beratung");
+        Assert.All(rows, row => Assert.NotEmpty(row.Error));
+    }
+    [Theory]
+    [InlineData("", "10a/Muster.Demo", false)]
+    [InlineData("Muster.Demo2", "10a/Muster.Demo2", false)]
+    [InlineData("../anderer", "", true)]
+    public void NamesBuildDefaultFolderAndOptionalOverrideIsValidated(string folder, string expected, bool error)
+    {
+        var table = StudentTableImport.Csv("studentId;firstName;lastName;class;year;username;folder\ndemo-001;Demo;Muster;10a;2029;DEMO\\demo;" + folder);
+        var row = StudentTableImport.Preview(table, table.Headers.ToDictionary(h => h, h => h), Origin, "demo-beratung").Single();
+        if (error) Assert.NotEmpty(row.Error);
+        else { Assert.Empty(row.Error); Assert.Equal(expected, row.Candidate!.HomeDirectory); Assert.Equal("Demo Muster", row.Candidate.Student.SyntheticDisplayName); }
+    }
     [Fact]
     public void ShippedDemoImportsWithoutErrorsAndLeavesMappingUnconfirmed()
     {

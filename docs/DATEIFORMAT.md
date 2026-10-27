@@ -31,3 +31,17 @@ Der HTML-Kontrollbogen ist ein abgeleiteter Export ohne Rückimport. Er enthält
 ### Nachfolgende Nutzerkorrektur: PDF-only / Sprachen
 
 Der oben beschriebene HTML-Export ist ersetzt: ausschließlich direkte PDF-Datei, kein HTML und keine Druckfunktion. Kataloginhalt `demo-2029-v3` enthält Französisch und Latein LF/BF; Regelversion `m2-2`. JSON-Struktur bleibt unverändert. PDF ist ein abgeleiteter Export ohne Rückimport oder Berechtigungswirkung.
+
+## Lehrer-Arbeitsstand und Speicherort v1 (27.10.2026)
+
+Neu und unabhängig von den unveränderten Wahl-/Profil-/Katalog- und SQLite-Schemata: `schemas/teacher-workspace.v1.schema.json` und `schemas/teacher-location.v1.schema.json`. Beide verlangen `schemaVersion: 1`; unbekannte Versionen werden abgelehnt, nicht migriert.
+
+`workspace.json` enthält `activeYear` sowie `years`: vollständiges `catalog`, absoluten `databasePath`, `step` (offer/import/mapping/review/complete), `actor`, `certificateThumbprint` und `keyId`. Kein privater Schlüssel. Eindeutige Jahrgänge, gültige aktive Referenz, absolute Pfade, Demo-Katalog und definierte Einrichtungsschritte werden zusätzlich beim Laden geprüft. Maximal 4 MiB beim Lesen. Die Auswahl des aktiven Jahrgangs erfolgt ausdrücklich, nicht kalenderabhängig.
+
+`location.json` im lokalen Standard-Datenordner enthält das ausdrücklich ausgewählte absolute Verwaltungsverzeichnis (`directory`). Ohne diese Datei gilt der Standardordner. Ist ein gemerkter Ordner nicht erreichbar, kein automatischer Rückfall auf einen leeren Standardbestand.
+
+Beide Dateien werden über temporäre Dateien im jeweiligen Zielverzeichnis, Flush und kontrollierten Austausch geschrieben. Exklusive kooperative Sperre und Inhaltsvergleich verhindern stilles Überschreiben konkurrierender Änderungen. Fehlende registrierte Datenbanken werden beim Öffnen abgewiesen. Der komplette Arbeitsstand gehört zusammen mit allen referenzierten Datenbanken ins geschützte Backup; bei eingebundenen alten Beständen liegen diese ggf. außerhalb des Verwaltungsverzeichnisses. Für Backup Anwendung vorher schließen.
+
+### Vereinfachter Import/Assistent
+
+Keine Änderung der JSON-Strukturen oder Schema-Versionen. Neue Jahrgänge starten weiterhin bei `offer`, danach `import` und `mapping` (gemeinsame Verteilung). Bereits gespeichertes `review` öffnet ebenfalls die Verteilung; bestehende Daten werden nicht migriert. Der Tabellenadapter akzeptiert zusätzlich `firstName`, `lastName` und `folder`. Vor Bestätigung kann das bestehende Home-Feld einen relativen Pfad `Klasse/Nachname.Vorname` enthalten; nach Verteilerbestätigung wird der absolute geprüfte Pfad als neue Stammdatenrevision gespeichert.

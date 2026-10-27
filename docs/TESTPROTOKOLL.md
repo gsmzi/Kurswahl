@@ -240,3 +240,43 @@ Paket-Audit `dotnet list GSM-Kurswahl.sln package --vulnerable --include-transit
 - Technische Texteingabe für das Spaltenmapping durch deutsch beschriftete Auswahllisten ersetzt, Pflichtfelder markiert. Dateiwechsel verwirft alte Zuordnungen. Passende Filter und klarere Titel für Dateidialoge; Schülerlistenimport weist andere Endungen ausdrücklich ab. Fachregeln, Schemata und bestätigte Übernahmen unverändert; keine neuen Pakete.
 - Erster Release-Build erfolgreich: 0 Warnungen, 0 Fehler. Abschluss `scripts/Test.ps1 -LockedMode`: Restore, Release-Build (0 Warnungen/0 Fehler), **169/169 Tests bestanden**, keine übersprungen, alle drei JSON-Sample-Schemas erfolgreich. Aufteilung: Domain 8, Rules 57, Storage 51, ImportExport 7, Application 37, UI 9.
 - Avalonia-Headless-Smoke prüft die neue Startseite und alle sechs Reiter. Zusätzlicher UI-Test prüft Zuordnung tatsächlich ausgewählter Spalten, unbekannte optionale Felder, Tooltip und Zurücksetzen beim Dateiwechsel. `git diff --check` erfolgreich. Keine native Schulgeräte-/Screenreader-Abnahme behauptet.
+
+## Jahrgangsoberfläche – erster Testlauf (27.10.2026)
+
+- Neuer automatischer Einstieg über gespeicherten aktiven Jahrgang, fortsetzbare Einrichtung, Aufgabenübersicht aus aktuellen Verwaltungsdaten, expliziter Jahrgangswechsel, lokale Speicherortwahl und einmalige Einbindung vorhandener Bestände.
+- Zwei Release-Builds erfolgreich, jeweils 0 Warnungen / 0 Fehler. Erster vollständiger Testlauf: **177 bestanden, 0 fehlgeschlagen, 0 übersprungen** (Domain 8, Rules 57, Storage 58, ImportExport 7, Application 37, UI 10). Ergebnisse unter artifacts/test-results/workspace-first.
+- Neue Prüfungen: Einrichtungsfortsetzung, explizite aktive Jahrgangswahl, fehlender Bestand wird nicht neu erzeugt, defektes/unbekanntes Arbeitsstandschema, konkurrierende Änderungen, Einbindung bestehender Datenbank, gemerkter/fehlender Speicherort; UI durchläuft Jahrgang und Angebot bis zum Import und öffnet fertigen Jahrgang direkt mit passender nächster Aufgabe.
+- Nacharbeiten: aktuelle Katalogversion gezielt exportieren, Fachauswahl bei bestehenden Wahlen schützen, Statusbereich in der Höhe begrenzen. Zusätzlicher Regressionstest für überholte Profile und fehlgeschlagene Zustellung in der Aufgabenübersicht. Abschlussprüfung folgt.
+
+## Jahrgangsoberfläche – Abschlussprüfung (27.10.2026)
+
+- `scripts/Test.ps1 -LockedMode` vollständig erfolgreich: Locked-Restore, Release-Build **0 Warnungen / 0 Fehler**, **178 Tests bestanden / 0 fehlgeschlagen / 0 übersprungen**, drei bestehende JSON-Sample-Schemas erfolgreich. Aufteilung: Domain 8, Rules 57, Storage 59, ImportExport 7, Application 37, UI 10.
+- Der UI-Test durchläuft nun auch Schülerliste → Zuordnung → Abschluss und öffnet danach in einem neuen Fenster automatisch die Aufgabenübersicht. Zusätzlicher Dashboardtest bestätigt, dass neuere Zustellfehler und Vorbildungskorrekturen frühere erfolgreiche Zustellungen nicht als aktuell erscheinen lassen.
+- `git diff --check` erfolgreich. Keine Paketänderungen; kein neuer Paket-Audit erforderlich oder behauptet. Keine Echtdaten, keine privaten Schlüssel, kein Deployment. Native Schulgeräte-/DPI-/Screenreader-Abnahme weiterhin offen; verfügbarer Avalonia-Headless-Smoke ausgeführt.
+
+## Vereinfachung und Navigationskorrektur – erster Lauf (27.10.2026)
+
+Release-Build erfolgreich, 0 Warnungen/Fehler. Vollständiger Lauf `scripts/Test.ps1 -LockedMode`: Restore/Build erfolgreich; 184 von 185 Tests bestanden, 1 fehlgeschlagen (Storage: Konkurrenztest schrieb nach Änderung des initialen Schritts denselben Inhalt und erwartete fälschlich eine Konkurrenzabweichung). Test schreibt jetzt tatsächlich einen anderen Schritt. UI-Navigation und Sammelimport bestanden. Schemaprüfung wegen Testfehler noch nicht gelaufen. Weitere Regressionen für automatische Sammlung und relative Reimporte ergänzt; Wiederholung folgt.
+
+Zweiter Abschlussversuch: Restore erfolgreich; Build mit CS8602 in StudentImportService abgebrochen (Nullable-Fluss nach Normalisierung des Kandidaten). Importherkunft jetzt vor der Normalisierung als geprüfte lokale Variable gespeichert. In diesem Versuch keine Tests/Schemaprüfung gelaufen.
+
+Dritter Lauf erfolgreich: Restore, Release-Build (0 Warnungen/Fehler), 187/187 Tests (Domain 8, Rules 57, Storage 62, ImportExport 10, Application 37, UI 13), drei Sample-Schemas. Automatische Sammlung mit Wiederholungsschutz und offenem Lehrerkonflikt sowie normalisierte Nachimporte getestet. Abschließende Ergänzung: doppelte SID/Ordner bereits in Importvorschau abweisen, vorhandenes gemeinsames Verteilungsverzeichnis vorbelegen; abschließender Lauf folgt.
+
+## Vereinfachte Lehrerverwaltung – Abschluss (27.10.2026)
+
+- Nutzerpräzisierung: Fachauswahl bleibt vor dem Import. Weniger Einzelschritte, tabellarische Sammelübernahme, gemeinsame Verteilung nach Grundverzeichnis und automatisches Einsammeln bleiben umgesetzt. Einstellungen/Hilfe haben einen dauerhaften Rückweg; wiederverwendete Ansichten besitzen jeweils nur einen Scroll-Container.
+- Letzter vollständiger Lauf `scripts/Test.ps1 -LockedMode` erfolgreich: Locked-Restore, Release-Build mit **0 Warnungen / 0 Fehlern**, **189 Tests bestanden / 0 fehlgeschlagen / 0 übersprungen**. Domain 8, Rules 57, Storage 62, ImportExport 12, Application 37, UI 13. Drei Sample-Schemas erfolgreich. Auch der unmittelbar vorherige Stand bestand 189 Tests; nach der Nutzerpräzisierung vollständig erneut geprüft.
+- Neue Regressionen: wiederholter Wechsel Einstellungen/Hilfe/Zurück vor Einrichtung; Sammelimport zweier vorausgewählter Zeilen; Standard-/Ausnahmeordner und unzulässige Ordnernamen; doppelte SID/Ziele; Wurzelbegrenzung und fehlende Verzeichnisse; unveränderte/relative Nachimporte erhalten bestätigte Zuordnungen; automatische Sammlung erzeugt keine Dubletten und überschreibt Lehrerentscheidungen nicht. Verfügbarer Avalonia-Headless-UI-Smoke ausgeführt.
+- Keine neuen Pakete, keine privaten Schlüssel oder Echtdaten. Reale Schulnetz-/Windows-Zertifikatverteilung und native Bildschirm-/DPI-/Screenreader-Abnahme weiterhin nicht ausgeführt. Automatische Sammlung läuft nur bei geöffneter App; Kontodaten und Signierkonfiguration benötigen weiterhin einmalige administrative Vorbereitung.
+
+## Optische Überarbeitung – erster Build (27.10.2026)
+
+Lehreroberfläche: helle Flächen, grüne Hauptaktionen, Fachkacheln, Kennzahlenkarten und grafischer Dreischritt. Erster Release-Build kompilierte die Änderungen, scheiterte beim Kopieren der von einer laufenden Lehrerapp gesperrten EXE (MSB3027/MSB3021, 10 Wiederholungswarnungen). Kein Prozess beendet. Weitere Builds/Tests in separatem `artifacts/visual-review`-Ausgabeverzeichnis.
+
+## Optische Überarbeitung – Abschluss (27.10.2026)
+
+- Separater Locked-Restore mit `dotnet restore GSM-Kurswahl.sln --configfile NuGet.Config --locked-mode --artifacts-path artifacts/visual-review` erfolgreich. Release-Build mit demselben Artifacts-Pfad erfolgreich, **0 Warnungen / 0 Fehler**. Die laufende Lehrerapp blieb geöffnet.
+- Vollständige Suite: `dotnet test GSM-Kurswahl.sln -c Release --no-build --no-restore --artifacts-path artifacts/visual-review --logger trx --results-directory artifacts/test-results/visual-final`: **190 bestanden / 0 fehlgeschlagen / 0 übersprungen**. Domain 8, Rules 57, Storage 62, ImportExport 12, Application 37, UI 14. `scripts/Test-Schemas.ps1`: drei Sample-Schemas erfolgreich. `git diff --check` erfolgreich.
+- UI-Test durchläuft Fachauswahl, Import, Verteilung und Unterbrechung. Prüft ausdrücklich, dass „Später verteilen“ weiterhin offene Zustellungen zeigt; Navigation Einstellungen/Hilfe/Übersicht und Breite der Schrittkarten bei 900 × 600 geprüft.
+- Mit `GSM_UI_SCREENSHOTS` auf `artifacts/ui-preview` verwendet die Testsuite den vorhandenen Skia-Renderer. Fachauswahl, Import, Verteilung, Übersicht und kompakte Ansicht wurden als PNG gerendert und visuell geprüft. Nach erster Sichtprüfung Hauptaktion in der Übersicht nach oben verlegt und anschließend erneut gebaut/getestet/gerendert. Screenshots enthalten ausschließlich synthetische Daten. Kein neuer Paketbezug.
+- Startbare geprüfte Lehrerfassung: `artifacts/visual-review/bin/GsmKurswahl.TeacherApp/release/GsmKurswahl.TeacherApp.exe`. Kein Deployment, kein Beenden der geöffneten App, keine Echtdatenänderungen. Native Schulgeräte-/DPI-/Screenreader-Abnahme bleibt offen.

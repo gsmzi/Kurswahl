@@ -18,7 +18,13 @@ namespace GsmKurswahl.StudentApp.Tests;
 
 public static class TestAppBuilder
 {
-    public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<TestApp>().UseHeadless(new AvaloniaHeadlessPlatformOptions());
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        var render = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GSM_UI_SCREENSHOTS"));
+        var builder = AppBuilder.Configure<TestApp>();
+        if (render) builder = builder.UseSkia();
+        return builder.UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = !render });
+    }
 }
 public sealed class TestApp : Avalonia.Application
 {

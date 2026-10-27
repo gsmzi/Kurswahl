@@ -16,6 +16,58 @@ public sealed class AdministrationTests : IDisposable
         new(Guid.NewGuid(), $"demo-{number:000}", $"Demo Person {number}", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown),
         $"DEMO\\test{number}", $"S-1-5-21-100-200-300-{number}", Path.Combine(root, "home" + number), true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
     [Fact]
+    public void RelativeReimportKeepsResolvedMappingAndOnlyReportsChangedPrerequisites()
+    {
+        using var store = new SqliteAdministrationStore(DbPath);
+        var current = Record() with { HomeDirectory = Path.Combine(root, "10a", "Muster.Demo"), Origin = new("demo.csv", "old", "map", DateTimeOffset.UtcNow, "demo-beratung") };
+        store.SaveStudent(current, null);
+        var incoming = current with { HomeDirectory = "10a/Muster.Demo", MappingConfirmed = false, Origin = current.Origin! with { ContentHash = "new" }, Student = current.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } };
+        Assert.Equal("Voraussetzungen", StudentImportService.Differences(current, incoming));
+        Assert.True(StudentImportService.Confirm(store, incoming, 1, true));
+        Assert.True(store.Students().Single().MappingConfirmed);
+        Assert.Equal(current.HomeDirectory, store.Students().Single().HomeDirectory);
+    }
+    [Fact]
+    public void DistributionRootResolvesExistingClassFoldersAndRejectsEscapeOrMissingTargets()
+    {
+        var target = Path.Combine(root, "10a", "Muster.Demo"); Directory.CreateDirectory(target);
+        Assert.Equal(target, StudentDirectories.Resolve(root, "10a/Muster.Demo"));
+        Assert.Equal(target, StudentDirectories.Resolve(root, target));
+        Assert.Throws<ArgumentException>(() => StudentDirectories.Resolve(root, "../outside"));
+        Assert.Throws<DirectoryNotFoundException>(() => StudentDirectories.Resolve(root, "10b/Missing.Demo"));
+        Assert.False(Directory.Exists(Path.Combine(root, "10b")));
+    }
+    [Fact]
+    public void UnchangedRowsInChangedImportFileKeepConfirmedMappingAndRevision()
+    {
+        using var store = new SqliteAdministrationStore(DbPath);
+        var current = Record() with { Origin = new("demo.csv", "old", "map", DateTimeOffset.UtcNow, "demo-beratung") };
+        store.SaveStudent(current, null);
+        var incoming = current with { Student = current.Student with { Id = Guid.NewGuid() }, MappingConfirmed = false, Origin = current.Origin! with { ContentHash = "new" } };
+        Assert.False(StudentImportService.Confirm(store, incoming, 1, true));
+        Assert.True(store.Students().Single().MappingConfirmed); Assert.Equal(1, store.Students().Single().Version);
+    }
+    [Fact]
+    public void DashboardUsesCurrentPrerequisitesAndLatestDeliveryInsteadOfCountingOldSuccess()
+    {
+        using var store = new SqliteAdministrationStore(DbPath); var record = Record(); store.SaveStudent(record, null);
+        var session = new TeacherSession(store, TestData.Catalog, "demo-beratung");
+        Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToIssue);
+        Directory.CreateDirectory(record.HomeDirectory);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); var service = new ProfileDistribution(store);
+        var profile = service.Issue(record, key, "demo-key");
+        Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToDeliver);
+        Assert.Equal("verteilt", service.Distribute(record, profile).Status);
+        Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).Delivered);
+        store.LogDistribution(new(Guid.NewGuid(), record.Student.ExternalStudentId, profile.Profile.ProfileRevision, DateTimeOffset.UtcNow, "Zugriff_verweigert", "Synthetischer Zustellfehler"));
+        Assert.Equal(0, TeacherDashboardBuilder.Build(store, session).Delivered);
+        Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToDeliver);
+        var corrected = record with { Version = 2, ChangedAt = DateTimeOffset.UtcNow, Student = record.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } };
+        store.SaveStudent(corrected, 1);
+        Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToIssue);
+        Assert.Equal(0, TeacherDashboardBuilder.Build(store, session).Delivered);
+    }
+    [Fact]
     public void ReimportPreservesAdministrativeCorrectionsAndChoiceHistory()
     {
         using var store = new SqliteAdministrationStore(DbPath);

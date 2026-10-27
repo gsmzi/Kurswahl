@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Speicherort der Lehrerverwaltung v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "directory"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "directory": { "type": "string", "minLength": 1 }
+  }
+}

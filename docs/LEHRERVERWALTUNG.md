@@ -6,19 +6,20 @@ Stand: 27.10.2026. Technischer Erprobungsbetrieb ausschließlich mit synthetisch
 
 `dotnet run --project src/GsmKurswahl.TeacherApp -c Release --no-build --no-restore`
 
-1. Bearbeiterkennung eingeben; „Verwaltung öffnen …“ wählen. Zuerst den Jahrgangskatalog, dann eine neue oder bestehende lokale `.db`-Datei auswählen. Eine bestehende Datenbank wird geöffnet, nicht ersetzt. Der Katalog `samples/fachangebot-demo.json` ist für den synthetischen Jahrgang 2029 vorbereitet.
-2. Eine exklusive Begleitdateisperre verhindert zwei schreibende Verwaltungsprozesse. UNC-Pfade und Netzlaufwerke werden für SQLite abgewiesen. Eine liegengebliebene `.lock`-Datei nach einem Absturz ist kein dauerhaftes Schloss; entscheidend ist der offene Dateihandle. Rechte und lokale Ablage sind vor Echtdatenbetrieb zu prüfen.
-3. Die Übersicht filtert kombinierbar nach Name/Klasse/ID, Prüfstatus und Nachwahl. Der Jahrgang stammt aus dem geöffneten Katalog. `invalid` führt zu Nachwahlbedarf; offene fachliche Freigaben bleiben `needs_review`. Ungeprüfte Wahl ist nicht eingereicht und nicht rechtsverbindlich freigegeben.
+Beim ersten Start führt die Einrichtung durch Fachauswahl, Schülerliste und gemeinsame Verteilung. Danach öffnet sich automatisch die Aufgabenübersicht des zuletzt aktiven Jahrgangs. Angefangene Einrichtungen werden beim gespeicherten Schritt fortgesetzt. Der vollständige Ablauf und die Standardablage sind unten unter **Jahrgangsbezogener Einstieg und Einrichtung** beschrieben.
+
+SQLite bleibt lokal und durch eine exklusive Begleitdateisperre gegen zwei schreibende Verwaltungsprozesse geschützt. Im Schülerbestand lassen sich Name/Klasse/ID, Prüfstatus und Nachwahl kombinieren. `invalid` führt zu Nachwahlbedarf; offene Freigaben bleiben `needs_review`. Bestätigte Änderungen werden sofort im Lehrerbestand gespeichert.
 
 ## Klasse-10-Import
 
 CSV: UTF-8, Semikolon, Kopfzeile; Anführungszeichen und eingebettete Zeilenumbrüche unterstützt. XLSX: genau ein Blatt, keine Formeln, nur Werte; gemeinsame/inline Zeichenfolgen und lückenhafte Zellbereiche unterstützt. Es handelt sich um einen allgemeinen Tabellenadapter, nicht um einen ASV-Adapter. Grenzen: 8 Millionen CSV-Zeichen, 16 MB entpackte XLSX-Daten, höchstens 10000 Datensätze, XLSX höchstens 100 Spalten. Mehrblattdateien und Formeln werden ausdrücklich abgewiesen.
 
-Spaltenzuordnung über deutsch beschriftete Auswahllisten: rechts die passende Spaltenüberschrift der geladenen Tabelle wählen. Gleichnamige technische Spalten werden vorgeschlagen; optionale Angaben können ohne Zuordnung bleiben. Pflichtfelder sind mit * markiert, Tooltips erläutern Bedeutung und Werte. Die technischen Feldnamen in der folgenden Tabelle dienen nur als Referenz. Pflichtfelder: `studentId`, `name`, `class`, `year`, `username`. Weitere Zielfelder:
+Spaltenzuordnung über deutsch beschriftete Auswahllisten: rechts die passende Spaltenüberschrift der geladenen Tabelle wählen. Gleichnamige technische Spalten werden vorgeschlagen; optionale Angaben können ohne Zuordnung bleiben. Pflichtfelder sind mit * markiert, Tooltips erläutern Bedeutung und Werte. Die technischen Feldnamen in der folgenden Tabelle dienen nur als Referenz. Pflichtfelder: `studentId`, `class`, `year`, `username` sowie `name` oder beide Felder `firstName` und `lastName`. Weitere Zielfelder:
 
 | Felder | Bedeutung/Werte |
 | --- | --- |
-| accountId, home | Administrativ zu prüfende Windows-SID und absolutes persönliches Wahl-/Profilverzeichnis |
+| firstName, lastName, folder | Vor-/Nachname für `Klasse/Nachname.Vorname`; `folder` überschreibt optional den Schülerordnernamen innerhalb der Klasse. |
+| accountId, home | Administrativ geprüfte Windows-SID; optional expliziter Wahlordner statt der Ableitung aus Namen. |
 | italian, bridge, imp, bilingual | ja/nein bzw. yes/no, true/false, 1/0; leer/unknown/unbekannt bleibt unbekannt |
 | religion | ETH, ER, KR oder leer |
 | sport | Kommagetrennte Halbjahre 1–4; `keine`/`none` bestätigt keine Befreiung; leer/unknown bedeutet unbekannt |
@@ -27,13 +28,21 @@ Spaltenzuordnung über deutsch beschriftete Auswahllisten: rechts die passende S
 | permanentSport | Dauerhafte Sportbefreiung, dreiwertig wie oben |
 | departure | aktiv, voraussichtlich, bestaetigt; ohne sensible Begründung |
 
-Die Vorschau zeigt alle zu übernehmenden Angaben und bei bestehenden Personen auch den aktuellen geschützten Bestand. Fehler und Dubletten werden angezeigt. Jede Zeile wird ausdrücklich einzeln übernommen; bestehende Personen erfordern eine bewusste Korrekturentscheidung. Der Import setzt die Kontozuordnung auf ungeprüft. Identischer Dateiinhalt mit identischem Mapping erzeugt keine neue Stammdatenrevision und überschreibt spätere Korrekturen nicht. Geänderter Inhalt oder Mapping erfordert erneut die Einzelentscheidung. Wahlhistorien bleiben immer erhalten.
+Die tabellarische Vorschau wählt alle fehlerfreien Zeilen vor. Eine gemeinsame Bestätigung übernimmt sie, auch beim Nachimport. Geänderte Felder sind gelb markiert; Tooltip zeigt bisherigen und vorgeschlagenen Stand. Fehler bleiben ausgeschlossen. Bei gleichbleibender Herkunft werden nachträgliche Verwaltungskorrekturen geschützt. Inhaltlich unveränderte Zeilen erzeugen auch in geänderten Dateien keine Revision. Bereits aufgelöste Ordner bleiben bei unverändertem relativen Ziel erhalten. Nur Änderungen an Konto/SID/Ordner heben die Zuordnungsbestätigung auf. Wahlhistorien bleiben erhalten. Falls einzelne Speicherungen scheitern, nennt die Anzeige Teilerfolge und abgelehnte Personen; keine behauptete Gesamttransaktion.
 
-Für den ersten Versuch kann `samples/klasse10-demo.csv` verwendet werden. SID und Zielverzeichnis sind absichtlich nicht gesetzt. Nach Import eine Person öffnen, schulisch geprüfte Konto-/SID-/Home-Zuordnung eintragen und ausdrücklich bestätigen. **Home bezeichnet hier das bereits vorhandene Verzeichnis für profil.json, profil.sig und aktuell.json**, nicht ein automatisch anzulegendes Netzlaufwerk. Leere oder nicht erreichbare Ziele werden niemals automatisch angelegt. Doppelte IDs, Konten, SIDs und Zielverzeichnisse werden zurückgewiesen.
+`samples/klasse10-demo.csv` enthält synthetische Vor-/Nachnamen und einen abweichenden Ordnernamen. SID bleibt absichtlich leer: echte Kontozuordnung erfolgt durch die Schul-IT, niemals durch Ableitung einer SID aus einem Namen. Für die Verteilung Konto/SID in der vorbereiteten Liste mitliefern. Home bezeichnet den vorhandenen Ordner für profil.json, profil.sig und aktuell.json. Fehlende Ordner werden nicht erzeugt.
+
+## Gemeinsame Verteilung und automatisches Einsammeln
+
+Nach Fachauswahl und Import nur Laufwerk/Grundverzeichnis mit den Klassenordnern angeben. „Ziele prüfen“ zeigt die vollständigen Zielpfade gemeinsam. Die Sammelbestätigung bestätigt die angezeigten Konto-/SID-/Ordnerzuordnungen und signiert/verteilt alle bereiten Personen. Fehlende Kontodaten, nicht vorhandene Ordner, doppelte Ziele, Verknüpfungen und Pfade außerhalb des gewählten Grundverzeichnisses bleiben offen. Die absoluten bestätigten Schülerpfade werden gespeichert; für das Einsammeln ist keine erneute Laufwerkswahl erforderlich.
+
+Einmalig benötigt die Schul-IT das Signierzertifikat und die passende geschützte Schülerinstallation mit aktuellem Katalog/öffentlichem Schlüssel. Die technischen Einzelfunktionen sind eingeklappt. Erfolgreiche Gesamtausgabe führt direkt zur Übersicht; „Später verteilen“ erlaubt eine Unterbrechung mit sichtbarer Restaufgabe.
+
+Bei geöffneter App werden bestätigte Schülerordner beim Start, nach der Verteilung und alle 60 Sekunden gelesen. Neue konfliktfreie Wahlen werden mit Herkunft und vollständiger Revision übernommen, auch wenn die fachliche Prüfung Hinweise enthält. Fachliche Hinweise bleiben in der Schülerübersicht; Übernahme ist keine Freigabe. Lehreränderungen, abweichende Dokument-IDs und alte Schülerrevisionen werden nicht automatisch überschrieben. Unter „Kurswahlen einsammeln“ sind Konflikte und Lesefehler sichtbar, mit manueller Konfliktentscheidung. Bei geschlossener App läuft kein Dienst.
 
 ## Signierung, Schlüssel und Verteilung
 
-Das Lehrerprogramm verwendet ein administrativ bereitgestelltes P-256-Zertifikat mit zugänglichem privaten Schlüssel aus dem Windows-Zertifikatspeicher **Aktueller Benutzer / Eigene Zertifikate**. Es erzeugt oder exportiert keinen privaten Schlüssel. Im Reiter „Profile ausgeben“ Zertifikat-Fingerabdruck und eigene eindeutige Schlüsselkennung angeben. Ein Zertifikat allein begründet keine Lehrerberechtigung; Zugriff auf den privaten Schlüssel muss auf berechtigte Verwaltungsaccounts beschränkt sein.
+Das Lehrerprogramm verwendet ein administrativ bereitgestelltes P-256-Zertifikat mit zugänglichem privaten Schlüssel aus dem Windows-Zertifikatspeicher **Aktueller Benutzer / Eigene Zertifikate**. Es erzeugt oder exportiert keinen privaten Schlüssel. Im Arbeitsbereich „Schülerprofile bereitstellen“ Zertifikat-Fingerabdruck und eigene eindeutige Schlüsselkennung angeben. Ein Zertifikat allein begründet keine Lehrerberechtigung; Zugriff auf den privaten Schlüssel muss auf berechtigte Verwaltungsaccounts beschränkt sein.
 
 „Öffentlichen Prüfschlüssel … exportieren“ erzeugt ausschließlich ein `TrustedProfileKey`-Objekt. Dieses wird administrativ in `keys` der schreibgeschützten Schülerinstallation (`profile-trust.json`, Schema 1) aufgenommen. `allowedAccountDomains` muss separat den tatsächlich bestätigten schulischen Kontobereich enthalten. Kein privater Schlüssel und keine vollständige Schülerliste werden verteilt. Der Schülerclient vertraut nicht einer Konfiguration aus dem Home.
 
@@ -57,7 +66,7 @@ Nachwahl kann mit Begründung und Frist vorgemerkt werden. Abschluss ist nur bei
 
 ## Angebot vor der Ausgabe
 
-Im Reiter „Fachangebot“ Jahrgang und angebotene LF wählen. Eine neue eindeutige Angebotsversion und eine neue Datei sind zwingend. Der gemeinsame Regelkern prüft schulische Angebotsgrenzen. Der aktive Katalog und Verwaltungswahlen werden nicht verändert. Zur anschließenden Verwendung Bestand mit dem neuen Katalog öffnen; Schülerinstallation entsprechend konfigurieren. Eine produktive Angebotsstreichung mit Auswirkungen/Umwahl ist M4 und wird hier nicht vorweggenommen.
+Die Fachauswahl erfolgt im Einrichtungsassistenten und wird im aktuellen Jahrgang gespeichert. Unter „Jahrgang verwalten“ kann das aktuelle Fachangebot angesehen und unverändert für die Schülerinstallation exportiert werden. Solange keine Verwaltungswahlen vorliegen, kann die Fachauswahl erneut geöffnet werden. Mit bestehenden Wahlen bleibt dieser Weg gesperrt; kontrollierte spätere Angebotsänderungen gehören zu M4.
 
 ## Datenformat und Sicherung
 
@@ -69,6 +78,35 @@ Vor Sicherung Anwendung schließen; konsistenten lokalen Bestand in den geschüt
 
 ## Orientierung in der Oberfläche (27.10.2026)
 
-Der zunächst geöffnete Reiter **Start & Dateien** erklärt den Ablauf sowie Herkunft, Inhalt und Verwendung aller Dateien. Aufklappbare Hilfen unterscheiden Schülerlisten (.xlsx/.csv), Fachangebot (.json), lokalen Lehrerbestand (.db), persönliche Profile (profil.json + profil.sig), Kurswahlen (aktuell.json), PDF-Kontrollbogen und technische Einrichtungsdateien. Eine eigene Hilfe ordnet die vorhandenen Testdateien zu.
+Die unter **Hilfe** erreichbare Dateiorientierung erklärt den Ablauf sowie Herkunft, Inhalt und Verwendung aller Dateien. Aufklappbare Hilfen unterscheiden Schülerlisten (.xlsx/.csv), Fachangebot (.json), lokalen Lehrerbestand (.db), persönliche Profile (profil.json + profil.sig), Kurswahlen (aktuell.json), PDF-Kontrollbogen und technische Einrichtungsdateien. Eine eigene Hilfe ordnet die vorhandenen Testdateien zu.
 
-Die Arbeitsreiter heißen Schülerbestand, Schülerlisten, Profile ausgeben, Wahlen einsammeln und Fachangebot. Jede Import-/Ausgabeseite erklärt die Aufgabe vor den nummerierten Aktionen. Dateidialoge filtern passende Endungen; die Inhalts-/Schemaprüfung bleibt maßgeblich, weil verschiedene JSON-Dateien dieselbe Endung haben. Die Signiereinrichtung liegt aufklappbar unter „Signierung einrichten · Schul-IT“. Tooltips ergänzen die sichtbaren Hinweise an Aktionen, Spaltenauswahl und Kontozuordnung; zentrale Erklärungen sind auch ohne Maus aufklappbar erreichbar.
+Die Arbeitsbereiche sind über die Aufgabenübersicht und Jahrgang verwalten erreichbar. Jede Import-/Ausgabeseite erklärt die Aufgabe vor den nummerierten Aktionen. Dateidialoge filtern passende Endungen; die Inhalts-/Schemaprüfung bleibt maßgeblich, weil verschiedene JSON-Dateien dieselbe Endung haben. Die Signiereinrichtung liegt aufklappbar unter „Signierung einrichten · Schul-IT“. Tooltips ergänzen die sichtbaren Hinweise an Aktionen, Spaltenauswahl und Kontozuordnung; zentrale Erklärungen sind auch ohne Maus aufklappbar erreichbar.
+
+## Jahrgangsbezogener Einstieg und Einrichtung (27.10.2026)
+
+Ablauf ab dem ersten Start:
+
+1. Beim ersten Start Jahrgang (Vorschlag 2029) und synthetische Bearbeiterkennung bestätigen. Das mitgelieferte Fachangebot dient als Ausgangspunkt; keine Katalogdateiauswahl nötig.
+2. Leistungsfächer auswählen und bestätigen.
+3. Schülerliste laden, tabellarische Vorschau prüfen und alle gewünschten Zeilen gemeinsam übernehmen.
+4. Laufwerk wählen, Ziele gemeinsam prüfen und Schülerdateien verteilen. Danach öffnet sich die Übersicht. Weitere Wahlen werden automatisch eingesammelt.
+
+Nach Abschluss öffnet sich automatisch die **Übersicht des aktiven Abiturjahrgangs**. Sie zeigt Schülerzahl, aktuelle erfolgreiche Profilzustellungen laut letztem Bericht, eingelesene Wahlen, Nachwahlen und Klärungsfälle. „Als Nächstes“ priorisiert offene Zuordnungen, fehlende/überholte Profile, Zustellprobleme und ausstehende Kurswahlen. Daneben bleiben Schülerprofile bereitstellen, Kurswahlen einsammeln, Schülerbestand bearbeiten und Schülerliste aktualisieren direkt erreichbar. Eine frühere erfolgreiche Zustellung wird nach neuerem Fehler oder Vorbildungskorrektur nicht als aktueller Erfolg gezählt; die Anzeige ist keine Live-Prüfung der Schülerordner.
+
+**Unterbrechen:** Jahrgang, Fachauswahl, bestätigte Importe, Zuordnungen und Einrichtungsstufe bleiben erhalten. Nach Neustart öffnet sich der gespeicherte Schritt. Noch nicht bestätigte Importvorschauen werden absichtlich nicht übernommen; zum Fortsetzen die Quelldatei erneut laden. Bereits übernommene Zeilen bleiben erhalten und werden über den vorhandenen Wiederholungsschutz erkannt.
+
+**Speicherort:** Standard ist der lokale Benutzer-Datenordner `LocalApplicationData/GSM-Kurswahl/Lehrerverwaltung`. Darin verwaltet die App `workspace.json` und pro neuem Jahrgang `Abitur-<Jahr>/verwaltung.db`. Das vollständige aktive Fachangebot ist im Arbeitsstand gespeichert. Unter **Einstellungen** lässt sich ein anderes vorhandenes lokales Verzeichnis wählen, auch ein beschreibbarer Ordner neben dem Programm. Diese Auswahl wird in `location.json` im Standardordner für den nächsten Start gemerkt. Es werden dabei keine Daten verschoben oder kopiert. UNC-/Netzlaufwerke bleiben für den Verwaltungsbestand gesperrt.
+
+**Bestehender M3-Bestand:** Unter Einstellungen einmalig „Vorhandenen Lehrerbestand einbinden“ wählen, bisherigen Katalog und vorhandene lokale Datenbank zuordnen. Die Datenbank bleibt am bisherigen Ort; Historie und Profile bleiben erhalten. Der Assistent führt ab der Schülerliste zur Überprüfung und zum Abschluss; vorhandene Personen müssen nicht erneut importiert werden. Ein bereits registrierter Jahrgang wird nicht ersetzt.
+
+**Jahrgang verwalten:** Zwischen vorhandenen Jahrgängen wechseln oder einen weiteren anlegen. Der aktive Jahrgang wird ausdrücklich gespeichert und nicht aus dem Kalenderjahr berechnet. Das aktuelle Fachangebot ist einsehbar und unverändert für die Schülerinstallation exportierbar. Eine erneute Fachauswahl ist nur möglich, solange für diesen Jahrgang keine Verwaltungswahlen vorliegen; danach bleibt der spätere kontrollierte Angebotsänderungsablauf erforderlich. Eine exportierte Datei überschreibt keine vorhandene Datei. In der Schülerinstallation den `catalogPath` auf genau diesen Katalog setzen, damit Angebotsversionen übereinstimmen.
+
+**Signiereinstellungen:** Fingerabdruck und Schlüsselkennung können pro Jahrgang ausdrücklich gespeichert werden. Private Schlüssel werden weiterhin ausschließlich im administrativen Zertifikatspeicher verwahrt. Unter „Signierung einrichten · Schul-IT“ steht auch der Export des aktuellen Fachangebots bereit.
+
+**Fehler:** Ein fehlender registrierter Lehrerbestand, ein defekter oder unbekannt versionierter Arbeitsstand, gesperrte Datenbank oder unerreichbarer gemerkter Speicherort erzeugt eine sichtbare Fehlerseite. Es wird kein leerer Ersatzbestand angelegt. Daten und Einstellungen werden nicht stillschweigend repariert. Bei konkurrierender Änderung des Arbeitsstands ist ein Neustart nötig.
+
+## Gestaltung und Verlaufsanzeige (27.10.2026)
+
+Die Lehreroberfläche verwendet eine helle Gestaltung mit klaren Arbeitsflächen, farbig hervorgehobenen Hauptaktionen, Fachkacheln und Kennzahlenkarten. Die grafische Leiste zeigt **Fächer auswählen → Schülerliste importieren → Dateien verteilen**. Der aktuelle Schritt, erledigte Schritte und offene Zustellungen sind jeweils mit Text und Symbol gekennzeichnet; die Leiste ist eine Statusanzeige und überspringt keine Bestätigung. Eine verschobene oder fehlgeschlagene Verteilung wird nicht als erledigt dargestellt. Fachliche Freigaben bleiben davon getrennt. Einstellungen und Hilfe behalten den bestehenden Einrichtungsstand; die aktive Seite ist in der Navigation hervorgehoben.
+
+Die nächste Aufgabe steht in der Übersicht vor den Kennzahlen, damit sie auch in kleinen Fenstern sichtbar bleibt. Weitere Inhalte bleiben scrollbar. Die helle Farbgestaltung gilt nur im Lehrerfenster, nicht global für das Schülerprogramm.

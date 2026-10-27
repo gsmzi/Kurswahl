@@ -49,7 +49,11 @@ dotnet run --project src/GsmKurswahl.TeacherApp -c Release --no-build --no-resto
 
 Tatsächliche Ergebnisse und fehlgeschlagene Zwischenläufe: [Testprotokoll](docs/TESTPROTOKOLL.md). Pakete sind explizit gepinnt, Lockdateien bleiben erhalten; [Abhängigkeiten](docs/ABHAENGIGKEITEN.md). Die vorhandene CI-Konfiguration ist kein Nachweis eines beobachteten CI-Laufs.
 
-## Bedienung
+## Lehrerprogramm: Jahrgang öffnen und weiterarbeiten
+
+Beim ersten Start führt ein Assistent durch Jahrgang (Vorschlag 2029), Fachauswahl, Schülerimport und Kontozuordnung. Danach lädt die App automatisch den zuletzt aktiven Jahrgang und zeigt offene Aufgaben: Zuordnungen prüfen, Profile bereitstellen, Zustellungen wiederholen oder Kurswahlen einsammeln. Speicherort, bestehende Datenbanken und Zertifikate sind unter Einstellungen erreichbar; der Jahrgangswechsel unter Jahrgang verwalten. Standardablage ist der lokale Benutzer-Datenordner, alternativ ein ausdrücklich gewähltes lokales Verzeichnis. [Bedienung und Fehlerbehandlung](docs/LEHRERVERWALTUNG.md).
+
+## Bedienung Schülerprogramm
 
 1. Start: Profil wird gelesen und geprüft, gespeicherter Wahlentwurf geladen. Die Fußzeile zeigt Profilstatus, Revision und Ausstellungsstand; Voraussetzungen sind aufklappbar und nicht editierbar. Ungültige Profile verlieren alle Berechtigungswirkung, niemals den Wahlentwurf.
 2. Drei LF wählen. Persönlich oder schulisch gesperrte Angebote stehen mit Begründung in einer aufklappbaren Liste. Sport-LF benötigt bestätigte Auskunft ohne Befreiung.
@@ -84,3 +88,5 @@ dotnet publish src/GsmKurswahl.TeacherApp -c Release -r win-x64 --self-contained
 Den gesamten jeweiligen Ausgabeordner verteilen. Der zuvor versuchte selbstenthaltende M1-Publish scheiterte an fehlenden Runtimepaketen; ein M2-Standalone-Paket wird mit diesem Entwicklungsstand nicht als getestet behauptet. Frameworkabhängiger Publish ist mit `--self-contained false` ohne Runtime-ID möglich und benötigt .NET 10 auf dem Zielgerät. Keine automatische Verteilung.
 
 M3 technisch umgesetzt: Jahrgang/LF-Angebote vor Ausgabe konfigurieren, Klasse-10-Import, Profilsignierung/-verteilung, separater SQLite-Lehrerbestand und Historie. Native Schulnetz-/Zertifikatsprüfung und fachliche Freigabe bleiben offen. Einstieg: [M3-Bedienung und Betrieb](docs/LEHRERVERWALTUNG.md), synthetisches Importsample `samples/klasse10-demo.csv`. M4: Planungen und Streichungen. M5: ASV nach Muster, Netzpilot und endgültiges Release. Fachliche Grenzen und Entscheidungen: [Offene Punkte](docs/OFFENE_PUNKTE.md), [Regel-/Quellenstand](docs/RECHTSQUELLEN.md), [Entwicklungsanweisungen](AGENTS.md).
+
+Lehrer-Alltag: Fächer auswählen → Schülerliste tabellarisch und gesammelt übernehmen → Grundverzeichnis der Klassenordner wählen und gemeinsam verteilen. Standardziel: `Klasse/Nachname.Vorname`, optional abweichender Ordner im Import. Bei geöffneter App werden neue Wahlen automatisch alle 60 Sekunden eingelesen; Konflikte bleiben zur Entscheidung offen. Schulzertifikat und geprüfte Kontodaten werden einmalig administrativ vorbereitet.
