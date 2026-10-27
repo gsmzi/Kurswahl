@@ -6,10 +6,13 @@ public static class StudentImportService
 {
     private static StudentRecord KeepResolvedDirectory(StudentRecord current, StudentRecord candidate)
     {
+        if (!string.IsNullOrWhiteSpace(current.AccountId) && string.IsNullOrWhiteSpace(candidate.AccountId)
+            && string.Equals(current.WindowsUsername, candidate.WindowsUsername, StringComparison.OrdinalIgnoreCase))
+            candidate = candidate with { AccountId = current.AccountId };
         var relative = candidate.HomeDirectory.Replace('\\', '/');
         if (Path.IsPathFullyQualified(current.HomeDirectory) && !Path.IsPathRooted(candidate.HomeDirectory)
-            && relative.Length > 0 && !relative.Split('/').Any(p => p is ".." or "." or "")
-            && current.HomeDirectory.Replace('\\', '/').EndsWith("/" + relative, StringComparison.OrdinalIgnoreCase))
+            && (relative.Length == 0 || (!relative.Split('/').Any(p => p is ".." or "." or "")
+                && current.HomeDirectory.Replace('\\', '/').EndsWith("/" + relative, StringComparison.OrdinalIgnoreCase))))
             return candidate with { HomeDirectory = current.HomeDirectory };
         return candidate;
     }

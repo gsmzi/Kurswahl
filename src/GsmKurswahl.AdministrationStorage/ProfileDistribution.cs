@@ -1,30 +1,26 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using GsmKurswahl.Domain;
 
 namespace GsmKurswahl.AdministrationStorage;
 
-// Signing is called only by administrative composition. The pupil application has no key loader or signing UI.
+// Profile creation and distribution in the teacher app; no certificate or SID required.
 public sealed class ProfileDistribution(IAdministrationStore store)
 {
-    public IssuedProfile Issue(StudentRecord record, ECDsa key, string keyId)
+    public IssuedProfile Issue(StudentRecord record)
     {
         var current = store.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId);
         if (current.Version != record.Version) throw new InvalidOperationException("Stammdaten geändert.");
         record = current;
-        if (!record.MappingConfirmed || string.IsNullOrWhiteSpace(record.AccountId) || record.WindowsUsername.Split('\\').Length != 2
-            || !Path.IsPathFullyQualified(record.HomeDirectory) || string.IsNullOrWhiteSpace(keyId))
-            throw new ArgumentException("Bestätigte Schüler-/Konto-/SID-/Home-Zuordnung erforderlich.");
-        if (key.ExportParameters(false).Curve.Oid.Value != "1.2.840.10045.3.1.7") throw new ArgumentException("P-256-Schlüssel erforderlich.");
+        if (!record.MappingConfirmed || !Path.IsPathFullyQualified(record.HomeDirectory))
+            throw new ArgumentException("Bestätigte Schüler-/Ordnerzuordnung erforderlich.");
         var previous = store.LatestProfile(record.Student.ExternalStudentId);
         var profile = new StudentProfile(1, (previous?.Profile.ProfileRevision ?? 0) + 1, record.Student.ExternalStudentId,
-            record.WindowsUsername, record.Student.GraduationYear, DateTimeOffset.UtcNow, keyId, record.Student.Prerequisites, record.AccountId);
+            record.WindowsUsername, record.Student.GraduationYear, DateTimeOffset.UtcNow, "local-profile", record.Student.Prerequisites, record.AccountId);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(profile, DocumentJson.Options);
         if (bytes.Length > 65536) throw new ArgumentException("Profil überschreitet 64 KiB.");
-        var signature = new ProfileSignature(1, keyId, "ECDSA-P256-SHA256-P1363", Convert.ToBase64String(key.SignData(bytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)));
-        var signed = new IssuedProfile(profile, bytes, JsonSerializer.SerializeToUtf8Bytes(signature, DocumentJson.Options));
-        store.SaveProfile(signed);
-        return signed;
+        var issued = new IssuedProfile(profile, bytes, []);
+        store.SaveProfile(issued);
+        return issued;
     }
     public DistributionEntry Distribute(StudentRecord record, IssuedProfile issued)
     {
@@ -36,37 +32,24 @@ public sealed class ProfileDistribution(IAdministrationStore store)
             record = current;
             var latest = store.LatestProfile(record.Student.ExternalStudentId);
             if (!record.MappingConfirmed || issued.Profile.StudentId != record.Student.ExternalStudentId
-                || issued.Profile.WindowsUsername != record.WindowsUsername || issued.Profile.AccountId != record.AccountId
                 || issued.Profile.GraduationYear != record.Student.GraduationYear
                 || JsonSerializer.Serialize(issued.Profile.Prerequisites, DocumentJson.Options) != JsonSerializer.Serialize(record.Student.Prerequisites, DocumentJson.Options)
                 || latest?.Profile.ProfileRevision != issued.Profile.ProfileRevision
-                || !latest.ProfileBytes.SequenceEqual(issued.ProfileBytes) || !latest.SignatureBytes.SequenceEqual(issued.SignatureBytes))
+                || !latest.ProfileBytes.SequenceEqual(issued.ProfileBytes))
                 throw new InvalidDataException("veraltet");
             if (!Path.IsPathFullyQualified(record.HomeDirectory) || !Directory.Exists(record.HomeDirectory)) throw new DirectoryNotFoundException();
             using var lease = new FileStream(Path.Combine(record.HomeDirectory, ".profil.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             var path = Path.Combine(record.HomeDirectory, "profil.json");
-            var sigPath = Path.Combine(record.HomeDirectory, "profil.sig");
             var before = ReadExisting(path);
-            var beforeSig = ReadExisting(sigPath);
-            if (beforeSig is not null)
-            {
-                var oldSignature = JsonSerializer.Deserialize<ProfileSignature>(beforeSig, DocumentJson.Options);
-                if (oldSignature is null || oldSignature.SchemaVersion != 1 || oldSignature.Algorithm != "ECDSA-P256-SHA256-P1363")
-                    throw new InvalidDataException("Profil_abweichend");
-                try { if (Convert.FromBase64String(oldSignature.Signature).Length != 64) throw new InvalidDataException("Profil_abweichend"); }
-                catch (FormatException) { throw new InvalidDataException("Profil_abweichend"); }
-            }
             if (before is not null)
             {
                 var old = JsonSerializer.Deserialize<StudentProfile>(before, DocumentJson.Options);
-                if (old is null || old.SchemaVersion != 1 || old.StudentId != issued.Profile.StudentId || old.WindowsUsername != issued.Profile.WindowsUsername || old.AccountId != issued.Profile.AccountId)
+                if (old is null || old.SchemaVersion != 1 || old.StudentId != issued.Profile.StudentId || old.GraduationYear != issued.Profile.GraduationYear)
                     throw new InvalidDataException("Profil_abweichend");
                 if (old.ProfileRevision > issued.Profile.ProfileRevision) throw new InvalidDataException("veraltet");
                 if (old.ProfileRevision == issued.Profile.ProfileRevision && !before.SequenceEqual(issued.ProfileBytes)) throw new InvalidDataException("Profil_abweichend");
             }
             Replace(path, issued.ProfileBytes, before);
-            // A crash between replacements yields an invalid signature, never a trusted mixed pair.
-            Replace(sigPath, issued.SignatureBytes, beforeSig);
         }
         catch (DirectoryNotFoundException) { status = "nicht_gefunden"; detail = "Bestätigtes Zielverzeichnis nicht erreichbar."; }
         catch (UnauthorizedAccessException) { status = "Zugriff_verweigert"; detail = "Keine Schreibberechtigung am Ziel."; }

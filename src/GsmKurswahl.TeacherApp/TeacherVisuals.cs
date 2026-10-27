@@ -37,7 +37,6 @@ public sealed partial class TeacherWindow
         Grid.SetColumn(badge, 1); brand.Children.Add(badge); header.Children.Add(brand);
         header.Children.Add(navigation);
         header.Children.Add(workflowProgress);
-        header.Children.Add(setupHeader);
         header.Margin = new Thickness(0, 0, 0, 12);
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         var footer = new StackPanel { Spacing = 4, Margin = new Thickness(0, 12, 0, 0) };
@@ -89,6 +88,7 @@ public sealed partial class TeacherWindow
         var strip = new Grid { ColumnDefinitions = new ColumnDefinitions("*,28,*,28,*") };
         for (var i = 0; i < 3; i++)
         {
+            var stepIndex = i;
             var complete = active is not null && (i == 0 ? setup != YearSetupStep.Offer : i == 1 ? stage > 1 || setup == YearSetupStep.Complete && summary?.Students > 0 : distributed);
             var current = stage == i || setup == YearSetupStep.Complete && i == 2 && !distributed;
             var state = current ? "Aktueller Schritt" : complete ? "Erledigt" : "Noch offen";
@@ -100,9 +100,11 @@ public sealed partial class TeacherWindow
                 Child = new TextBlock { Text = complete && !current ? "✓" : (i + 1).ToString(), Foreground = current ? Brushes.White : complete ? Accent : Muted, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("42,*") }; row.Children.Add(number); Grid.SetColumn(caption, 1); row.Children.Add(caption);
             var tile = Surface(row, 12); tile.Name = "WorkflowStep" + i;
+            tile.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
             tile.Background = current ? Brush.Parse("#F0F8F6") : Brushes.White; tile.BorderBrush = current ? Accent : Line;
+            tile.PointerPressed += (_, _) => JumpToWorkflowStep(stepIndex);
             AutomationProperties.SetName(tile, $"Schritt {i + 1}: {titles[i]}. {state}.");
-            ToolTip.SetTip(tile, descriptions[i] + ". Die Anzeige beschreibt den Arbeitsablauf, keine fachliche Freigabe.");
+            ToolTip.SetTip(tile, descriptions[i] + ". Anklicken, um direkt zu diesem Schritt zu wechseln. Die Anzeige beschreibt den Arbeitsablauf, keine fachliche Freigabe.");
             Grid.SetColumn(tile, i * 2); strip.Children.Add(tile);
             if (i < 2)
             {

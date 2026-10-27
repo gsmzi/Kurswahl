@@ -75,4 +75,17 @@ public class StudentTableImportTests
         Assert.Equal("", table.Rows[0][0]); Assert.Equal("2029", table.Rows[0][1]);
         using var formulas = Workbook(true); Assert.Throws<InvalidDataException>(() => StudentTableImport.Xlsx(formulas));
     }
+    [Fact]
+    public void SportUnknownLowercaseReligionAndUmlautDepartureAreNormalized()
+    {
+        var table = StudentTableImport.Csv("studentId;name;class;year;username;sport;religion;departure\ndemo-001;Demo Eins;10a;2029;DEMO\\test1;unbekannt;eth;bestätigt\ndemo-002;Demo Zwei;10a;2029;DEMO\\test2;2, 1;kr;Aktiv");
+        var rows = StudentTableImport.Preview(table, table.Headers.ToDictionary(h => h, h => h), Origin, "demo-beratung");
+        Assert.All(rows, r => Assert.Empty(r.Error));
+        Assert.Null(rows[0].Candidate!.Student.Prerequisites.SportExemptSemesters);
+        Assert.Equal("ETH", rows[0].Candidate!.Student.Prerequisites.ReligionEthicsGrade10);
+        Assert.Equal(DepartureStatus.ConfirmedDeparture, rows[0].Candidate!.Student.Departure);
+        Assert.Equal([1, 2], rows[1].Candidate!.Student.Prerequisites.SportExemptSemesters);
+        Assert.Equal("KR", rows[1].Candidate!.Student.Prerequisites.ReligionEthicsGrade10);
+        Assert.Equal(DepartureStatus.Active, rows[1].Candidate!.Student.Departure);
+    }
 }

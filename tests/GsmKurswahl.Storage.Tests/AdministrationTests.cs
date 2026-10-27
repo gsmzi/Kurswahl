@@ -21,11 +21,12 @@ public sealed class AdministrationTests : IDisposable
         using var store = new SqliteAdministrationStore(DbPath);
         var current = Record() with { HomeDirectory = Path.Combine(root, "10a", "Muster.Demo"), Origin = new("demo.csv", "old", "map", DateTimeOffset.UtcNow, "demo-beratung") };
         store.SaveStudent(current, null);
-        var incoming = current with { HomeDirectory = "10a/Muster.Demo", MappingConfirmed = false, Origin = current.Origin! with { ContentHash = "new" }, Student = current.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } };
+        var incoming = current with { HomeDirectory = "10a/Muster.Demo", AccountId = "", MappingConfirmed = false, Origin = current.Origin! with { ContentHash = "new" }, Student = current.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } };
         Assert.Equal("Voraussetzungen", StudentImportService.Differences(current, incoming));
         Assert.True(StudentImportService.Confirm(store, incoming, 1, true));
         Assert.True(store.Students().Single().MappingConfirmed);
         Assert.Equal(current.HomeDirectory, store.Students().Single().HomeDirectory);
+        Assert.Equal(current.AccountId, store.Students().Single().AccountId);
     }
     [Fact]
     public void DistributionRootResolvesExistingClassFoldersAndRejectsEscapeOrMissingTargets()
@@ -54,16 +55,19 @@ public sealed class AdministrationTests : IDisposable
         var session = new TeacherSession(store, TestData.Catalog, "demo-beratung");
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToIssue);
         Directory.CreateDirectory(record.HomeDirectory);
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); var service = new ProfileDistribution(store);
-        var profile = service.Issue(record, key, "demo-key");
+        var service = new ProfileDistribution(store);
+        var profile = service.Issue(record);
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToDeliver);
         Assert.Equal("verteilt", service.Distribute(record, profile).Status);
+        Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).Delivered);
+        var nonProfileUpdate = record with { Version = 2, ChangedAt = DateTimeOffset.UtcNow.AddMinutes(1), Student = record.Student with { Departure = DepartureStatus.ExpectedDeparture } };
+        store.SaveStudent(nonProfileUpdate, 1);
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).Delivered);
         store.LogDistribution(new(Guid.NewGuid(), record.Student.ExternalStudentId, profile.Profile.ProfileRevision, DateTimeOffset.UtcNow, "Zugriff_verweigert", "Synthetischer Zustellfehler"));
         Assert.Equal(0, TeacherDashboardBuilder.Build(store, session).Delivered);
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToDeliver);
-        var corrected = record with { Version = 2, ChangedAt = DateTimeOffset.UtcNow, Student = record.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } };
-        store.SaveStudent(corrected, 1);
+        var corrected = nonProfileUpdate with { Version = 3, ChangedAt = DateTimeOffset.UtcNow, Student = record.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } };
+        store.SaveStudent(corrected, 2);
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToIssue);
         Assert.Equal(0, TeacherDashboardBuilder.Build(store, session).Delivered);
     }
@@ -138,18 +142,18 @@ public sealed class AdministrationTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => store.SaveStudent(Record(2) with { AccountId = record.AccountId }, null));
     }
     [Fact]
-    public void SignaturesRoundTripAndOldProfileCannotWinAgainstCorrection()
+    public void ProfilesRoundTripAndOldProfileCannotWinAgainstCorrection()
     {
-        using var store = new SqliteAdministrationStore(DbPath); var record = Record(); store.SaveStudent(record, null); Directory.CreateDirectory(record.HomeDirectory);
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); var distribution = new ProfileDistribution(store);
-        var issued = distribution.Issue(record, key, "demo-key");
-        var reader = new SignedProfileReader(new(1, [new("demo-key", Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()))], ["DEMO"]), new Identity(record));
+        using var store = new SqliteAdministrationStore(DbPath); var record = Record() with { WindowsUsername = "", AccountId = "" }; store.SaveStudent(record, null); Directory.CreateDirectory(record.HomeDirectory);
+        var distribution = new ProfileDistribution(store);
+        var issued = distribution.Issue(record);
+        var reader = new SignedProfileReader();
         Assert.Equal("verteilt", distribution.Distribute(record, issued).Status);
         Assert.Equal(ProfileStatus.Verified, reader.Read(record.HomeDirectory, "demo-001", 2029).Status);
         Assert.Equal("verteilt", distribution.Distribute(record, issued).Status); Assert.Empty(store.History("demo-001"));
         var corrected = record with { Version = 2, Student = record.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } }; store.SaveStudent(corrected, 1);
         Assert.Equal("veraltet", distribution.Distribute(corrected, issued).Status);
-        var newer = distribution.Issue(corrected, key, "demo-key"); Assert.Equal(2, newer.Profile.ProfileRevision);
+        var newer = distribution.Issue(corrected); Assert.Equal(2, newer.Profile.ProfileRevision);
         Assert.Equal("verteilt", distribution.Distribute(corrected, newer).Status);
         Assert.Equal(Knowledge.Yes, reader.Read(record.HomeDirectory, "demo-001", 2029).Prerequisites.InformaticsImp);
         Assert.Equal("veraltet", distribution.Distribute(record, issued).Status);
@@ -157,11 +161,11 @@ public sealed class AdministrationTests : IDisposable
     [Fact]
     public void HundredProfilesContinueAfterOneLockedTargetWithoutChangingChoices()
     {
-        using var store = new SqliteAdministrationStore(DbPath); using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var store = new SqliteAdministrationStore(DbPath);
         var distribution = new ProfileDistribution(store); var records = Enumerable.Range(1, 100).Select(Record).ToArray();
         foreach (var record in records) { store.SaveStudent(record, null); Directory.CreateDirectory(record.HomeDirectory); File.WriteAllText(Path.Combine(record.HomeDirectory, "aktuell.json"), "synthetic unchanged choice"); }
         using var locked = new FileStream(Path.Combine(records[49].HomeDirectory, ".profil.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        var reports = records.Select(r => distribution.Distribute(r, distribution.Issue(r, key, "demo-key"))).ToArray();
+        var reports = records.Select(r => distribution.Distribute(r, distribution.Issue(r))).ToArray();
         Assert.Equal(99, reports.Count(r => r.Status == "verteilt")); Assert.Single(reports, r => r.Status == "Zugriff_verweigert");
         Assert.Equal(100, store.DistributionLog().Length);
         Assert.All(records, r => Assert.Equal("synthetic unchanged choice", File.ReadAllText(Path.Combine(r.HomeDirectory, "aktuell.json"))));
@@ -170,10 +174,9 @@ public sealed class AdministrationTests : IDisposable
     public void CorruptOrForeignProfileIsNotOverwritten()
     {
         using var store = new SqliteAdministrationStore(DbPath); var record = Record(); store.SaveStudent(record, null); Directory.CreateDirectory(record.HomeDirectory);
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); var distribution = new ProfileDistribution(store); var issued = distribution.Issue(record, key, "demo-key");
+        var distribution = new ProfileDistribution(store); var issued = distribution.Issue(record);
         var path = Path.Combine(record.HomeDirectory, "profil.json"); File.WriteAllText(path, "broken");
         Assert.Equal("Profil_abweichend", distribution.Distribute(record, issued).Status); Assert.Equal("broken", File.ReadAllText(path));
     }
-    private sealed class Identity(StudentRecord record) : ICurrentIdentityProvider { public CurrentIdentity GetCurrent() => new(record.WindowsUsername, record.AccountId); }
     public void Dispose() => Directory.Delete(root, true);
 }

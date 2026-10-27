@@ -1,6 +1,4 @@
 using System.Collections.Immutable;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -20,6 +18,8 @@ public sealed partial class TeacherWindow
     private bool collecting;
     private readonly TextBox distributionRoot = new() { Watermark = "Laufwerk oder Grundverzeichnis der Klassenordner", Name = "DistributionRoot" };
     private readonly StackPanel deliveryPreview = new() { Spacing = 4 };
+    private readonly List<(CheckBox Box, CollectionPreview Preview)> conflictSelection = [];
+    private readonly HashSet<string> dismissedConflicts = [];
     private static Grid TableLine(string name, string classroom, string state, string notes, Control? action = null)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,80,*,2*,100"), Margin = new Thickness(8, 8) };
@@ -32,12 +32,22 @@ public sealed partial class TeacherWindow
         importResults.Children.Clear();
         importResults.Children.Add(TableLine("Name / ID", "Klasse", "Status", "Abweichungen · Details als Tooltip", Text("Übernehmen")));
         var selected = new List<(CheckBox Box, StudentRecord Candidate, int? Version)>();
+        var existingStudents = store!.Students();
         foreach (var row in importRows)
         {
             var candidate = row.Candidate;
-            var current = candidate is null ? null : store!.Students().SingleOrDefault(s => s.Student.ExternalStudentId == candidate.Student.ExternalStudentId);
+            var current = candidate is null ? null : existingStudents.SingleOrDefault(s => s.Student.ExternalStudentId == candidate.Student.ExternalStudentId);
             var error = row.Error;
             if (candidate is not null && candidate.Student.GraduationYear != session!.Catalog.GraduationYear) error = "Abiturjahrgang passt nicht.";
+            if (candidate is not null && error.Length == 0)
+            {
+                var others = existingStudents.Where(s => s.Student.ExternalStudentId != candidate.Student.ExternalStudentId);
+                var candidateHome = candidate.HomeDirectory.Replace('\\', '/').TrimEnd('/');
+                if (others.Any(s => (!string.IsNullOrWhiteSpace(candidate.WindowsUsername) && string.Equals(s.WindowsUsername, candidate.WindowsUsername, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrWhiteSpace(candidate.AccountId) && string.Equals(s.AccountId, candidate.AccountId, StringComparison.OrdinalIgnoreCase))
+                    || (candidateHome.Length > 0 && string.Equals(s.HomeDirectory.Replace('\\', '/').TrimEnd('/'), candidateHome, StringComparison.OrdinalIgnoreCase))))
+                    error = "Konto, SID oder Ordner bereits einer anderen Person im Bestand zugeordnet.";
+            }
             var difference = current is null || candidate is null ? "" : StudentImportService.Differences(current, candidate);
             var identicalSource = current?.Origin is { } origin && candidate?.Origin is { } incoming && origin.ContentHash == incoming.ContentHash && origin.MappingVersion == incoming.MappingVersion;
             var box = new CheckBox { IsChecked = error.Length == 0, IsEnabled = error.Length == 0 };
@@ -79,7 +89,11 @@ public sealed partial class TeacherWindow
             var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Grundverzeichnis mit Klassenordnern", AllowMultiple = false });
             if (folders.FirstOrDefault()?.TryGetLocalPath() is { } path) distributionRoot.Text = path;
         }));
-        profilePanel.Children.Add(Button("Ziele prüfen und gemeinsame Verteilung vorbereiten", PrepareDelivery));
+        var actions = new WrapPanel { Orientation = Orientation.Horizontal };
+        var check = Button("Ziele prüfen und gemeinsame Verteilung vorbereiten", PrepareDelivery); check.Margin = new Thickness(0, 0, 10, 0);
+        var defer = Button("Später verteilen · Übersicht öffnen", () => SetStep(YearSetupStep.Complete));
+        actions.Children.Add(check); actions.Children.Add(defer);
+        profilePanel.Children.Add(actions);
         profilePanel.Children.Add(deliveryPreview);
     }
     private void PrepareDelivery()
@@ -96,20 +110,15 @@ public sealed partial class TeacherWindow
         foreach (var record in records.Where(r => paths.ContainsKey(r.Student.ExternalStudentId)))
         {
             var path = paths[record.Student.ExternalStudentId];
-            var error = paths.Values.Count(p => string.Equals(path, p, StringComparison.OrdinalIgnoreCase)) > 1 ? "Ordner mehreren Personen zugeordnet" :
-                string.IsNullOrWhiteSpace(record.AccountId) || record.WindowsUsername.Split('\\').Length != 2 ? "Geprüftes Schulkonto und SID fehlen in der Schülerliste" : "";
+            var error = paths.Values.Count(p => string.Equals(path, p, StringComparison.OrdinalIgnoreCase)) > 1 ? "Ordner mehreren Personen zugeordnet" : "";
             deliveryPreview.Children.Add(TableLine(record.Student.SyntheticDisplayName, record.Student.ClassName, error.Length == 0 ? "Bereit" : "Offen", error.Length == 0 ? path : error));
             if (error.Length == 0) prepared.Add(record with { HomeDirectory = path });
         }
-        deliveryPreview.Children.Add(Text("Mit der gemeinsamen Bestätigung bestätigen Sie die angezeigten Konto-/Ordnerzuordnungen. Offene Zeilen bleiben unbearbeitet."));
+        deliveryPreview.Children.Add(Text("Mit der gemeinsamen Bestätigung bestätigen Sie die angezeigten Ordnerzuordnungen. Offene Zeilen bleiben unbearbeitet."));
         deliveryPreview.Children.Add(Button($"{prepared.Count} Zuordnungen bestätigen und Schülerdateien verteilen", async () =>
         {
             Ready();
             if (prepared.Count == 0) throw new InvalidOperationException("Keine verteilbaren Schüler. Hinweise in der Tabelle prüfen.");
-            using var certificates = new X509Store(StoreName.My, StoreLocation.CurrentUser); certificates.Open(OpenFlags.ReadOnly);
-            var matches = certificates.Certificates.Find(X509FindType.FindByThumbprint, thumbprint.Text ?? "", false);
-            if (matches.Count != 1 || string.IsNullOrWhiteSpace(keyId.Text)) throw new InvalidOperationException("Bitte einmalig unter Signierung einrichten das Schulzertifikat und die Schlüsselkennung hinterlegen.");
-            using var certificate = matches[0]; using var key = certificate.GetECDsaPrivateKey() ?? throw new InvalidOperationException("Signierschlüssel fehlt.");
             if (prepared.Any(r => store!.Students().Single(s => s.Student.ExternalStudentId == r.Student.ExternalStudentId).Version != r.Version)) throw new InvalidOperationException("Schülerbestand geändert. Ziele erneut prüfen.");
             var service = new ProfileDistribution(store!); var reports = new List<string>(); var count = 0;
             foreach (var record in prepared)
@@ -124,17 +133,30 @@ public sealed partial class TeacherWindow
                         store.SaveStudent(current, record.Version);
                     }
                     var latest = store.LatestProfile(current.Student.ExternalStudentId);
-                    if (latest is null || latest.Profile.WindowsUsername != current.WindowsUsername || latest.Profile.AccountId != current.AccountId || latest.Profile.KeyId != keyId.Text || System.Text.Json.JsonSerializer.Serialize(latest.Profile.Prerequisites, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(current.Student.Prerequisites, DocumentJson.Options)) latest = service.Issue(current, key, keyId.Text!);
+                    if (latest is null || latest.Profile.GraduationYear != current.Student.GraduationYear || System.Text.Json.JsonSerializer.Serialize(latest.Profile.Prerequisites, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(current.Student.Prerequisites, DocumentJson.Options))
+                        latest = service.Issue(current);
                     var result = service.Distribute(current, latest); if (result.Status == "verteilt") count++;
                     reports.Add(current.Student.SyntheticDisplayName + ": " + result.Status);
                 }
-                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or CryptographicException) { reports.Add(record.Student.SyntheticDisplayName + ": " + ex.Message); }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException) { reports.Add(record.Student.SyntheticDisplayName + ": " + ex.Message); }
             }
             deliveryPreview.Children.Clear(); foreach (var report in reports) deliveryPreview.Children.Add(Text(report));
             if (count == records.Length && workspace!.Active!.Step != YearSetupStep.Complete) SetStep(YearSetupStep.Complete);
             Refresh(); status.Text = $"{count} von {records.Length} Schülerdateien verteilt. " + string.Join(" · ", reports);
             await CollectAutomatically();
         }));
+    }
+    private void RenderCollectionStatus(int importedCount, IReadOnlyList<string> messages)
+    {
+        conflictSelection.Clear(); collectionResults.Children.Clear();
+        collectionResults.Children.Add(Text($"Automatisch eingelesen: {importedCount}. Offene Konflikte: {collections.Length}. Zuletzt geprüft: {DateTime.Now:t}"));
+        foreach (var preview in collections)
+        {
+            var box = new CheckBox { IsChecked = true };
+            conflictSelection.Add((box, preview));
+            collectionResults.Children.Add(TableLine(preview.Student.Student.SyntheticDisplayName + " (" + preview.Choice.StudentId + ")", preview.Student.Student.ClassName, "Konflikt", preview.Conflict, box));
+        }
+        foreach (var message in messages) collectionResults.Children.Add(Text(message));
     }
     private async Task CollectAutomatically()
     {
@@ -154,16 +176,20 @@ public sealed partial class TeacherWindow
                     if (loaded is null) continue;
                     var preview = activeSession.Preview(loaded.Choice, record.Student.ExternalStudentId, new(path, loaded.ContentToken, "m3-choice-v1", DateTimeOffset.UtcNow, record.WindowsUsername));
                     if (preview.Duplicate) continue;
-                    if (preview.Conflict.Length > 0) { pending.Add(preview); messages.Add(record.Student.SyntheticDisplayName + ": " + preview.Conflict); continue; }
+                    if (preview.Conflict.Length > 0)
+                    {
+                        if (!dismissedConflicts.Contains(record.Student.ExternalStudentId + ":" + loaded.ContentToken))
+                            pending.Add(preview);
+                        continue;
+                    }
                     activeSession.Confirm(preview, true, false, "Automatische Sammlung aus bestätigtem Schülerordner"); count++;
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or System.Text.Json.JsonException)
                 { if (session != activeSession || store != activeStore) return; messages.Add(record.Student.SyntheticDisplayName + ": " + ex.Message); }
             }
-            collections = pending.ToImmutable(); collectionResults.Children.Clear();
-            collectionResults.Children.Add(Text($"Automatisch eingelesen: {count}. Offene Konflikte: {pending.Count}. Zuletzt geprüft: {DateTime.Now:t}"));
-            foreach (var message in messages) collectionResults.Children.Add(Text(message));
-            if (count > 0 || messages.Count > 0) status.Text = $"Automatische Sammlung: {count} neue Wahlen; {messages.Count} Hinweise unter Kurswahlen einsammeln.";
+            collections = pending.ToImmutable();
+            RenderCollectionStatus(count, messages);
+            if (count > 0 || collections.Length > 0 || messages.Count > 0) status.Text = $"Automatische Sammlung: {count} neue Wahlen; {collections.Length + messages.Count} Hinweise unter Kurswahlen einsammeln.";
             Refresh(); UpdateDashboard();
         }
         catch (Exception ex) { if (session == activeSession) status.Text = "Automatische Sammlung nicht abgeschlossen: " + ex.Message; }

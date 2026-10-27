@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Avalonia;
 using Avalonia.Controls;
@@ -41,10 +40,9 @@ public sealed partial class TeacherWindow : Window
     private readonly StackPanel collectionResults = new() { Spacing = 5 };
     private readonly CheckBox conflict = new() { Content = "Angezeigte Konflikte bewusst zugunsten der eingelesenen Wahl entscheiden" };
     private readonly TextBox reason = new() { Watermark = "Änderungs-/Übernahmegrund" };
-    private readonly TextBox thumbprint = new() { Watermark = "Fingerabdruck des P-256-Signierzertifikats (Windows: eigener Zertifikatspeicher)" };
-    private readonly TextBox keyId = new() { Watermark = "Öffentliche Schlüsselkennung, z. B. demo-key-01" };
     private readonly ListBox profileTargets = new() { SelectionMode = SelectionMode.Multiple, MinHeight = 180 };
-    private sealed record Target(StudentRecord Record) { public override string ToString() => $"{Record.Student.ExternalStudentId} · {Record.WindowsUsername} → {Record.HomeDirectory} · Zuordnung {(Record.MappingConfirmed ? "bestätigt" : "offen")}"; }
+    private string? selectedStudentId;
+    private sealed record Target(StudentRecord Record) { public override string ToString() => $"{Record.Student.ExternalStudentId} · {Record.Student.SyntheticDisplayName} → {Record.HomeDirectory} · Zuordnung {(Record.MappingConfirmed ? "bestätigt" : "offen")}"; }
 
     private static TabItem Tab(string name, Control content) => new() { Header = name, Content = content };
     private static ScrollViewer Scroll(Control content) => new() { Content = content, Margin = new Thickness(8) };
@@ -70,17 +68,17 @@ public sealed partial class TeacherWindow : Window
         Intro(panel, "Welche Datei brauche ich wofür?", "Im Alltag gibt es drei Aufgaben: Schülerlisten einlesen, persönliche Profile ausgeben und ausgefüllte Kurswahlen einsammeln. Die Dateiendung allein sagt nicht, welchen Inhalt eine Datei hat.");
         Intro(panel, "1 · Jahrgang einrichten oder weiterarbeiten", "Beim ersten Start: Fächer auswählen, Schülerliste laden und Schülerdateien verteilen. Danach öffnet sich automatisch die Übersicht Ihres aktiven Abiturjahrgangs. Unter Einstellungen können Sie vorhandene Dateien einmalig einbinden oder einen anderen lokalen Speicherort wählen.");
         Intro(panel, "2 · Schülerliste einlesen", "Über „Schülerliste aktualisieren“ eine Excel- oder CSV-Tabelle mit Personen, Klassen und Vorbildung laden. Spalten über Auswahllisten zuordnen, Vorschau prüfen und gewünschte Zeilen übernehmen. Alle fehlerfreien Zeilen gemeinsam übernehmen; Abweichungen sind markiert.");
-        Intro(panel, "3 · Profile ausgeben", "Ein Profil enthält die bestätigten Voraussetzungen einer Person, etwa IMP oder bilingualen Bildungsgang. Über „Schülerprofile bereitstellen“ erstellt und signiert das Lehrerprogramm die Profile und legt sie in den persönlichen Wahlordnern ab. Die Signatur ist das digitale Echtheitssiegel. Dafür richtet die Schul-IT einmalig den Signierschlüssel ein.");
+        Intro(panel, "3 · Profile ausgeben", "Ein Profil enthält die bestätigten Voraussetzungen einer Person, etwa IMP oder bilingualen Bildungsgang. Über „Schülerprofile bereitstellen“ legt das Lehrerprogramm die Datei profil.json in den persönlichen Wahlordnern ab.");
         Intro(panel, "4 · Kurswahlen einsammeln", "Wenn die Schüler ihre Kurse gewählt haben: unter „Wahlen einsammeln“ die Vorschau lesen. Die Dateien werden automatisch in den bestätigten Wahlordnern gefunden. Neue Wahlen werden bei geöffneter App alle 60 Sekunden automatisch übernommen. Nur Konflikte benötigen eine Entscheidung.");
-        panel.Children.Add(Help("Dateiübersicht: Inhalt, Herkunft und Verwendung", "Schülerliste (.xlsx / .csv)\nEine Tabelle aus Ihrer vorbereiteten Klassen-10-Liste. Unter Schülerlisten einlesen. Enthält Personen und Voraussetzungen.\n\nFachangebot (.json), z. B. fachangebot-demo.json\nBeschreibt Fächer, Kursarten und Halbjahre eines Jahrgangs. Wird bei der Einrichtung vorbereitet und im Jahrgang gespeichert. Unter Jahrgang verwalten ansehen oder für das Schülerprogramm exportieren.\n\nVerwaltungsdatei (.db), z. B. verwaltung.db\nSpeichert den Lehrerbestand mit Änderungen und Historie lokal. Wird bei der Jahrgangseinrichtung automatisch angelegt und später automatisch geöffnet.\n\nPersönliches Profil (profil.json) + Echtheitssiegel (profil.sig)\nDas Lehrerprogramm erzeugt beide gemeinsam aus den geprüften Voraussetzungen. Unter Profile ausgeben verteilen. Diese beiden Dateien sind keine Schülerliste und keine Kurswahl.\n\nKurswahl (aktuell.json)\nWird vom Schülerprogramm gespeichert und enthält die gewählten Kurse. Unter Wahlen einsammeln automatisch aus dem persönlichen Wahlordner lesen.\n\nKontrollbogen (.pdf)\nLesbare Übersicht aus dem Schülerprogramm. Zum Ansehen und Kontrollieren; kein Importformat.\n\nASV-Dateien\nEin eigener ASV-Import ist noch nicht verfügbar."));
-        panel.Children.Add(Help("Mit welchen Testdateien kann ich beginnen?", "Im Projektordner samples liegen:\n• fachangebot-demo.json: wird beim Anlegen eines Jahrgangs automatisch als Vorlage geladen.\n• klasse10-demo.csv: unter Schülerlisten laden; enthält zwei erfundene Personen.\n• schueler-demo.json: Beispiel für eine Kurswahl. Beim Einsammeln erwartet das Programm den Namen aktuell.json im bestätigten Wahlordner.\n• profil-demo-unsigned.json: erklärt nur das Profilformat. Es ist absichtlich unsigniert und kein nutzbarer Berechtigungsnachweis.\n\nDie Verwaltungsdatei legt der Einrichtungsassistent automatisch an. Für einen ersten Blick auf den Import benötigen Sie noch keine signierten Profile."));
-        panel.Children.Add(Help("Nur für die Einrichtung: Schlüssel und Einstellungen", "profile-trust.json enthält die zugelassenen öffentlichen Prüfschlüssel und Kontodomänen der geschützten Schülerinstallation. Der Export public-profile-key.json liefert einen öffentlichen Schlüssel für diese Einrichtung. appsettings.json enthält Programmeinstellungen. Diese Dateien richten Verwaltung und Schul-IT ein; sie werden nicht als Schülerliste importiert. Der private Signierschlüssel bleibt im administrativen Windows-Zertifikatspeicher."));
+        panel.Children.Add(Help("Dateiübersicht: Inhalt, Herkunft und Verwendung", "Schülerliste (.xlsx / .csv)\nEine Tabelle aus Ihrer vorbereiteten Klassen-10-Liste. Unter Schülerlisten einlesen. Enthält Personen und Voraussetzungen.\n\nFachangebot (.json), z. B. fachangebot-demo.json\nBeschreibt Fächer, Kursarten und Halbjahre eines Jahrgangs. Wird bei der Einrichtung vorbereitet und im Jahrgang gespeichert. Unter Jahrgang verwalten ansehen oder für das Schülerprogramm exportieren.\n\nVerwaltungsdatei (.db), z. B. verwaltung.db\nSpeichert den Lehrerbestand mit Änderungen und Historie lokal. Wird bei der Jahrgangseinrichtung automatisch angelegt und später automatisch geöffnet.\n\nPersönliches Profil (profil.json)\nDas Lehrerprogramm erzeugt diese Datei aus den geprüften Voraussetzungen. Unter Profile ausgeben verteilen. Diese Datei ist keine Schülerliste und keine Kurswahl.\n\nKurswahl (aktuell.json)\nWird vom Schülerprogramm gespeichert und enthält die gewählten Kurse. Unter Wahlen einsammeln automatisch aus dem persönlichen Wahlordner lesen.\n\nKontrollbogen (.pdf)\nLesbare Übersicht aus dem Schülerprogramm. Zum Ansehen und Kontrollieren; kein Importformat.\n\nASV-Dateien\nEin eigener ASV-Import ist noch nicht verfügbar."));
+        panel.Children.Add(Help("Mit welchen Testdateien kann ich beginnen?", "Im Projektordner samples liegen:\n• fachangebot-demo.json: wird beim Anlegen eines Jahrgangs automatisch als Vorlage geladen.\n• klasse10-demo.csv: unter Schülerlisten laden; enthält zwei erfundene Personen.\n• schueler-demo.json: Beispiel für eine Kurswahl. Beim Einsammeln erwartet das Programm den Namen aktuell.json im bestätigten Wahlordner.\n• profil-demo-unsigned.json: Beispiel für ein persönliches Schülerprofil.\n\nDie Verwaltungsdatei legt der Einrichtungsassistent automatisch an."));
+        panel.Children.Add(Help("Nur für die Einrichtung: Programmeinstellungen", "appsettings.json im Schülerprogramm enthält die Programmeinstellungen (Speicherort, Katalogpfad). Diese Datei wird nicht als Schülerliste importiert."));
         return panel;
     }
     private static string Describe(StudentRecord r)
     {
         var p = r.Student.Prerequisites;
-        return $"{r.Student.SyntheticDisplayName}, {r.Student.ClassName}, Abitur {r.Student.GraduationYear}, Abgängerstatus {r.Student.Departure}\nKonto: {r.WindowsUsername}; SID: {r.AccountId}; Ziel: {r.HomeDirectory}\nItalienisch: {p.ItalianProfile}; Brücke: {p.InformaticsBridge}; IMP: {p.InformaticsImp}; Bili: {p.ContinuousBilingual}\nReligion/Ethik Klasse 10: {p.ReligionEthicsGrade10 ?? "unbekannt"}; Belegung freigegeben: {p.ReligionEthicsPermission}; Prüfung freigegeben: {p.ReligionEthicsExamPermission}\nSportbefreiung: {(p.SportExemptSemesters is { } h ? (h.Length == 0 ? "keine" : string.Join(',', h)) : "unbekannt")}; dauerhaft: {p.PermanentSportExemption}; bestätigte Sprachlaufbahnen: {string.Join(',', p.ContinuedLanguages)}";
+        return $"{r.Student.SyntheticDisplayName}, {r.Student.ClassName}, Abitur {r.Student.GraduationYear}, Abgängerstatus {r.Student.Departure}\nKonto: {r.WindowsUsername}; Ziel: {r.HomeDirectory}\nItalienisch: {p.ItalianProfile}; Brücke: {p.InformaticsBridge}; IMP: {p.InformaticsImp}; Bili: {p.ContinuousBilingual}\nReligion/Ethik Klasse 10: {p.ReligionEthicsGrade10 ?? "unbekannt"}; Belegung freigegeben: {p.ReligionEthicsPermission}; Prüfung freigegeben: {p.ReligionEthicsExamPermission}\nSportbefreiung: {(p.SportExemptSemesters is { } h ? (h.Length == 0 ? "keine" : string.Join(',', h)) : "unbekannt")}; dauerhaft: {p.PermanentSportExemption}; bestätigte Sprachlaufbahnen: {string.Join(',', p.ContinuedLanguages)}";
     }
     private async Task<string?> Pick(string title, string typeName, params string[] patterns)
     {
@@ -92,50 +90,125 @@ public sealed partial class TeacherWindow : Window
     {
         if (session is null || store is null) return;
         roster.Children.Clear();
-        roster.Children.Add(TableLine("Name", "Klasse", "Prüfstand", ""));
-        foreach (var state in session.Overview().Where(s => s.Record.Student.GraduationYear == session.Catalog.GraduationYear))
+        roster.Children.Add(TableLine("Name", "Klasse", "Prüfstand", "Nachwahl / Status", Text("Aktion")));
+        var states = session.Overview().Where(s => s.Record.Student.GraduationYear == session.Catalog.GraduationYear).ToArray();
+        foreach (var state in states)
         {
             var label = $"{state.Record.Student.SyntheticDisplayName} · {state.Record.Student.ClassName} · {state.Record.Student.ExternalStudentId}";
             if (!label.Contains(filter.Text ?? "", StringComparison.OrdinalIgnoreCase) || followupFilter.IsChecked == true && !state.RequiresReselection) continue;
             if (statusFilter.SelectedIndex == 1 && state.Active is not null || statusFilter.SelectedIndex == 2 && state.Validation?.Status != ReviewStatus.Invalid
                 || statusFilter.SelectedIndex == 3 && state.Validation?.Status != ReviewStatus.NeedsReview || statusFilter.SelectedIndex == 4 && state.Validation?.Status != ReviewStatus.Valid) continue;
-            roster.Children.Add(TableLine(state.Record.Student.SyntheticDisplayName, state.Record.Student.ClassName, state.Validation?.Status.ToString() ?? "Ohne Wahl", state.RequiresReselection ? "Nachwahl" : "", Button("Öffnen", () => ShowStudent(state))));
+            var notes = string.Join(" · ", new[] { state.RequiresReselection ? "Nachwahl" : "", state.Record.Student.Departure == DepartureStatus.Active ? "" : state.Record.Student.Departure.ToString() }.Where(s => s.Length > 0));
+            roster.Children.Add(TableLine(state.Record.Student.SyntheticDisplayName, state.Record.Student.ClassName, state.Validation?.Status.ToString() ?? "Ohne Wahl", notes, Button("Öffnen", () => ShowStudent(state))));
         }
         profileTargets.ItemsSource = store.Students().Where(s => s.Student.GraduationYear == session.Catalog.GraduationYear).Select(s => new Target(s)).ToArray();
         profileTargets.SelectAll();
+        if (personEditor.IsExpanded && selectedStudentId is not null && states.SingleOrDefault(s => s.Record.Student.ExternalStudentId == selectedStudentId) is { } current)
+            ShowStudent(current);
     }
     private void ShowStudent(TeacherState state)
     {
-        Ready(); personEditor.IsExpanded = true; detail.Children.Clear(); var record = state.Record; var id = record.Student.ExternalStudentId;
-        detail.Children.Add(Text($"{record.Student.SyntheticDisplayName} · Stammdatenrevision {record.Version}"));
-        var user = new TextBox { Text = record.WindowsUsername, Watermark = "DOMÄNE\\Konto" };
-        var sid = new TextBox { Text = record.AccountId, Watermark = "Administrativ geprüfte SID" };
-        var home = new TextBox { Text = record.HomeDirectory, Watermark = "Absolutes persönliches Wahl-/Profilverzeichnis" };
-        ToolTip.SetTip(user, "Das schulische Windows-Konto dieser Person. Es wird mit dem persönlichen Profil abgeglichen.");
-        ToolTip.SetTip(sid, "SID = eindeutige Windows-Konto-ID. Die Schul-IT bestätigt diese Zuordnung; der Benutzername allein reicht nicht aus.");
-        ToolTip.SetTip(home, "Hier liegen die Kurswahl aktuell.json sowie das Profil profil.json mit profil.sig. Das Verzeichnis muss bereits vorhanden sein und eindeutig dieser Person gehören.");
-        var confirmed = new CheckBox { Content = "Schüler-ID, Konto, SID und tatsächliches Zielverzeichnis administrativ geprüft", IsChecked = record.MappingConfirmed };
-        detail.Children.Add(user); detail.Children.Add(sid); detail.Children.Add(home); detail.Children.Add(confirmed);
+        Ready(); selectedStudentId = state.Record.Student.ExternalStudentId; personEditor.IsExpanded = true; detail.Children.Clear(); var record = state.Record; var id = record.Student.ExternalStudentId;
+        detail.Children.Add(Text($"{record.Student.SyntheticDisplayName} ({id}) · Klasse {record.Student.ClassName} · Stammdatenrevision {record.Version}"));
+        var user = new TextBox { Name = "StudentUsername", Text = record.WindowsUsername, Watermark = "DOMÄNE\\Konto (optional)" };
+        var home = new TextBox { Name = "StudentHomeDirectory", Text = record.HomeDirectory, Watermark = "Persönliches Wahl-/Profilverzeichnis" };
+        ToolTip.SetTip(user, "Optionales schulisches Windows-Konto dieser Person.");
+        ToolTip.SetTip(home, "Hier liegen die Kurswahl aktuell.json sowie das Profil profil.json. Vor der Sammelverteilung kann hier auch der relative Ordner Klasse/Nachname.Vorname stehen.");
+        var confirmed = new CheckBox { Name = "StudentMappingConfirmed", Content = "Schüler-ID und tatsächliches Zielverzeichnis geprüft", IsChecked = record.MappingConfirmed };
+        detail.Children.Add(user); detail.Children.Add(home); detail.Children.Add(confirmed);
         detail.Children.Add(Button("Zuordnung speichern", () =>
         {
-            if (confirmed.IsChecked == true && (string.IsNullOrWhiteSpace(sid.Text) || (user.Text ?? "").Split('\\').Length != 2 || !Path.IsPathFullyQualified(home.Text ?? ""))) throw new ArgumentException("Vollständige Konto-/SID-/Home-Zuordnung erforderlich.");
-            store!.SaveStudent(record with { WindowsUsername = user.Text ?? "", AccountId = sid.Text ?? "", HomeDirectory = string.IsNullOrWhiteSpace(home.Text) ? "" : Path.GetFullPath(home.Text), MappingConfirmed = confirmed.IsChecked == true, Version = record.Version + 1, Actor = Actor, ChangedAt = DateTimeOffset.UtcNow }, record.Version);
-            Refresh(); detail.Children.Clear(); status.Text = "Zuordnung versioniert gespeichert. Person erneut öffnen.";
+            var trimmedUser = (user.Text ?? "").Trim();
+            var trimmedHome = (home.Text ?? "").Trim();
+            var userParts = trimmedUser.Split('\\');
+            if (trimmedUser.Length > 0 && (userParts.Length != 2 || userParts.Any(string.IsNullOrWhiteSpace)))
+                throw new ArgumentException("Windows-Benutzername muss die Form DOMÄNE\\Benutzername haben.");
+            string normalizedHome;
+            if (trimmedHome.Length == 0) normalizedHome = "";
+            else if (Path.IsPathFullyQualified(trimmedHome)) normalizedHome = Path.GetFullPath(trimmedHome);
+            else if (!Path.IsPathRooted(trimmedHome) && !trimmedHome.Split('/', '\\').Any(p => p is ".." or "." or "")) normalizedHome = trimmedHome.Replace('\\', '/');
+            else throw new ArgumentException("Ungültiger Schülerordner.");
+            if (confirmed.IsChecked == true)
+            {
+                if (!Path.IsPathFullyQualified(normalizedHome) || !Directory.Exists(normalizedHome))
+                    throw new ArgumentException("Für eine bestätigte Zuordnung ist ein vorhandenes absolutes Zielverzeichnis erforderlich.");
+                for (var directory = new DirectoryInfo(normalizedHome); directory is not null; directory = directory.Parent)
+                    if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                        throw new ArgumentException("Verknüpfte Ordner bitte durch einen direkten Pfad ersetzen.");
+            }
+            store!.SaveStudent(record with { WindowsUsername = trimmedUser, HomeDirectory = normalizedHome, MappingConfirmed = confirmed.IsChecked == true, Version = record.Version + 1, Actor = Actor, ChangedAt = DateTimeOffset.UtcNow }, record.Version);
+            Refresh(); status.Text = "Zuordnung versioniert gespeichert.";
         }));
-        detail.Children.Add(Text($"Vorbildung: INF-Brücke {record.Student.Prerequisites.InformaticsBridge}, IMP {record.Student.Prerequisites.InformaticsImp}, Italienisch {record.Student.Prerequisites.ItalianProfile}, Bili {record.Student.Prerequisites.ContinuousBilingual}. Korrekturen über geprüfte Importzeile; Änderungen werden gemeinsam in der Importvorschau bestätigt."));
+        var p = record.Student.Prerequisites;
+        var prereqPanel = new StackPanel { Spacing = 6 };
+        ComboBox KnowledgeBox(string name, Knowledge value) => new() { Name = name, ItemsSource = Enum.GetValues<Knowledge>(), SelectedItem = value, Width = 160 };
+        Control Labeled(string label, Control control)
+        {
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("260,*") };
+            row.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
+            Grid.SetColumn(control, 1); row.Children.Add(control); return row;
+        }
+        var departureBox = new ComboBox { Name = "StudentDeparture", ItemsSource = Enum.GetValues<DepartureStatus>(), SelectedItem = record.Student.Departure, Width = 220 };
+        var italianBox = KnowledgeBox("PrereqItalian", p.ItalianProfile);
+        var bridgeBox = KnowledgeBox("PrereqBridge", p.InformaticsBridge);
+        var impBox = KnowledgeBox("PrereqImp", p.InformaticsImp);
+        var biliBox = KnowledgeBox("PrereqBilingual", p.ContinuousBilingual);
+        var relGrade10Box = new ComboBox { Name = "PrereqReligionGrade10", ItemsSource = new[] { "", "ETH", "ER", "KR" }, SelectedItem = p.ReligionEthicsGrade10 ?? "", Width = 160 };
+        var relPermBox = KnowledgeBox("PrereqReligionPerm", p.ReligionEthicsPermission);
+        var relExamPermBox = KnowledgeBox("PrereqReligionExamPerm", p.ReligionEthicsExamPermission);
+        var sportBox = new TextBox { Name = "PrereqSportSemesters", Text = p.SportExemptSemesters is { } h ? (h.Length == 0 ? "keine" : string.Join(",", h)) : "", Watermark = "leer = unbekannt, keine, oder z. B. 1,2" };
+        var permSportBox = KnowledgeBox("PrereqPermanentSport", p.PermanentSportExemption);
+        var langBox = new TextBox { Name = "PrereqLanguages", Text = string.Join(",", p.ContinuedLanguages), Watermark = "Bestätigte fortgeführte Sprachen, z. B. E,F" };
+        prereqPanel.Children.Add(Labeled("Abgängerstatus", departureBox));
+        prereqPanel.Children.Add(Labeled("Italienisch-Profil", italianBox));
+        prereqPanel.Children.Add(Labeled("Informatik-Brückenkurs", bridgeBox));
+        prereqPanel.Children.Add(Labeled("IMP besucht", impBox));
+        prereqPanel.Children.Add(Labeled("Durchgängig bilingual", biliBox));
+        prereqPanel.Children.Add(Labeled("Religion/Ethik Klasse 10", relGrade10Box));
+        prereqPanel.Children.Add(Labeled("Religion/Ethik: Belegung freigegeben", relPermBox));
+        prereqPanel.Children.Add(Labeled("Religion/Ethik: Prüfung freigegeben", relExamPermBox));
+        prereqPanel.Children.Add(Labeled("Sportbefreiung Halbjahre", sportBox));
+        prereqPanel.Children.Add(Labeled("Dauerhafte Sportbefreiung", permSportBox));
+        prereqPanel.Children.Add(Labeled("Bestätigte Sprachlaufbahnen", langBox));
+        var savePrereq = Button("Vorbildung und Abgängerstatus speichern", () =>
+        {
+            var sportText = (sportBox.Text ?? "").Trim().ToLowerInvariant();
+            ImmutableArray<int>? semesters = sportText is "" or "unknown" or "unbekannt" ? null : sportText is "keine" or "none" ? [] : [.. sportText.Split(',', StringSplitOptions.TrimEntries).Select(int.Parse).Order()];
+            if (semesters is { } s && (s.Any(v => v is < 1 or > 4) || s.Distinct().Count() != s.Length)) throw new ArgumentException("Sport-Halbjahre ungültig (1–4 oder keine).");
+            var rel10 = (string?)relGrade10Box.SelectedItem ?? "";
+            var updatedPrior = new PriorEducation((Knowledge)italianBox.SelectedItem!, (Knowledge)bridgeBox.SelectedItem!, (Knowledge)impBox.SelectedItem!, (Knowledge)biliBox.SelectedItem!, rel10.Length == 0 ? null : rel10, semesters)
+            {
+                ContinuedLanguages = [.. (langBox.Text ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct()],
+                ReligionEthicsPermission = (Knowledge)relPermBox.SelectedItem!,
+                ReligionEthicsExamPermission = (Knowledge)relExamPermBox.SelectedItem!,
+                PermanentSportExemption = (Knowledge)permSportBox.SelectedItem!
+            };
+            store!.SaveStudent(record with
+            {
+                Student = record.Student with { Departure = (DepartureStatus)departureBox.SelectedItem!, Prerequisites = updatedPrior },
+                Version = record.Version + 1, Actor = Actor, ChangedAt = DateTimeOffset.UtcNow
+            }, record.Version);
+            Refresh(); status.Text = "Vorbildung und Abgängerstatus versioniert gespeichert.";
+        });
+        savePrereq.Name = "SavePrerequisites"; prereqPanel.Children.Add(savePrereq);
+        detail.Children.Add(new Expander { Header = "Vorbildung und Abgängerstatus bearbeiten", Content = prereqPanel, IsExpanded = true, HorizontalAlignment = HorizontalAlignment.Stretch });
         if (state.Validation is { } validation) foreach (var message in validation.Messages) detail.Children.Add(Text(message.Rule.Id + ": " + message.Explanation));
+        if (!string.IsNullOrWhiteSpace(state.Note)) detail.Children.Add(Text("Nachwahl-Vermerk: " + state.Note));
         var editReason = new TextBox { Watermark = "Begründung für Änderung/Wiederherstellung/Nachwahl" }; detail.Children.Add(editReason);
         var deadline = new TextBox { Watermark = "Nachwahlfrist (JJJJ-MM-TT)", Text = state.ReselectionDeadline?.ToString("yyyy-MM-dd") }; detail.Children.Add(deadline);
-        detail.Children.Add(Button("Nachwahl vormerken", () => { session!.FollowUp(id, true, string.IsNullOrWhiteSpace(deadline.Text) ? null : DateTimeOffset.ParseExact(deadline.Text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), editReason.Text ?? ""); Refresh(); status.Text = "Nachwahl protokolliert."; }));
-        detail.Children.Add(Button("Nachwahl abschließen", () => { session!.FollowUp(id, false, null, editReason.Text ?? ""); Refresh(); }));
+        detail.Children.Add(Button("Nachwahl vormerken", () => { session!.FollowUp(id, true, string.IsNullOrWhiteSpace(deadline.Text) ? null : DateTimeOffset.ParseExact(deadline.Text.Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), editReason.Text ?? ""); Refresh(); status.Text = "Nachwahl protokolliert."; }));
+        detail.Children.Add(Button("Nachwahl abschließen", () => { session!.FollowUp(id, false, null, editReason.Text ?? ""); Refresh(); status.Text = "Nachwahl abgeschlossen."; }));
         var active = state.Active;
         var choice = active?.Snapshot ?? new CourseChoice(2, Guid.NewGuid(), id, record.Student.GraduationYear, session!.Catalog.Version, GsmKurswahl.Rules.ChoiceValidator.Version, 1, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, SubmissionStatus.Draft, ElectionPhase.Preliminary, [], []);
         detail.Children.Add(Text("Administrative Wahl bearbeiten · angebotene Halbjahre wählen"));
         var selections = new List<(CourseOffer Offer, int Semester, CheckBox Box)>();
         foreach (var offer in session!.Catalog.Offers)
         {
+            var isOffered = offer.Status is OfferStatus.Offered or OfferStatus.Established;
+            var alreadyChosen = choice.Selections.Any(s => s.OfferId == offer.Id);
+            if (!isOffered && !alreadyChosen) continue;
             var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            line.Children.Add(new TextBlock { Text = $"{offer.SubjectId} {offer.Type} {offer.Variant}", Width = 190 });
+            line.Children.Add(new TextBlock { Text = $"{offer.SubjectId} {offer.Type} {offer.Variant}" + (isOffered ? "" : $" ({offer.Status})"), Width = 220 });
             foreach (var semester in offer.Schedule)
             {
                 var box = new CheckBox { Content = "HJ " + semester.Semester, IsChecked = choice.Selections.Any(s => s.OfferId == offer.Id && s.Semesters.Contains(semester.Semester)) };
@@ -147,14 +220,16 @@ public sealed partial class TeacherWindow : Window
         detail.Children.Add(Button("Lehreränderung als neue Revision speichern", () =>
         {
             var selected = selections.Where(s => s.Box.IsChecked == true).GroupBy(s => s.Offer).Select(g => new CourseSelection(g.Key.Id, g.Key.SubjectId, g.Key.Type, g.Key.Variant, [.. g.Select(v => v.Semester)])).ToImmutableArray();
-            session.Save(choice with { Selections = selected, PlannedOralSubjects = [.. (oral.Text ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)], UpdatedAt = DateTimeOffset.UtcNow }, active?.Id, RevisionSource.TeacherEdit, editReason.Text ?? "");
-            Refresh(); detail.Children.Clear(); status.Text = "Neue Lehrerrevision gespeichert und gegen aktuelle Stammdaten geprüft.";
+            session.Save(choice with { OfferVersion = session.Catalog.Version, RuleVersion = GsmKurswahl.Rules.ChoiceValidator.Version, Revision = active is null ? 1 : active.Snapshot.Revision + 1, Selections = selected, PlannedOralSubjects = [.. (oral.Text ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)], UpdatedAt = DateTimeOffset.UtcNow }, active?.Id, RevisionSource.TeacherEdit, editReason.Text ?? "");
+            Refresh(); status.Text = "Neue Lehrerrevision gespeichert und gegen aktuelle Stammdaten geprüft.";
         }));
         detail.Children.Add(Text("Wahlhistorie (vollständige Snapshots; Wiederherstellung erzeugt neue Revision)"));
         foreach (var revision in store!.History(id).Reverse())
         {
-            detail.Children.Add(Text($"{revision.ChangedAt:g} · {revision.Source} · {revision.ActorId} · {revision.Reason}\n" + string.Join("; ", revision.Changes.Select(c => $"{c.OfferId}: [{string.Join(',', c.Before)}] → [{string.Join(',', c.After)}]"))));
-            detail.Children.Add(Button("Diesen Stand wiederherstellen", () => { session.Restore(id, revision.Id, active!.Id, editReason.Text ?? ""); Refresh(); detail.Children.Clear(); status.Text = "Neue Wiederherstellungsrevision angelegt."; }));
+            var diff = string.Join("; ", revision.Changes.Select(c => $"{c.OfferId}: [{string.Join(',', c.Before)}] → [{string.Join(',', c.After)}]"));
+            var oralSummary = $"Mündlich: [{string.Join(',', revision.Snapshot.PlannedOralSubjects)}]";
+            detail.Children.Add(Text($"{revision.ChangedAt:g} · {revision.Source} · {revision.ActorId} ({revision.ActorRole}) · {revision.Reason}\n{oralSummary}" + (diff.Length > 0 ? " · " + diff : "")));
+            detail.Children.Add(Button("Diesen Stand wiederherstellen", () => { session.Restore(id, revision.Id, active!.Id, editReason.Text ?? ""); Refresh(); status.Text = "Neue Wiederherstellungsrevision angelegt."; }));
         }
     }
     private void BuildImport()
@@ -197,66 +272,39 @@ public sealed partial class TeacherWindow : Window
     {
         BuildSimpleDistribution();
         var advanced = new StackPanel { Spacing = 8 };
-        Intro(advanced, "Persönliche Voraussetzungen an die Schülerprogramme weitergeben", "Ein Profil sagt dem Schülerprogramm, welche Voraussetzungen bestätigt sind – etwa IMP oder bilingualer Bildungsgang. Das Lehrerprogramm erstellt profil.json und das zugehörige digitale Echtheitssiegel profil.sig. Die beiden Dateien werden gemeinsam ausgegeben.");
-        advanced.Children.Add(Help("Wann brauche ich eine neue Ausgabe?", "Beim ersten Mal: Personen auswählen → Profile erstellen und signieren → an Wahlordner verteilen. Konto und Wahlordner müssen zuvor im Schülerbestand geprüft und bestätigt sein.\n\nNach einer Vorbildungskorrektur: ein neues Profil erstellen und anschließend verteilen.\n\nNach einem Zustellfehler: nur die Verteilung wiederholen. Dafür braucht es keine neue Profilversion. Die gewählten Kurse stehen separat in aktuell.json und bleiben erhalten."));
+        Intro(advanced, "Persönliche Voraussetzungen einzeln bereitstellen", "Ein Profil sagt dem Schülerprogramm, welche Voraussetzungen bestätigt sind – etwa IMP oder bilingualer Bildungsgang. Das Lehrerprogramm legt die Datei profil.json im persönlichen Wahlordner ab.");
+        advanced.Children.Add(Help("Wann brauche ich eine neue Ausgabe?", "Beim ersten Mal: Grundverzeichnis oben prüfen und gemeinsam verteilen (oder hier einzelne Personen auswählen).\n\nNach einer Vorbildungskorrektur: ein neues Profil erstellen und anschließend verteilen.\n\nNach einem Zustellfehler: nur die Verteilung wiederholen. Dafür braucht es keine neue Profilversion. Die gewählten Kurse stehen separat in aktuell.json und bleiben erhalten."));
         advanced.Children.Add(Text("Personen auswählen · Strg/Umschalt für mehrere Personen"));
         advanced.Children.Add(profileTargets);
-        var setup = new StackPanel { Spacing = 8 };
-        setup.Children.Add(Text("Einmalige Einrichtung mit der Schul-IT: Zum Signieren wird ein administrativ bereitgestelltes Zertifikat benötigt. Der Fingerabdruck identifiziert dieses Zertifikat; die Schlüsselkennung benennt seinen öffentlichen Prüfschlüssel."));
-        setup.Children.Add(Text("Zertifikat-Fingerabdruck")); setup.Children.Add(thumbprint);
-        ToolTip.SetTip(thumbprint, "Kennung des bereitgestellten P-256-Zertifikats im Windows-Zertifikatspeicher. Dies ist kein Passwort und keine Schüler-ID.");
-        setup.Children.Add(Text("Schlüsselkennung")); setup.Children.Add(keyId);
-        setup.Children.Add(Button("Signiereinstellungen für diesen Jahrgang speichern", SaveSigningSettings));
-        setup.Children.Add(Text("Auch das Schülerprogramm benötigt das Fachangebot dieses Jahrgangs. Den exportierten Katalog bei der Einrichtung der Schülerinstallation verwenden."));
-        setup.Children.Add(Button("Aktuelles Fachangebot für das Schülerprogramm exportieren …", ExportCurrentCatalog));
-        ToolTip.SetTip(keyId, "Muss der Schlüsselkennung in der geschützten Schülerinstallation entsprechen, z. B. demo-key-01. Mit der Schul-IT abstimmen.");
-        setup.Children.Add(Button("Öffentlichen Prüfschlüssel für die Schülerinstallation exportieren", async () =>
+        advanced.Children.Add(Button("Aktuelles Fachangebot für das Schülerprogramm exportieren …", ExportCurrentCatalog));
+        advanced.Children.Add(Button("1 · Neue Profile erstellen", () =>
         {
-            using var certificates = new X509Store(StoreName.My, StoreLocation.CurrentUser); certificates.Open(OpenFlags.ReadOnly);
-            var matches = certificates.Certificates.Find(X509FindType.FindByThumbprint, thumbprint.Text ?? "", false);
-            if (matches.Count != 1 || string.IsNullOrWhiteSpace(keyId.Text)) throw new InvalidOperationException("Eindeutiges Zertifikat und Schlüsselkennung erforderlich.");
-            using var certificate = matches[0]; using var key = certificate.GetECDsaPublicKey() ?? throw new InvalidOperationException("ECDSA-Schlüssel fehlt.");
-            if (key.ExportParameters(false).Curve.Oid.Value != "1.2.840.10045.3.1.7") throw new InvalidOperationException("P-256-Schlüssel erforderlich.");
-            var exported = new TrustedProfileKey(keyId.Text, Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()));
-            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Öffentlichen Schlüssel speichern", SuggestedFileName = "public-profile-key.json" });
-            var path = file?.TryGetLocalPath(); if (path is null) return;
-            using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            output.Write(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(exported, DocumentJson.Options)); output.Flush(true);
-            status.Text = "Öffentlicher Schlüssel exportiert. Administrativ in keys der geschützten profile-trust.json aufnehmen und Kontodomäne prüfen.";
-        }, "Einrichtungshilfe für die Schul-IT: exportiert nur den öffentlichen Prüfschlüssel. Diese Datei enthält keine Schülerdaten und ist kein Schülerprofil."));
-        advanced.Children.Add(new Expander { Header = "Signierung einrichten · Schul-IT", Content = setup, HorizontalAlignment = HorizontalAlignment.Stretch });
-        advanced.Children.Add(Button("1 · Neue Profile erstellen und signieren", () =>
-        {
-            Ready(); using var certificates = new X509Store(StoreName.My, StoreLocation.CurrentUser); certificates.Open(OpenFlags.ReadOnly);
-            var matches = certificates.Certificates.Find(X509FindType.FindByThumbprint, thumbprint.Text ?? "", false);
-            if (matches.Count != 1) throw new InvalidOperationException("Signierzertifikat nicht eindeutig gefunden.");
-            using var certificate = matches[0]; using var key = certificate.GetECDsaPrivateKey() ?? throw new InvalidOperationException("ECDSA-Privatschlüssel nicht verfügbar.");
-            var distribution = new ProfileDistribution(store!); var count = 0; var failed = new List<string>();
+            Ready(); var distribution = new ProfileDistribution(store!); var count = 0; var failed = new List<string>();
             foreach (var target in profileTargets.SelectedItems!.Cast<Target>())
             {
-                try { distribution.Issue(target.Record, key, keyId.Text ?? ""); count++; }
-                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or CryptographicException)
+                try { distribution.Issue(target.Record); count++; }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
                 {
                     failed.Add(target.Record.Student.ExternalStudentId + ": " + ex.Message);
-                    store!.LogDistribution(new(Guid.NewGuid(), target.Record.Student.ExternalStudentId, 0, DateTimeOffset.UtcNow, "Profil_abweichend", "Signierung fehlgeschlagen; Zuordnung oder Schlüssel prüfen."));
+                    store!.LogDistribution(new(Guid.NewGuid(), target.Record.Student.ExternalStudentId, 0, DateTimeOffset.UtcNow, "Profil_abweichend", "Profilerstellung fehlgeschlagen; Ordnerzuordnung prüfen."));
                 }
             }
-            status.Text = $"{count} neue Einzelprofile signiert. Noch nicht verteilt. " + string.Join(" · ", failed);
-        }, "Erstellt für die ausgewählten Personen jeweils eine neue Profilversion mit digitalem Echtheitssiegel. Die Dateien sind danach vorbereitet, aber noch nicht im Schülerordner."));
+            status.Text = $"{count} neue Einzelprofile erstellt. Noch nicht verteilt. " + string.Join(" · ", failed);
+        }, "Erstellt für die ausgewählten Personen jeweils eine neue Profilversion. Die Dateien sind danach vorbereitet, aber noch nicht im Schülerordner."));
         advanced.Children.Add(Button("2 · Profile an Wahlordner verteilen / erneut zustellen", () =>
         {
             Ready(); var distribution = new ProfileDistribution(store!); var reports = new List<string>();
             foreach (var target in profileTargets.SelectedItems!.Cast<Target>())
             {
                 var issued = store!.LatestProfile(target.Record.Student.ExternalStudentId);
-                if (issued is null) { reports.Add(target.Record.Student.ExternalStudentId + ": noch kein Profil signiert"); continue; }
+                if (issued is null) { reports.Add(target.Record.Student.ExternalStudentId + ": noch kein Profil erstellt"); continue; }
                 var entry = distribution.Distribute(target.Record, issued); reports.Add(entry.StudentId + ": " + entry.Status);
             }
             status.Text = string.Join(" · ", reports);
-        }, "Kopiert profil.json und profil.sig in die bestätigten Wahlordner. Bei Zustellfehlern dieselbe Ausgabe erneut zustellen; vorhandene Kurswahlen werden nicht verändert."));
+        }, "Kopiert profil.json in die bestätigten Wahlordner. Bei Zustellfehlern dieselbe Ausgabe erneut zustellen; vorhandene Kurswahlen werden nicht verändert."));
         var report = new TextBox { IsReadOnly = true, AcceptsReturn = true, MinHeight = 180 };
         advanced.Children.Add(Button("Verteilungsbericht anzeigen", () => { Ready(); report.Text = string.Join(Environment.NewLine, store!.DistributionLog().Select(e => $"{e.At:g} · {e.StudentId} · Profil {e.ProfileRevision} · {e.Status} · {e.Detail}")); })); advanced.Children.Add(report);
-        profilePanel.Children.Add(new Expander { Header = "Technische Einrichtung und einzelne Profile · Schul-IT", Content = advanced });
+        profilePanel.Children.Add(new Expander { Header = "Einzelne Profile und Verteilungsbericht", Content = advanced });
     }
     private void BuildCollection()
     {
@@ -265,16 +313,35 @@ public sealed partial class TeacherWindow : Window
         collectionPanel.Children.Add(Text("Bei geöffneter App werden neue Wahlen alle 60 Sekunden automatisch eingelesen. Lehreränderungen und widersprüchliche Schülerrevisionen bleiben zur Entscheidung hier stehen."));
         collectionPanel.Children.Add(Button("Jetzt auf neue Kurswahlen prüfen", CollectAutomatically));
         collectionPanel.Children.Add(collectionResults); collectionPanel.Children.Add(conflict); collectionPanel.Children.Add(reason);
-        collectionPanel.Children.Add(Button("Offene Konflikte nach Prüfung übernehmen", () =>
+        var conflictActions = new WrapPanel { Orientation = Orientation.Horizontal };
+        var acceptConflicts = Button("Offene Konflikte nach Prüfung übernehmen", () =>
         {
-            Ready(); var results = new List<string>();
-            foreach (var preview in collections)
+            Ready(); var results = new List<string>(); var remaining = ImmutableArray.CreateBuilder<CollectionPreview>();
+            var chosen = conflictSelection.Count > 0 ? conflictSelection.Select(c => (c.Box.IsChecked == true, c.Preview)).ToArray() : collections.Select(p => (true, p)).ToArray();
+            foreach (var (selected, preview) in chosen)
             {
+                if (!selected) { remaining.Add(preview); continue; }
                 try { session!.Confirm(preview, true, conflict.IsChecked == true, reason.Text ?? ""); results.Add(preview.Choice.StudentId + ": übernommen/bereits vorhanden"); }
-                catch (InvalidOperationException ex) { results.Add(preview.Choice.StudentId + ": " + ex.Message); }
+                catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { remaining.Add(preview); results.Add(preview.Choice.StudentId + ": " + ex.Message); }
             }
-            Refresh(); status.Text = string.Join(" · ", results);
-        }, "Übernimmt die zuvor angezeigten Kurswahlen mit Herkunft und Historie. Bei Konflikten ist Ihre ausdrückliche Entscheidung erforderlich."));
+            collections = remaining.ToImmutable(); conflict.IsChecked = false;
+            RenderCollectionStatus(0, results); Refresh(); status.Text = string.Join(" · ", results);
+        }, "Übernimmt die ausgewählten Kurswahlen mit Herkunft und Historie. Bei Konflikten ist Ihre ausdrückliche Entscheidung erforderlich.");
+        acceptConflicts.Margin = new Thickness(0, 0, 10, 0);
+        var dismissButton = Button("Ausgewählte Konflikte verwerfen (Lehrerstand behalten)", () =>
+        {
+            Ready(); var remaining = ImmutableArray.CreateBuilder<CollectionPreview>(); var dismissed = 0;
+            var chosen = conflictSelection.Count > 0 ? conflictSelection.Select(c => (c.Box.IsChecked == true, c.Preview)).ToArray() : collections.Select(p => (true, p)).ToArray();
+            foreach (var (selected, preview) in chosen)
+            {
+                if (selected) { dismissedConflicts.Add(preview.Choice.StudentId + ":" + preview.Origin.ContentHash); dismissed++; }
+                else remaining.Add(preview);
+            }
+            collections = remaining.ToImmutable(); conflict.IsChecked = false;
+            RenderCollectionStatus(0, []); Refresh(); status.Text = $"{dismissed} Konflikte zugunsten des Lehrerbestands verworfen.";
+        }, "Behält den aktuellen Lehrerbestand bei und meldet denselben Dateiinhalt nicht erneut als offenen Konflikt.");
+        conflictActions.Children.Add(acceptConflicts); conflictActions.Children.Add(dismissButton);
+        collectionPanel.Children.Add(conflictActions);
     }
     private void BuildCatalog()
     {

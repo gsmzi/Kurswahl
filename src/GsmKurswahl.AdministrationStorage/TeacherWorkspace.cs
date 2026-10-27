@@ -98,7 +98,9 @@ public sealed class TeacherWorkspace
         if (!File.Exists(databasePath)) throw new FileNotFoundException("Vorhandene Verwaltungsdatei auswählen.");
         if (Document.Years.Any(y => y.Catalog.GraduationYear == catalog.GraduationYear)) throw new InvalidOperationException("Jahrgang bereits vorhanden; bestehende Zuordnung bleibt erhalten.");
         using var existing = new SqliteAdministrationStore(databasePath);
-        _ = existing.Students();
+        var students = existing.Students();
+        if (students.Any(s => s.Student.GraduationYear != catalog.GraduationYear))
+            throw new InvalidDataException("Die ausgewählte Verwaltungsdatei enthält Schüler eines anderen Abiturjahrgangs.");
         var year = new TeacherYear(catalog, Path.GetFullPath(databasePath), YearSetupStep.Import, actor, "", "");
         Save(Document with { ActiveYear = catalog.GraduationYear, Years = Document.Years.Add(year) });
     }

@@ -24,7 +24,7 @@ Aktuelles Schema: `schemas/course-choice.v2.schema.json`; Katalog und Einstellun
 
 Wahlschema v2 und Katalogschema v1 bleiben strukturell unverändert. Geänderter Regelstand `m2-1`, Kataloginhalt `demo-2029-v2`: bisherige Wahlentwürfe werden bei Versionsabweichung weiterhin geschützt abgewiesen. Es gibt keine automatische Migration, kein Zurücksetzen vorhandener Dateien und keine Änderung fremder Home-Dateien. Das aktualisierte Sample in einem separaten Testordner verwenden.
 
-Neu: `student-profile.v1.schema.json` und `profile-signature.v1.schema.json`. Profilv1 ist erstmals implementiert; die englischen JSON-Feldnamen entsprechen dem bestehenden C#-Modell, nicht dem unverbindlichen deutschen Beispiel im Pflichtenheft. SID (`accountId`) ist für die Windows-Vertrauensprüfung zusätzlich verpflichtend. Weitere Details, Algorithmus und Schlüsselrotation: [PROFILE.md](PROFILE.md). Keine Vorbildung im Wahl-JSON; unbekannte Mitglieder werden weiterhin abgewiesen.
+Neu: `student-profile.v1.schema.json`. Profilv1 ist implementiert; die englischen JSON-Feldnamen entsprechen dem bestehenden C#-Modell, nicht dem unverbindlichen deutschen Beispiel im Pflichtenheft. Auf Nutzerentscheidung (27.10.2026) entfallen Zertifikats-/Signaturdateien (`profil.sig`, `profile-trust.json`), Schlüsselkennungen (`keyId`) und Windows-SID-Pflicht (`accountId`); `windowsUsername`, `accountId` und `keyId` dürfen in `profil.json` leer sein (`""`). Weitere Details: [PROFILE.md](PROFILE.md). Keine Vorbildung im Wahl-JSON; unbekannte Mitglieder werden weiterhin abgewiesen.
 
 Der HTML-Kontrollbogen ist ein abgeleiteter Export ohne Rückimport. Er enthält keine Signatur und keine Berechtigungswirkung. Zeitstempel verwenden im Bogen ISO-8601 mit Offset.
 

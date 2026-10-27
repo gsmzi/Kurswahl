@@ -23,22 +23,7 @@ public sealed class App : Avalonia.Application
                 var settings = StudentSettings.Load(settingsPath);
                 var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(settings.ResolveCatalogPath(settingsPath)));
                 var path = settings.ResolveChoicePath();
-                // Only the protected installation supplies trust. Never load keys from the student home or settings override.
-                var trustPath = Path.Combine(AppContext.BaseDirectory, "profile-trust.json");
-                GsmKurswahl.Domain.ProfileContext profile;
-                try
-                {
-                    var trust = File.Exists(trustPath)
-                        ? System.Text.Json.JsonSerializer.Deserialize<GsmKurswahl.Domain.ProfileTrust>(File.ReadAllBytes(trustPath), JsonDocuments.Options)
-                        : null;
-                    profile = new SignedProfileReader(trust ?? new(1, [], []), new OperatingSystemIdentityProvider())
-                        .Read(Path.GetDirectoryName(path)!, settings.DemoStudentId, catalog.GraduationYear);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
-                {
-                    profile = new(GsmKurswahl.Domain.ProfileStatus.ProfileInvalid, GsmKurswahl.Domain.PriorEducation.Unknown)
-                    { Detail = "Vertrauenskonfiguration nicht lesbar. Oberstufenberatung kontaktieren; Entwurf bleibt erhalten." };
-                }
+                var profile = new SignedProfileReader().Read(Path.GetDirectoryName(path)!, settings.DemoStudentId, catalog.GraduationYear);
                 var session = new StudentSession(catalog, settings.DemoStudentId, new JsonChoiceStore(path, settings.ResolveHomeDirectory()), profile);
                 desktop.MainWindow = new MainWindow(session, path, new OperatingSystemIdentityProvider().GetCurrent().Username);
             }

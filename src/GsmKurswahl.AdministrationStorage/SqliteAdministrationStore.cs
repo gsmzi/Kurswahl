@@ -78,7 +78,7 @@ public sealed class SqliteAdministrationStore : IAdministrationStore
         var others = all.Where(s => s.Student.ExternalStudentId != record.Student.ExternalStudentId);
         if (others.Any(s => s.Student.Id == record.Student.Id || (!string.IsNullOrWhiteSpace(record.WindowsUsername) && string.Equals(s.WindowsUsername, record.WindowsUsername, StringComparison.OrdinalIgnoreCase))
             || (!string.IsNullOrWhiteSpace(record.AccountId) && s.AccountId == record.AccountId)
-            || (!string.IsNullOrWhiteSpace(record.HomeDirectory) && string.Equals(s.HomeDirectory.TrimEnd('\\','/'), record.HomeDirectory.TrimEnd('\\','/'), StringComparison.OrdinalIgnoreCase))))
+            || (!string.IsNullOrWhiteSpace(record.HomeDirectory) && string.Equals(s.HomeDirectory.Replace('\\', '/').TrimEnd('/'), record.HomeDirectory.Replace('\\', '/').TrimEnd('/'), StringComparison.OrdinalIgnoreCase))))
             throw new InvalidOperationException("Schüler-ID, Konto, SID oder Home bereits einer anderen Person zugeordnet.");
         using var tx = db.BeginTransaction();
         var current = Scalar("SELECT MAX(version) FROM students WHERE id=$p0", record.Student.ExternalStudentId);

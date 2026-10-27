@@ -13,14 +13,13 @@ public sealed class ImportColumnPicker : StackPanel
     private static readonly (string Field, string Label, string Help)[] Fields =
     [
         ("studentId", "Schüler-ID *", "Eindeutige Kennung pro Person. Im Erprobungsbetrieb z. B. demo-001."),
-        ("firstName", "Vorname", "Zusammen mit Nachname für den Standardordner Nachname.Vorname."),
-        ("lastName", "Nachname", "Zusammen mit Vorname für den Standardordner Nachname.Vorname."),
+        ("firstName", "Vorname *", "Zusammen mit Nachname für den Standardordner Nachname.Vorname."),
+        ("lastName", "Nachname *", "Zusammen mit Vorname für den Standardordner Nachname.Vorname."),
         ("folder", "Abweichender Schülerordner (optional)", "Nur der Ordnername innerhalb der Klasse, z. B. Muster.Demo2. Überschreibt Nachname.Vorname."),
-        ("name", "Anzeigename (alternativ Vor-/Nachname)", "Anzeigename der Person. In Testdateien ausschließlich erfundene Namen verwenden."),
+        ("name", "Anzeigename * (alternativ Vor-/Nachname)", "Anzeigename der Person. In Testdateien ausschließlich erfundene Namen verwenden."),
         ("class", "Klasse *", "Klassenbezeichnung, z. B. 10-demo."),
         ("year", "Abiturjahrgang *", "Vierstellige Jahreszahl, passend zum geöffneten Fachangebot."),
-        ("username", "Windows-Benutzername *", "Schulisches Konto in der Form DOMÄNE\\Benutzername; die Zuordnung wird anschließend geprüft."),
-        ("accountId", "Windows-Konto-ID (SID)", "Eindeutige technische Kontokennung. Von der Schul-IT bestätigen lassen; nicht selbst erfinden."),
+        ("username", "Windows-Benutzername (optional)", "Optionales schulisches Konto in der Form DOMÄNE\\Benutzername."),
         ("home", "Persönlicher Wahlordner", "Optionaler expliziter Ordner, absolut oder relativ zum gewählten Laufwerk. Sonst wird Klasse/Nachname.Vorname verwendet. Die Verteilung prüft die Ziele gemeinsam."),
         ("italian", "Italienisch-Profil", "ja/nein; leer bedeutet unbekannt. Bestätigt das Profil, nicht automatisch die fortgeführte Sprachlaufbahn."),
         ("bridge", "Informatik-Brückenkurs", "Brückenkurs besucht: ja/nein; leer bedeutet unbekannt."),

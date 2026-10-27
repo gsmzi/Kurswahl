@@ -72,3 +72,10 @@ Automatisches Öffnen des ausdrücklich aktiven Jahrgangs und fortsetzbare Einri
 ## Vereinfachter Verwaltungsablauf (27.10.2026)
 
 Nutzerauftrag ersetzt die Einzelbestätigung durch vorausgewählte Sammelübernahme und erlaubt automatisches Einsammeln konfliktfreier Schülerwahlen bei geöffneter App. Konto-/SID-Vertrauensanker und einmalige Zertifikats-/Katalogbereitstellung bleiben erforderlich. Ordnernamen allein bestätigen keine Windows-Identität. Kein Hintergrunddienst bei geschlossener Anwendung; native Netz-/Zertifikatprüfung weiterhin offen.
+
+## M3 Review-Korrekturen, Verzicht auf Zertifikats-/SID-Pflicht und Direkt-Navigation in der Verlaufsleiste (27.10.2026)
+
+- **Verzicht auf Zertifikats- und SID-Pflicht (Nutzerentscheidung 27.10.2026):** `profil.json` wird direkt ohne Zertifikatssignatur (`profil.sig`), ohne Windows-Zertifikatsspeicher und ohne Windows-SID-Pflicht erstellt, verteilt und vom Schülerprogramm gelesen. Auch `username` ist beim Tabellenimport optional. Die verbindliche Prüfung findet im Lehrerprogramm (und vor der ASV-Eingabe) ausschließlich gegen den geschützten Lehrerbestand (`verwaltung.db`) statt.
+- Persönliche Voraussetzungen (`PriorEducation`) und Abgangsstatus (`DepartureStatus`) sind im Personenbereich (`ShowStudent`) direkt bearbeitbar; relative Schülerordner bleiben beim Speichern unbestätigter Zuordnungen erhalten.
+- Die drei Schrittkarten der Verlaufsleiste (`Fächer auswählen`, `Schülerliste importieren`, `Dateien verteilen`) sind direkt anklickbar; die redundanten Sprungbuttons darunter wurden entfernt.
+- Offene Rückfrage mit dem Nutzer: Phasenmodell beim Einsammeln vs. Lehrerbearbeitung (Schüler-Wahlphase übernimmt automatisch neuere Schülerstände; ab Lehrer-Bearbeitungsphase ist der Lehrerbestand verbindlich).

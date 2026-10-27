@@ -56,19 +56,28 @@ public static class StudentTableImport
         var relation = Read("xl/_rels/workbook.xml.rels").Root!.Elements().Single(e => (string?)e.Attribute("Id") == (string?)sheets[0].Attribute(rel + "id"));
         var target = (string?)relation.Attribute("Target") ?? throw new InvalidDataException("Tabellenblatt fehlt.");
         if (target.Contains("..", StringComparison.Ordinal) || (string?)relation.Attribute("TargetMode") == "External") throw new InvalidDataException("Externe XLSX-Verknüpfung abgewiesen.");
+        var normalizedTarget = target.TrimStart('/');
+        if (!normalizedTarget.StartsWith("xl/", StringComparison.OrdinalIgnoreCase)) normalizedTarget = "xl/" + normalizedTarget;
         var shared = zip.GetEntry("xl/sharedStrings.xml") is null ? [] : Read("xl/sharedStrings.xml").Descendants(ns + "si").Select(e => string.Concat(e.Descendants(ns + "t").Select(t => t.Value))).ToArray();
         var rows = new List<ImmutableArray<string>>();
-        foreach (var r in Read(target.StartsWith('/') ? target.TrimStart('/') : "xl/" + target).Descendants(ns + "row"))
+        foreach (var r in Read(normalizedTarget).Descendants(ns + "row"))
         {
             var cells = new SortedDictionary<int, string>();
             foreach (var c in r.Elements(ns + "c"))
             {
                 if (c.Element(ns + "f") is not null) throw new InvalidDataException("Formelzellen im Import nicht erlaubt; Werte exportieren.");
                 var reference = (string?)c.Attribute("r") ?? throw new InvalidDataException("Zelladresse fehlt.");
-                var index = 0; foreach (var letter in reference.TakeWhile(char.IsLetter)) index = checked(index * 26 + letter - 'A' + 1);
+                var index = 0; foreach (var letter in reference.TakeWhile(char.IsLetter)) index = checked(index * 26 + char.ToUpperInvariant(letter) - 'A' + 1);
                 if (index is < 1 or > 100) throw new InvalidDataException("Zu viele Spalten.");
                 var value = c.Element(ns + "v")?.Value ?? string.Concat(c.Descendants(ns + "t").Select(t => t.Value));
-                cells.Add(index - 1, (string?)c.Attribute("t") == "s" ? shared[int.Parse(value, System.Globalization.CultureInfo.InvariantCulture)] : value);
+                var text = value;
+                if ((string?)c.Attribute("t") == "s")
+                {
+                    if (!int.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var sharedIndex) || sharedIndex < 0 || sharedIndex >= shared.Length)
+                        throw new InvalidDataException("Ungültiger XLSX-Textverweis.");
+                    text = shared[sharedIndex];
+                }
+                cells[index - 1] = text;
             }
             if (cells.Count > 0) rows.Add([.. Enumerable.Range(0, cells.Keys.Max() + 1).Select(i => cells.GetValueOrDefault(i, ""))]);
         }
@@ -78,13 +87,17 @@ public static class StudentTableImport
     {
         if (rows.Count < 2 || rows.Count > 10001) throw new InvalidDataException("Import benötigt Kopfzeile und 1–10000 Datenzeilen.");
         var headers = rows[0].Select(h => h.Trim().TrimStart('\uFEFF')).ToImmutableArray();
+        if (headers.Length > 100) throw new InvalidDataException("Zu viele Spalten.");
         if (headers.Any(string.IsNullOrWhiteSpace) || headers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != headers.Length) throw new InvalidDataException("Leere/doppelte Spaltenüberschrift.");
         return new(headers, [.. rows.Skip(1)]);
     }
     public static ImmutableArray<StudentImportRow> Preview(ImportTable table, IReadOnlyDictionary<string, string> mapping, ImportOrigin origin, string actor)
     {
-        foreach (var field in new[] { "studentId", "class", "year", "username" })
-            if (!mapping.TryGetValue(field, out var header) || !table.Headers.Contains(header)) throw new ArgumentException("Spaltenzuordnung fehlt: " + field);
+        bool HasMapped(string field) => mapping.TryGetValue(field, out var header) && table.Headers.Contains(header);
+        foreach (var field in new[] { "studentId", "class", "year" })
+            if (!HasMapped(field)) throw new ArgumentException("Spaltenzuordnung fehlt: " + field);
+        if (!HasMapped("name") && !(HasMapped("firstName") && HasMapped("lastName")))
+            throw new ArgumentException("Spaltenzuordnung fehlt: name oder firstName + lastName.");
         if (mapping.Keys.Any(k => !Fields.Contains(k)) || mapping.Values.Distinct().Count() != mapping.Count) throw new ArgumentException("Unbekannte oder mehrfach zugeordnete Spalte.");
         var result = new List<StudentImportRow>();
         for (var i = 0; i < table.Rows.Length; i++)
@@ -112,24 +125,24 @@ public static class StudentTableImport
                     }
                 }
                 var year = int.Parse(Value("year"), System.Globalization.CultureInfo.InvariantCulture);
-                if (year is < 2000 or > 2200 || name.Length == 0 || Value("username").Length == 0) throw new ArgumentException("Name, Konto oder Jahrgang ungültig.");
-                var sport = Value("sport");
-                ImmutableArray<int>? semesters = sport is "" or "unknown" ? null : sport is "keine" or "none" ? [] : [.. sport.Split(',').Select(int.Parse)];
+                if (year is < 2000 or > 2200 || name.Length == 0) throw new ArgumentException("Name oder Jahrgang ungültig.");
+                var sport = Value("sport").ToLowerInvariant();
+                ImmutableArray<int>? semesters = sport is "" or "unknown" or "unbekannt" ? null : sport is "keine" or "none" ? [] : [.. sport.Split(',', StringSplitOptions.TrimEntries).Select(int.Parse).Order()];
                 if (semesters is { } h && (h.Any(v => v is < 1 or > 4) || h.Distinct().Count() != h.Length)) throw new ArgumentException("Sport-Halbjahre ungültig.");
-                var religion = Value("religion");
+                var religion = Value("religion").ToUpperInvariant();
                 if (religion is not ("" or "ETH" or "ER" or "KR")) throw new ArgumentException("Religion/Ethik ungültig.");
                 var prior = new PriorEducation(Known("italian"), Known("bridge"), Known("imp"), Known("bilingual"), religion.Length == 0 ? null : religion, semesters)
                 { ContinuedLanguages = [.. Value("languages").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct()], ReligionEthicsPermission = Known("religionPermission"), ReligionEthicsExamPermission = Known("religionExamPermission"), PermanentSportExemption = Known("permanentSport") };
-                var departure = Value("departure") switch { "" or "aktiv" => DepartureStatus.Active, "voraussichtlich" => DepartureStatus.ExpectedDeparture, "bestaetigt" => DepartureStatus.ConfirmedDeparture, _ => throw new ArgumentException("Abgängerstatus ungültig.") };
+                var departure = Value("departure").ToLowerInvariant() switch { "" or "aktiv" => DepartureStatus.Active, "voraussichtlich" => DepartureStatus.ExpectedDeparture, "bestaetigt" or "bestätigt" => DepartureStatus.ConfirmedDeparture, _ => throw new ArgumentException("Abgängerstatus ungültig.") };
                 var student = new AdministrativeStudent(Guid.NewGuid(), id, name, Value("class"), year, departure, prior);
                 result.Add(new(i + 2, new(1, student, Value("username"), Value("accountId"), home, false, 1, actor, DateTimeOffset.UtcNow, origin), ""));
             }
             catch (Exception ex) when (ex is ArgumentException or FormatException or OverflowException) { result.Add(new(i + 2, null, ex.Message)); }
         }
-        var duplicates = result.Where(r => r.Candidate is not null).GroupBy(r => r.Candidate!.Student.ExternalStudentId).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
-        var accounts = result.Where(r => r.Candidate is not null).GroupBy(r => r.Candidate!.WindowsUsername, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var duplicates = result.Where(r => r.Candidate is not null).GroupBy(r => r.Candidate!.Student.ExternalStudentId, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var accounts = result.Where(r => !string.IsNullOrWhiteSpace(r.Candidate?.WindowsUsername)).GroupBy(r => r.Candidate!.WindowsUsername, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var sids = result.Where(r => !string.IsNullOrWhiteSpace(r.Candidate?.AccountId)).GroupBy(r => r.Candidate!.AccountId, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var homes = result.Where(r => !string.IsNullOrWhiteSpace(r.Candidate?.HomeDirectory)).GroupBy(r => r.Candidate!.HomeDirectory.Replace('\\', '/').TrimEnd('/'), StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return [.. result.Select(r => r.Candidate is { } c && (duplicates.Contains(c.Student.ExternalStudentId) || accounts.Contains(c.WindowsUsername) || sids.Contains(c.AccountId) || homes.Contains(c.HomeDirectory.Replace('\\', '/').TrimEnd('/'))) ? r with { Error = "Doppelte Schüler-ID, Benutzerkennung, SID oder Ordner; keine Übernahme." } : r)];
+        return [.. result.Select(r => r.Candidate is { } c && (duplicates.Contains(c.Student.ExternalStudentId) || accounts.Contains(c.WindowsUsername) || sids.Contains(c.AccountId) || homes.Contains(c.HomeDirectory.Replace('\\', '/').TrimEnd('/'))) ? r with { Error = "Doppelte Schüler-ID, Benutzerkennung oder Ordner; keine Übernahme." } : r)];
     }
 }

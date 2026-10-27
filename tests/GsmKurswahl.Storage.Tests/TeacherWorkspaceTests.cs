@@ -53,7 +53,9 @@ public sealed class TeacherWorkspaceTests : IDisposable
         Directory.CreateDirectory(root); var path = Path.Combine(root, "previous.db");
         using (var db = new SqliteAdministrationStore(path))
             db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
-        var workspace = new TeacherWorkspace(Path.Combine(root, "managed")); workspace.Attach(TestData.Catalog, path, "demo-beratung");
+        var workspace = new TeacherWorkspace(Path.Combine(root, "managed"));
+        Assert.Throws<InvalidDataException>(() => workspace.Attach(TestData.Catalog with { GraduationYear = 2030 }, path, "demo-beratung"));
+        workspace.Attach(TestData.Catalog, path, "demo-beratung");
         using var attached = new TeacherWorkspace(Path.Combine(root, "managed")).OpenActive();
         Assert.Equal("Demo Eins", attached.Students().Single().Student.SyntheticDisplayName);
     }

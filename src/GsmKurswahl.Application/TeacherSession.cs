@@ -22,9 +22,10 @@ public sealed class TeacherSession(IAdministrationStore store, OfferCatalog cata
     public CollectionPreview Preview(CourseChoice choice, string studentId, ImportOrigin origin)
     {
         var record = store.Students().Single(s => s.Student.ExternalStudentId == studentId);
-        if (!record.MappingConfirmed || origin.AuthenticatedAccount != record.WindowsUsername
+        if (!record.MappingConfirmed
+            || (!string.IsNullOrWhiteSpace(record.WindowsUsername) && !string.IsNullOrWhiteSpace(origin.AuthenticatedAccount) && !string.Equals(origin.AuthenticatedAccount, record.WindowsUsername, StringComparison.OrdinalIgnoreCase))
             || choice.StudentId != studentId || choice.GraduationYear != record.Student.GraduationYear)
-            throw new InvalidOperationException("Herkunft, bestätigte Kontozuordnung oder Jahrgang stimmt nicht überein.");
+            throw new InvalidOperationException("Herkunft, bestätigte Ordnerzuordnung oder Jahrgang stimmt nicht überein.");
         var history = store.History(studentId);
         var active = history.LastOrDefault();
         var duplicate = history.Any(r => r.ImportOrigin?.ContentHash == origin.ContentHash && r.ImportOrigin?.SourceId == origin.SourceId);
@@ -53,10 +54,11 @@ public sealed class TeacherSession(IAdministrationStore store, OfferCatalog cata
         if (record.Student.GraduationYear != choice.GraduationYear) throw new ArgumentException("Abiturjahrgang stimmt nicht überein.");
         var before = store.History(choice.StudentId).LastOrDefault();
         var changes = (before?.Snapshot.Selections ?? []).Select(s => s.OfferId).Union(choice.Selections.Select(s => s.OfferId))
-            .Select(id => new SelectionChange(id, before?.Snapshot.Selections.SingleOrDefault(s => s.OfferId == id)?.Semesters ?? [], choice.Selections.SingleOrDefault(s => s.OfferId == id)?.Semesters ?? []))
+            .Select(id => new SelectionChange(id, [.. (before?.Snapshot.Selections.SingleOrDefault(s => s.OfferId == id)?.Semesters ?? []).Order()], [.. (choice.Selections.SingleOrDefault(s => s.OfferId == id)?.Semesters ?? []).Order()]))
             .Where(c => !c.Before.SequenceEqual(c.After)).ToImmutableArray();
+        var role = source == RevisionSource.StudentSubmission ? ActorRole.Student : ActorRole.Teacher;
         var revision = new ChoiceRevision(Guid.NewGuid(), expectedActive, choice.StudentId, DateTimeOffset.UtcNow, actor,
-            ActorRole.Teacher, source, reason, Catalog.Version, ChoiceValidator.Version, choice, changes, origin);
+            role, source, reason, Catalog.Version, ChoiceValidator.Version, choice, changes, origin);
         _ = Validate(choice, record); // Always evaluate against current protected prerequisites, never a supplied profile.
         store.Append(revision, expectedActive);
         return revision;
@@ -64,7 +66,7 @@ public sealed class TeacherSession(IAdministrationStore store, OfferCatalog cata
     public ChoiceRevision Restore(string studentId, Guid revisionId, Guid expectedActive, string reason)
     {
         var previous = store.History(studentId).Single(r => r.Id == revisionId);
-        return Save(previous.Snapshot, expectedActive, RevisionSource.Restoration, reason);
+        return Save(previous.Snapshot with { OfferVersion = Catalog.Version, RuleVersion = ChoiceValidator.Version, UpdatedAt = DateTimeOffset.UtcNow }, expectedActive, RevisionSource.Restoration, reason);
     }
     public void FollowUp(string studentId, bool required, DateTimeOffset? deadline, string reason)
     {

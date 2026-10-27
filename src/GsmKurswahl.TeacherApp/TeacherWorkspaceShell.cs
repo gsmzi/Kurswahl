@@ -16,7 +16,6 @@ public sealed partial class TeacherWindow
     private TeacherWorkspace? workspace;
     private readonly ContentControl pageHost = new();
     private readonly StackPanel navigation = new() { Orientation = Orientation.Horizontal, Spacing = 6 };
-    private readonly StackPanel setupHeader = new() { Spacing = 8, Margin = new Thickness(0, 0) };
     private readonly StackPanel dashboardPanel = new() { Spacing = 16 };
     private readonly StackPanel managePanel = new() { Spacing = 12 };
     private readonly StackPanel settingsPanel = new() { Spacing = 12 };
@@ -61,7 +60,7 @@ public sealed partial class TeacherWindow
         store?.Dispose(); store = null; session = null;
         workflowProgress.Children.Clear();
         heading.Text = "Verwaltungsstand konnte nicht geöffnet werden";
-        navigation.Children.Clear(); setupHeader.Children.Clear();
+        navigation.Children.Clear();
         var panel = new StackPanel { Spacing = 14 };
         Intro(panel, "Gespeicherte Daten bleiben erhalten", ex.Message);
         panel.Children.Add(Text("Prüfen Sie Speicherort und Zugriffsrechte. Ein fehlender oder beschädigter Bestand wird nicht automatisch neu angelegt."));
@@ -79,7 +78,7 @@ public sealed partial class TeacherWindow
         if (year is null) { ShowNewYear(); return; }
         try { store = workspace!.OpenActive(); }
         catch (Exception ex) { ShowStartupError(ex); return; }
-        actor.Text = year.Actor; thumbprint.Text = year.CertificateThumbprint; keyId.Text = year.KeyId;
+        actor.Text = year.Actor;
         session = new TeacherSession(store, year.Catalog, year.Actor);
         heading.Text = "Abitur " + year.Catalog.GraduationYear;
         status.Text = "Aktueller Stand geladen. Bestätigte Änderungen werden automatisch gespeichert.";
@@ -105,7 +104,7 @@ public sealed partial class TeacherWindow
     }
     private void ShowNewYear()
     {
-        visiblePage = "new"; heading.Text = "Willkommen in der Lehrerverwaltung"; setupHeader.Children.Clear(); RebuildNavigation();
+        visiblePage = "new"; heading.Text = "Willkommen in der Lehrerverwaltung"; RebuildNavigation();
         var panel = new StackPanel { Spacing = 16, MaxWidth = 900, HorizontalAlignment = HorizontalAlignment.Left };
         Intro(panel, "Abiturjahrgang einrichten", "Sie legen den Jahrgang einmal an. Danach öffnet das Programm automatisch den zuletzt aktiven Stand und zeigt die nächsten Aufgaben.");
         panel.Children.Add(Text("Abiturjahrgang"));
@@ -119,7 +118,8 @@ public sealed partial class TeacherWindow
             if (workspace is null) throw new InvalidOperationException("Speicherort zuerst prüfen.");
             var basis = JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json")));
             var graduation = (int)(year.Value ?? 0);
-            workspace.Create(basis with { GraduationYear = graduation, Version = $"demo-{graduation}-" + Guid.NewGuid().ToString("N")[..8] }, editor.Text?.Trim() ?? "");
+            var version = graduation == basis.GraduationYear ? basis.Version : $"demo-{graduation}-" + Guid.NewGuid().ToString("N")[..8];
+            workspace.Create(basis with { GraduationYear = graduation, Version = version }, editor.Text?.Trim() ?? "");
             OpenActiveYear();
         }); create.Name = "CreateYear"; panel.Children.Add(Primary(create));
         if (workspace?.Active is not null) panel.Children.Add(Button("Zum bisherigen Jahrgang zurück", OpenActiveYear));
@@ -130,27 +130,51 @@ public sealed partial class TeacherWindow
     private void ShowCurrentStep()
     {
         var active = workspace?.Active; if (active is null) { ShowNewYear(); return; }
-        setupHeader.Children.Clear(); UpdateWorkflowProgress();
-        if (active.Step == YearSetupStep.Complete) { ShowPage("start"); return; }
-        var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        setupHeader.Children.Add(controls);
+        UpdateWorkflowProgress();
         switch (active.Step)
         {
-            case YearSetupStep.Import:
-                controls.Children.Add(Button("Zur Fachauswahl", () => SetStep(YearSetupStep.Offer)));
-                controls.Children.Add(Primary(Button("Schülerliste übernommen · weiter", () =>
-                {
-                    if (!CurrentStudents().Any()) throw new InvalidOperationException("Zuerst die Schülerliste übernehmen.");
-                    SetStep(YearSetupStep.Mapping);
-                })));
-                ShowPage("import"); break;
-            case YearSetupStep.Offer:
-                ShowOfferSetup(); break;
-            default:
-                controls.Children.Add(Button("Zur Schülerliste", () => SetStep(YearSetupStep.Import)));
-                controls.Children.Add(Button("Später verteilen · Übersicht öffnen", () => SetStep(YearSetupStep.Complete)));
-                ShowPage("profiles"); break;
+            case YearSetupStep.Complete: ShowPage("start"); break;
+            case YearSetupStep.Offer: ShowOfferSetup(); break;
+            case YearSetupStep.Import: ShowPage("import"); break;
+            default: ShowPage("profiles"); break;
         }
+    }
+    public void JumpToWorkflowStep(int index)
+    {
+        var active = workspace?.Active;
+        if (active is null || store is null || session is null) return;
+        try
+        {
+            if (index == 0)
+            {
+                if (session.Overview().Any(s => s.Record.Student.GraduationYear == session.Catalog.GraduationYear && s.Active is not null))
+                { BuildCatalog(); visiblePage = "catalog"; pageHost.Content = catalogView; }
+                else if (active.Step == YearSetupStep.Complete)
+                    ShowOfferSetup();
+                else
+                    SetStep(YearSetupStep.Offer);
+            }
+            else if (index == 1)
+            {
+                if (active.Catalog.Offers.Count(o => o.Type == CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established) < 3)
+                    throw new InvalidOperationException("Bitte mindestens drei Leistungsfachangebote auswählen.");
+                if (active.Step == YearSetupStep.Complete)
+                    ShowPage("import");
+                else
+                    SetStep(YearSetupStep.Import);
+            }
+            else if (index == 2)
+            {
+                if (!CurrentStudents().Any())
+                    throw new InvalidOperationException("Zuerst die Schülerliste übernehmen.");
+                if (active.Step == YearSetupStep.Complete)
+                    ShowPage("profiles");
+                else
+                    SetStep(YearSetupStep.Mapping);
+            }
+            UpdateDashboard(); UpdateVisualNavigation(); UpdateWorkflowProgress();
+        }
+        catch (Exception ex) { status.Text = "Vorgang nicht abgeschlossen: " + ex.Message; }
     }
     private StudentRecord[] CurrentStudents() => store!.Students().Where(s => s.Student.GraduationYear == workspace!.Active!.Catalog.GraduationYear).ToArray();
     private void SetStep(YearSetupStep step)
@@ -195,7 +219,10 @@ public sealed partial class TeacherWindow
         {
             if (workspace.Active!.Catalog.Offers.Count(o => o.Type == CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established) < 3)
                 throw new InvalidOperationException("Bitte mindestens drei Leistungsfachangebote auswählen.");
-            SetStep(YearSetupStep.Import);
+            if (workspace.Active.Step == YearSetupStep.Complete && CurrentStudents().Any())
+                ShowPage("start");
+            else
+                SetStep(YearSetupStep.Import);
         }); next.Name = "ConfirmSetupOffer"; panel.Children.Add(Primary(next));
         pageHost.Content = Scroll(panel); UpdateVisualNavigation();
     }
@@ -215,9 +242,10 @@ public sealed partial class TeacherWindow
         dashboardPanel.Children.Add(new TextBlock { Text = "Ihr aktueller Jahrgang", FontSize = 23, FontWeight = FontWeight.SemiBold, Foreground = Ink });
         string next; string action; string target;
         if (summary.Students == 0) { next = "Für diesen Jahrgang fehlen noch Schüler."; action = "Schülerliste importieren"; target = "import"; }
-        else if (summary.UnconfirmedMappings > 0) { next = $"{summary.UnconfirmedMappings} Kontozuordnungen müssen noch geprüft werden."; action = "Schülerdateien verteilen"; target = "profiles"; }
+        else if (summary.UnconfirmedMappings > 0) { next = $"{summary.UnconfirmedMappings} Ordnerzuordnungen müssen noch geprüft werden."; action = "Schülerdateien verteilen"; target = "profiles"; }
         else if (summary.ProfilesToIssue > 0) { next = $"Für {summary.ProfilesToIssue} Personen fehlen aktuelle Profile."; action = "Schülerprofile bereitstellen"; target = "profiles"; }
         else if (summary.ProfilesToDeliver > 0) { next = $"{summary.ProfilesToDeliver} Profile sind noch zuzustellen oder erneut zu verteilen."; action = "Zustellung bearbeiten"; target = "profiles"; }
+        else if (collections.Length > 0) { next = $"Für {collections.Length} Personen liegen offene Wahlkonflikte zur Entscheidung vor."; action = "Konflikte prüfen"; target = "collection"; }
         else if (summary.Choices < summary.Students) { next = $"Für {summary.Students - summary.Choices} Personen wurde noch keine Kurswahl eingelesen."; action = "Kurswahlen einsammeln"; target = "collection"; }
         else { next = "Alle Personen haben einen eingelesenen Wahlstand. Prüfen Sie offene Fälle oder sammeln Sie neue Änderungen ein."; action = "Schülerbestand prüfen"; target = "people"; }
         var primary = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -249,7 +277,7 @@ public sealed partial class TeacherWindow
         managePanel.Children.Add(Button("Weiteren Abiturjahrgang einrichten", ShowNewYear));
         managePanel.Children.Add(Button("Fachangebot ansehen / für Schülerprogramm exportieren", () => { BuildCatalog(); visiblePage = "catalog"; pageHost.Content = catalogView; }));
         if (session is not null && !session.Overview().Any(s => s.Record.Student.GraduationYear == session.Catalog.GraduationYear && s.Active is not null))
-            managePanel.Children.Add(Button("Fachauswahl erneut bearbeiten", () => SetStep(YearSetupStep.Offer), "Öffnet die Einrichtung erneut. Schülerdaten bleiben erhalten. Bei bereits eingelesenen Wahlen ist diese Änderung gesperrt."));
+            managePanel.Children.Add(Button("Fachauswahl erneut bearbeiten", () => { ShowOfferSetup(); UpdateVisualNavigation(); UpdateWorkflowProgress(); }, "Öffnet die Fachauswahl erneut. Schülerdaten bleiben erhalten. Bei bereits eingelesenen Wahlen ist diese Änderung gesperrt."));
         pageHost.Content = manageView; UpdateVisualNavigation();
     }
     private void ShowSettings()
@@ -275,7 +303,6 @@ public sealed partial class TeacherWindow
             settingsPanel.Children.Add(Text("Bearbeiterkennung"));
             var editor = new TextBox { Text = active.Actor }; settingsPanel.Children.Add(editor);
             settingsPanel.Children.Add(Button("Bearbeiter speichern", () => { workspace.Update(active with { Actor = editor.Text?.Trim() ?? "" }); OpenActiveYear(); }));
-            settingsPanel.Children.Add(Button("Zertifikat und Profilsignierung einrichten", () => ShowPage("profiles")));
         }
         pageHost.Content = settingsView; UpdateVisualNavigation();
     }
@@ -285,13 +312,7 @@ public sealed partial class TeacherWindow
         var catalogPath = await Pick("Fachangebot des bestehenden Bestands", "Fachangebot (.json)", "*.json"); if (catalogPath is null) return;
         var catalog = JsonDocuments.ReadCatalog(await File.ReadAllBytesAsync(catalogPath));
         var databasePath = await Pick("Bestehende lokale Verwaltungsdatei auswählen", "Lehrerbestand (.db)", "*.db"); if (databasePath is null) return;
-        workspace.Attach(catalog, databasePath, "demo-beratung"); OpenActiveYear();
-    }
-    private void SaveSigningSettings()
-    {
-        if (workspace?.Active is not { } active) throw new InvalidOperationException("Jahrgang fehlt.");
-        workspace.Update(active with { CertificateThumbprint = thumbprint.Text?.Trim() ?? "", KeyId = keyId.Text?.Trim() ?? "" });
-        status.Text = "Signiereinstellungen für diesen Jahrgang gespeichert. Der private Schlüssel bleibt im Zertifikatspeicher.";
+        workspace.Attach(catalog, databasePath, workspace.Active?.Actor ?? "demo-beratung"); OpenActiveYear();
     }
     private async Task ExportCurrentCatalog()
     {

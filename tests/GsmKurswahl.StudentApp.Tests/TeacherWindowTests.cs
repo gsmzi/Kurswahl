@@ -39,8 +39,12 @@ public class TeacherWindowTests
             Assert.Equal("Aktueller Schritt", State(0)); Assert.Equal("Noch offen", State(2)); Capture("teacher-offer");
             Click("Fachangebot bestätigen · weiter zur Schülerliste");
             Assert.Equal("Erledigt", State(0)); Assert.Equal("Aktueller Schritt", State(1)); Capture("teacher-import");
-            Click("Schülerliste übernommen · weiter");
+            window.JumpToWorkflowStep(2); window.UpdateLayout();
             Assert.Equal("Erledigt", State(1)); Assert.Equal("Aktueller Schritt", State(2)); Capture("teacher-distribution");
+            window.JumpToWorkflowStep(0); window.UpdateLayout();
+            Assert.Equal("Aktueller Schritt", State(0));
+            window.JumpToWorkflowStep(2); window.UpdateLayout();
+            Assert.Equal("Aktueller Schritt", State(2));
             Click("Später verteilen · Übersicht öffnen");
             Assert.Equal("Zustellungen offen", State(2)); Capture("teacher-dashboard");
             window.Width = 900; window.Height = 600; window.UpdateLayout(); Capture("teacher-compact");
@@ -161,7 +165,7 @@ public class TeacherWindowTests
         {
             setup.Show(); setup.UpdateLayout();
             void Click(string label) => setup.GetLogicalDescendants().OfType<Button>().Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Click("Schülerliste übernommen · weiter");
+            setup.JumpToWorkflowStep(2); setup.UpdateLayout();
             Assert.Equal(YearSetupStep.Mapping, new TeacherWorkspace(root).Active!.Step);
             Click("Später verteilen · Übersicht öffnen");
             Assert.Equal(YearSetupStep.Complete, new TeacherWorkspace(root).Active!.Step);
@@ -199,5 +203,79 @@ public class TeacherWindowTests
             picker.Clear(); Assert.Empty(picker.Read());
         }
         finally { window.Close(); }
+    }
+    [AvaloniaFact]
+    public void StudentDetailsAllowPrerequisiteEditingAndPreserveRelativeHomeDirectory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-edit-student-" + Guid.NewGuid());
+        var workspace = new TeacherWorkspace(root); workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
+        workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
+        using (var db = workspace.OpenActive())
+            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+        var window = new TeacherWindow(root);
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            void Click(string label)
+            {
+                window.GetLogicalDescendants().OfType<Button>().Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+            }
+            Click("Schülerbestand");
+            Click("Öffnen");
+            var userBox = window.GetLogicalDescendants().OfType<TextBox>().Single(t => t.Name == "StudentUsername");
+            userBox.Text = "DEMO\\test2";
+            Click("Zuordnung speichern");
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var store = (IAdministrationStore)typeof(TeacherWindow).GetField("store", flags)!.GetValue(window)!;
+            var afterMapping = store.Students().Single();
+            Assert.Equal("10a/Eins.Demo", afterMapping.HomeDirectory);
+            Assert.Equal("DEMO\\test2", afterMapping.WindowsUsername);
+            var impBox = window.GetLogicalDescendants().OfType<ComboBox>().Single(c => c.Name == "PrereqImp");
+            impBox.SelectedItem = Knowledge.Yes;
+            var departureBox = window.GetLogicalDescendants().OfType<ComboBox>().Single(c => c.Name == "StudentDeparture");
+            departureBox.SelectedItem = DepartureStatus.ExpectedDeparture;
+            var sportBox = window.GetLogicalDescendants().OfType<TextBox>().Single(t => t.Name == "PrereqSportSemesters");
+            sportBox.Text = "2,1";
+            var langBox = window.GetLogicalDescendants().OfType<TextBox>().Single(t => t.Name == "PrereqLanguages");
+            langBox.Text = "E, F";
+            window.GetLogicalDescendants().OfType<Button>().Single(b => b.Name == "SavePrerequisites").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
+            var updated = store.Students().Single();
+            Assert.Equal(3, updated.Version);
+            Assert.Equal(Knowledge.Yes, updated.Student.Prerequisites.InformaticsImp);
+            Assert.Equal(DepartureStatus.ExpectedDeparture, updated.Student.Departure);
+            Assert.Equal([1, 2], updated.Student.Prerequisites.SportExemptSemesters!.Value.ToArray());
+            Assert.Equal(["E", "F"], updated.Student.Prerequisites.ContinuedLanguages.ToArray());
+        }
+        finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+    [AvaloniaFact]
+    public void SimpleDistributionDeliversProfilesWithoutCertificateOrSid()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-distribute-ui-" + Guid.NewGuid());
+        var targetFolder = Path.Combine(root, "homes", "10a", "Eins.Demo");
+        Directory.CreateDirectory(targetFolder);
+        var workspace = new TeacherWorkspace(root); workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
+        workspace.Update(workspace.Active! with { Step = YearSetupStep.Mapping });
+        using (var db = workspace.OpenActive())
+            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes }), "", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+        var window = new TeacherWindow(root);
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            window.GetLogicalDescendants().OfType<TextBox>().Single(t => t.Name == "DistributionRoot").Text = Path.Combine(root, "homes");
+            void Click(string label)
+            {
+                window.GetLogicalDescendants().OfType<Button>().Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+            }
+            Click("Ziele prüfen und gemeinsame Verteilung vorbereiten");
+            Click("1 Zuordnungen bestätigen und Schülerdateien verteilen");
+            Assert.True(File.Exists(Path.Combine(targetFolder, "profil.json")));
+            Assert.False(File.Exists(Path.Combine(targetFolder, "profil.sig")));
+            Assert.Equal(YearSetupStep.Complete, new TeacherWorkspace(root).Active!.Step);
+        }
+        finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 }

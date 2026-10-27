@@ -15,12 +15,11 @@ public static class TeacherDashboardBuilder
         foreach (var state in states.Where(s => s.Record.MappingConfirmed))
         {
             var r = state.Record; var profile = store.LatestProfile(r.Student.ExternalStudentId)?.Profile;
-            if (profile is null || profile.WindowsUsername != r.WindowsUsername || profile.AccountId != r.AccountId
-                || profile.GraduationYear != r.Student.GraduationYear
+            if (profile is null || profile.GraduationYear != r.Student.GraduationYear
                 || JsonSerializer.Serialize(profile.Prerequisites, DocumentJson.Options) != JsonSerializer.Serialize(r.Student.Prerequisites, DocumentJson.Options))
             { issue++; continue; }
             var last = logs.LastOrDefault(l => l.StudentId == r.Student.ExternalStudentId && l.ProfileRevision == profile.ProfileRevision);
-            if (last is not null && last.Status == "verteilt" && last.At >= r.ChangedAt) delivered++;
+            if (last is not null && last.Status == "verteilt" && last.At >= profile.IssuedAt) delivered++;
             else deliver++;
         }
         return new(states.Length, states.Count(s => !s.Record.MappingConfirmed), issue, deliver, delivered,

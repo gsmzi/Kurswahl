@@ -9,3 +9,12 @@ foreach ($pair in @(
     if (-not $valid) { throw "Schemafehler: $($pair[0])" }
     Write-Output "Schema OK: $($pair[0])"
 }
+foreach ($synthetic in @(
+    @('{"schemaVersion":1,"keyId":"demo-key-01","algorithm":"ECDSA-P256-SHA256-P1363","signature":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="}', 'schemas/profile-signature.v1.schema.json'),
+    @('{"schemaVersion":1,"directory":"C:\\Demo\\Lehrerverwaltung"}', 'schemas/teacher-location.v1.schema.json'),
+    @('{"schemaVersion":1,"activeYear":null,"years":[]}', 'schemas/teacher-workspace.v1.schema.json')
+)) {
+    $valid = $synthetic[0] | Test-Json -SchemaFile (Join-Path $root $synthetic[1])
+    if (-not $valid) { throw "Schemafehler: $($synthetic[1])" }
+    Write-Output "Schema OK: $($synthetic[1])"
+}
