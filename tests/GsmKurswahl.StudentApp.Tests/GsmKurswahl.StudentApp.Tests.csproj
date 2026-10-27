@@ -8,4 +8,7 @@
     <ProjectReference Include="../../src/GsmKurswahl.StudentApp/GsmKurswahl.StudentApp.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\GsmKurswahl.TeacherApp\GsmKurswahl.TeacherApp.csproj" />
+  </ItemGroup>
 </Project>

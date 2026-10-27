@@ -1,16 +1,16 @@
 # GSM-Kurswahl
 
-Deutschsprachige Avalonia-Desktopanwendungen für die schulinterne Kurswahl. M1 ist abgenommen; aktueller Ausbau ist **M2**, erster Einsatzjahrgang **Abitur 2029**. Grundlage: [Anforderungen](docs/GSM_Kurswahl_Anforderungen_Codex.md).
+Deutschsprachige Avalonia-Desktopanwendungen für die schulinterne Kurswahl. M1 ist abgenommen; aktueller Ausbau ist **M3**, erster Einsatzjahrgang **Abitur 2029**. Grundlage: [Anforderungen](docs/GSM_Kurswahl_Anforderungen_Codex.md).
 
 ## Aktueller Stand
 
 - Schülerassistent mit Wahl, automatischem Zwischenspeichern, sicherem Laden und Konflikterkennung.
-- Standardangebot für 2029: vorhandene LF-fähige Pflichtfächer aktiviert; Religion, Ethik, Informatik und Italienisch nicht als LF. Psychologie bleibt Wahlfach, SIA Seminarkurs. Jahrgang, Status und einzelne Varianten sind im versionierten Katalog konfigurierbar. Die Oberfläche zur administrativen Auswahl vor der Verteilung folgt in M3.
+- Standardangebot für 2029: vorhandene LF-fähige Pflichtfächer aktiviert; Religion, Ethik, Informatik und Italienisch nicht als LF. Psychologie bleibt Wahlfach, SIA Seminarkurs. Jahrgang, Status und einzelne Varianten sind im versionierten Katalog konfigurierbar. Die administrative Jahrgangs-/LF-Auswahl vor der Ausgabe steht im Lehrerprogramm unter „Angebot vorbereiten“.
 - Schülerseitige Prüfung individueller signierter Profile: ECDSA P-256/SHA-256, Betriebssystemkonto/SID, Jahrgang und Schüler-ID. Unbekanntes bleibt unbekannt. Details: [Profilvertrag und Betrieb](docs/PROFILE.md).
 - Belegungsprüfung mit stabilen Regel-IDs, Pflichtfächern, LF/BF-Zählung, Sprach-/NW-Alternativen, persönlichen Voraussetzungen, GK/GEO/Wirtschaft und Sportersatz. Mögliche mündliche Kombinationen aus den belegten Kursen einschließlich vorläufiger Mindestanrechnung.
 - Direkter PDF-Kontrollbogen mit Wahl, Halbjahresstunden, Profilrevision, Prüfungsoptionen und allen offenen Punkten. Offline erzeugt; ohne Browser oder Druckfunktion.
 
-**Keine verbindliche Freigabe:** Der Rechtsstand für Abitur 2029, interne KOE-Sonderfälle und administrative Entscheidungen sind noch abzugleichen. Auch eine strukturell vollständige Wahl bleibt `needs_review`; eindeutig fehlende Belegungen sind `invalid`. Es gibt keine verbindliche Abgabe. Der bisherige Sicherheitsrahmen beschränkt den lauffähigen Stand weiterhin auf synthetische demo-IDs und Demo-Kataloge. Keine Echtdaten verwenden. Signierung, Verteilung und Lehrerstammdatenverwaltung folgen in M3.
+**Keine verbindliche Freigabe:** Der Rechtsstand für Abitur 2029, interne KOE-Sonderfälle und administrative Entscheidungen sind noch abzugleichen. Auch eine strukturell vollständige Wahl bleibt `needs_review`; eindeutig fehlende Belegungen sind `invalid`. Es gibt keine verbindliche Abgabe. Der bisherige Sicherheitsrahmen beschränkt den lauffähigen Stand weiterhin auf synthetische demo-IDs und Demo-Kataloge. Keine Echtdaten verwenden. Die technische M3-Lehrerverwaltung ist implementiert; Bedienung und Betriebsgrenzen: [Lehrerverwaltung](docs/LEHRERVERWALTUNG.md).
 
 ## Architektur
 
@@ -22,9 +22,10 @@ Deutschsprachige Avalonia-Desktopanwendungen für die schulinterne Kurswahl. M1 
 | ImportExport | PDF-Kontrollbogen und Importvorschauvertrag; nur Domain |
 | Application | UI-unabhängige Schülerlogik auf Domain/Rules |
 | StudentApp | Avalonia-Schüleroberfläche, Zusammensetzung der Komponenten |
-| TeacherApp | Startbares Grundgerüst; Verwaltung folgt in M3 |
+| AdministrationStorage | Nur lehrerseitig: SQLite, append-only Historie, Signierung und Verteilung; nur Domain |
+| TeacherApp | Importvorschau CSV/XLSX, Stammdaten, Konto-/Home-Zuordnung, Profile, Einsammeln, Bearbeitung, Historie, Filter, Nachwahl und Angebotsvorbereitung |
 
-Keine Rechtsregeln in UI oder Exportadapter. Planung, Schülerwahl und spätere Verwaltungsrevisionen bleiben getrennt. Keine Onlinezugriffe durch die Desktopprogramme.
+Keine Rechtsregeln in UI oder Exportadapter. Planung, Schülerwahl und Verwaltungsrevisionen bleiben getrennt. Keine Onlinezugriffe durch die Desktopprogramme.
 
 ## Bauen und testen
 
@@ -56,7 +57,7 @@ Tatsächliche Ergebnisse und fehlgeschlagene Zwischenläufe: [Testprotokoll](doc
 4. Pflichtbereiche beantworten, weitere Kurse ergänzen, Halbjahresplan rechts kontrollieren. Eine Fremdsprache und eine Naturwissenschaft sind Pflicht. Anschließend erscheint immer die gleichwertige Alternative zweite Fremdsprache oder zweite Naturwissenschaft; LF zählen mit. Englisch, Französisch und Latein sind reguläre Angebote; Italienisch erfordert eine bestätigte geeignete Sprachlaufbahn. INF ersetzt nie die erste Naturwissenschaft. Bekannte Sportbefreiungen werden bei automatischen Pflichten berücksichtigt; vorhandene Kurse bleiben bei Änderungen erhalten.
 5. Im Überblick Fehler und Klärungsfälle lesen, Prüfungsoptionen ansehen und **Kontrollbogen als PDF exportieren** wählen. Der Export enthält den aktuellen, gegebenenfalls noch ungespeicherten Entwurf.
 
-Autosave nach 1,5 Sekunden ohne Änderung ist abschaltbar. Laden und Schließen schützen ungespeicherte Änderungen durch Rückfrage. LF-/Prüfungswechsel löschen zusätzliche Kurse nicht automatisch. Eine neue Profilrevision wird beim nächsten Programmstart eingelesen und bewertet die erhaltene Wahl neu. Der Offlineclient kann veraltete, noch gültig signierte Profile nicht zuverlässig erkennen; maßgeblich bleibt später der aktuelle Lehrerbestand.
+Autosave nach 1,5 Sekunden ohne Änderung ist abschaltbar. Laden und Schließen schützen ungespeicherte Änderungen durch Rückfrage. LF-/Prüfungswechsel löschen zusätzliche Kurse nicht automatisch. Eine neue Profilrevision wird beim nächsten Programmstart eingelesen und bewertet die erhaltene Wahl neu. Der Offlineclient kann veraltete, noch gültig signierte Profile nicht zuverlässig erkennen; maßgeblich bleibt der aktuelle Lehrerbestand.
 
 ## Konfiguration und Dateiversionen
 
@@ -82,4 +83,4 @@ dotnet publish src/GsmKurswahl.TeacherApp -c Release -r win-x64 --self-contained
 
 Den gesamten jeweiligen Ausgabeordner verteilen. Der zuvor versuchte selbstenthaltende M1-Publish scheiterte an fehlenden Runtimepaketen; ein M2-Standalone-Paket wird mit diesem Entwicklungsstand nicht als getestet behauptet. Frameworkabhängiger Publish ist mit `--self-contained false` ohne Runtime-ID möglich und benötigt .NET 10 auf dem Zielgerät. Keine automatische Verteilung.
 
-M3: Jahrgang/LF-Angebote administrativ auswählen, Klasse-10-Import, Profilsignierung/-verteilung, verbindlicher geschützter Lehrerbestand und Historie. M4: Planungen und Streichungen. M5: ASV nach Muster, Netzpilot und endgültiges Release. Fachliche Grenzen und Entscheidungen: [Offene Punkte](docs/OFFENE_PUNKTE.md), [Regel-/Quellenstand](docs/RECHTSQUELLEN.md), [Entwicklungsanweisungen](AGENTS.md).
+M3 technisch umgesetzt: Jahrgang/LF-Angebote vor Ausgabe konfigurieren, Klasse-10-Import, Profilsignierung/-verteilung, separater SQLite-Lehrerbestand und Historie. Native Schulnetz-/Zertifikatsprüfung und fachliche Freigabe bleiben offen. Einstieg: [M3-Bedienung und Betrieb](docs/LEHRERVERWALTUNG.md), synthetisches Importsample `samples/klasse10-demo.csv`. M4: Planungen und Streichungen. M5: ASV nach Muster, Netzpilot und endgültiges Release. Fachliche Grenzen und Entscheidungen: [Offene Punkte](docs/OFFENE_PUNKTE.md), [Regel-/Quellenstand](docs/RECHTSQUELLEN.md), [Entwicklungsanweisungen](AGENTS.md).

@@ -6,22 +6,7 @@ namespace GsmKurswahl.Storage;
 
 public static class JsonDocuments
 {
-    public static JsonSerializerOptions Options { get; } = CreateOptions();
-    private static JsonSerializerOptions CreateOptions()
-    {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-            RespectRequiredConstructorParameters = true,
-            RespectNullableAnnotations = true,
-            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-            MaxDepth = 32
-        };
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false));
-        options.MakeReadOnly(populateMissingResolver: true);
-        return options;
-    }
+    public static JsonSerializerOptions Options => DocumentJson.Options;
 
     public static CourseChoice ReadChoice(byte[] bytes)
     {

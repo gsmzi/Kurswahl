@@ -6,4 +6,11 @@ TestResults/
 *.user
 *.tmp
 *.lock
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.pfx
+*.p12
+*.key
 docs/Kursstufenorganisationserlasse*KOE*.pdf

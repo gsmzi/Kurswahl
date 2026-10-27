@@ -206,3 +206,37 @@ Paket-Audit `dotnet list GSM-Kurswahl.sln package --vulnerable --include-transit
 - Nachtrag (Tooltips für `klären`- und `Fehler`-Badges im Plan):
   - `PlanRow` um `IssueText` ergänzt; `MainWindow.BuildPlan` setzt den vollständigen Regel- und Abhilfetext (`Rule.Id: Explanation\nRemedy`) als Tooltip sowohl auf das `klären`-/`Fehler`-Badge als auch auf die Planzeile bzw. den Sprung-Button.
   - Release-Build (**0 Warnungen, 0 Fehler**), gesamte Testsuite (**155/155 Tests bestanden**, inkl. UI-Prüfung auf den Tooltip in `WindowTests`) und `git diff --check` erfolgreich.
+
+## M3 – erster integrierter Entwicklungsschritt (26.10.2026)
+
+- SQLite-Bestand, versionierte Stammdaten, append-only Wahlhistorie, Importvorschau CSV/XLSX, Signierung/Verteilung und Lehreroberfläche implementiert.
+- Erstes `dotnet add ... Microsoft.Data.Sqlite --version 10.0.0` in Sandbox: Zugriff auf Benutzer-NuGet.Config verweigert. Mit erweitertem Zugriff Paketauflösung möglich, aber Restore wegen NU1903 für SQLitePCLRaw.lib.e_sqlite3 2.1.11 fehlgeschlagen (GHSA-2m69-gcr7-jv3q). Auf Microsoft.Data.Sqlite 10.0.14 / transitive SQLitePCLRaw 2.1.13 aktualisiert; Restore erfolgreich. Keine Audit-Unterdrückung.
+- Erster Release-Build: CS8602 in TeacherWindow, nullable Importherkunft korrigiert. Zweiter Release-Build: 0 Warnungen, 0 Fehler.
+- Gesamte Testsuite mit lokal freigegebenem Testhost: 165 bestanden, 0 fehlgeschlagen, 0 übersprungen (Domain 8, Rules 57, Storage 50, ImportExport 6, Application 36, UI 8). Artefakte unter artifacts/test-results/m3-first.
+- Neue Tests: Einzelwriter-Sperre, unbekannte/defekte DB, stale Importvorschau, Lehreränderung/Altdatei, append-only Wiederherstellung, Vorbildungskorrektur, Signatur-Roundtrip/Profilrevision, beschädigtes Profil, 100 Einzelprofile mit genau einem gesperrten Ziel (99 erfolgreich), unveränderte Wahldateien, CSV-Mapping/Dubletten/unbekannte Angaben, XLSX/Formelablehnung sowie startende Lehreroberfläche.
+- Anschließende Architekturprüfung: administrative Signierung/SQLite werden in ein eigenes, nur vom Lehrerprogramm verwendetes Assembly verlegt; Abschlussprüfung folgt.
+
+## M3 – Architektur und Angebotsvorbereitung (27.10.2026)
+
+- AdministrationStorage referenziert ausschließlich Domain; StudentApp hat weder diese Projektreferenz noch SQLite im neu ausgewerteten Lockgraph. Gemeinsamer JSON-Vertrag ohne Datei-/UI-Zugriff in Domain. Zertifikat bleibt ausschließlich administrativ; öffentlicher Schlüsselexport ergänzt.
+- Zwischen-Build meldete CS0407 bei SelectMany mit ImmutableArray-Methodengruppe in CatalogConfiguration. Durch expliziten Lambdaausdruck korrigiert. Anschließender Release-Build: 0 Warnungen, 0 Fehler.
+- Zweiter vollständiger Testlauf: **167 bestanden, 0 fehlgeschlagen, 0 übersprungen** (Domain 8, Rules 57, Storage 51, ImportExport 6, Application 37, UI 8), artifacts/test-results/m3-second. Neu: Reimport erhält manuelle Stammdatenkorrekturen/Wahlhistorie und Angebotsvorbereitung verändert den Ursprungskatalog nicht.
+- Review-Nacharbeiten: kanonische Home-Pfade, stabile interne IDs, unbekannte Stammdatenschemata abweisen, Nachwahl-Zeitstempel, striktes CSV-Quoting, begrenztes Wahl-Einsammeln über bestehenden JsonChoiceStore, offene Vorschauen beim Bestandswechsel verwerfen. Demo-Importsample mit Regressionstest ergänzt. Erneuter Release-Build: 0 Warnungen, 0 Fehler. Abschlusslauf folgt.
+
+- Erster M3-Abschlusslauf am 27.10.2026: Locked-Restore und Release-Build erfolgreich; 167/168 Tests bestanden. Neuer Demo-Sampletest fand eine verschobene CSV-Spalte (unknown stand in Religion statt Sport). Sample anhand aller 18 Spalten korrigiert. Skript brach vor Schemaprüfung ab; diese wird im Wiederholungslauf ausgeführt.
+
+## M3 – erfolgreicher Abschlusslauf (27.10.2026)
+
+- `pwsh -NoProfile -File scripts/Test.ps1 -LockedMode`: **erfolgreich**, Locked-Restore aller 14 Projekte, Release-Build **0 Warnungen / 0 Fehler**, gesamte Testsuite **168 bestanden / 0 fehlgeschlagen / 0 übersprungen**. Aufteilung: Domain 8, Rules 57, Storage 51, ImportExport 7, Application 37, UI 8. Die UI-Suite enthält den Avalonia-Headless-Smoke für Schüler- und Lehrerprogramm.
+- Alle drei JSON-Sample-Schemas erfolgreich geprüft. Das neue CSV-Importsample wird zusätzlich durch den Importtest geprüft.
+- `dotnet list GSM-Kurswahl.sln package --vulnerable --include-transitive --no-restore`: erfolgreich; laut NuGet.org für sämtliche 14 Projekte keine bekannten anfälligen Pakete.
+- `git diff --check`: erfolgreich (nur Git-Hinweise zur automatischen LF/CRLF-Konvertierung).
+- Keine privaten Schlüssel, lokalen Datenbanken oder echten Personendaten erstellt/eingecheckt. Synthetische Signiertests erzeugen Schlüssel nur im Arbeitsspeicher und löschen ihre temporären Dateien. Kein Deployment und keine Arbeit an M4/M5.
+- Nicht ausgeführt: realer Windows-Zertifikatsspeicher-/Schuldomänen-/SMB-Test, native DPI-/Screenreader-Abnahme, selbstenthaltender Release/Schulnetzpilot. Die UI-Smoke-Tests ersetzen diese Prüfungen nicht. Fachliche Freigabe 2029 und verbindliche Endwahl bleiben offen.
+
+## M3 – Dateiorientierung und verständliche Importe (27.10.2026)
+
+- Nutzerwunsch: Dateitypen, Importwege und technische Begriffe verständlicher machen. Neue Startseite „Start & Dateien“ erklärt Ablauf, Dateirollen, Testdateien und Einrichtungsdateien. Sichtbare Hinweise und aufklappbare Erklärungen je Arbeitsbereich; ergänzende Tooltips an Aktionen, Kontofeldern und Spaltenauswahl. Zertifikateinrichtung zusammengefasst im aufklappbaren Schul-IT-Bereich.
+- Technische Texteingabe für das Spaltenmapping durch deutsch beschriftete Auswahllisten ersetzt, Pflichtfelder markiert. Dateiwechsel verwirft alte Zuordnungen. Passende Filter und klarere Titel für Dateidialoge; Schülerlistenimport weist andere Endungen ausdrücklich ab. Fachregeln, Schemata und bestätigte Übernahmen unverändert; keine neuen Pakete.
+- Erster Release-Build erfolgreich: 0 Warnungen, 0 Fehler. Abschluss `scripts/Test.ps1 -LockedMode`: Restore, Release-Build (0 Warnungen/0 Fehler), **169/169 Tests bestanden**, keine übersprungen, alle drei JSON-Sample-Schemas erfolgreich. Aufteilung: Domain 8, Rules 57, Storage 51, ImportExport 7, Application 37, UI 9.
+- Avalonia-Headless-Smoke prüft die neue Startseite und alle sechs Reiter. Zusätzlicher UI-Test prüft Zuordnung tatsächlich ausgewählter Spalten, unbekannte optionale Felder, Tooltip und Zurücksetzen beim Dateiwechsel. `git diff --check` erfolgreich. Keine native Schulgeräte-/Screenreader-Abnahme behauptet.

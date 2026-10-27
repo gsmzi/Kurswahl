@@ -1,0 +1,3 @@
+studentId;name;class;year;username;accountId;home;italian;bridge;imp;bilingual;religion;sport;languages;religionPermission;religionExamPermission;permanentSport;departure
+demo-001;Demo Person Eins;10-demo;2029;DEMO\test1;;;nein;nein;ja;ja;ETH;keine;E,F;ja;ja;nein;aktiv
+demo-002;Demo Person Zwei;10-demo;2029;DEMO\test2;;;;;;;;unknown;;;;;voraussichtlich
