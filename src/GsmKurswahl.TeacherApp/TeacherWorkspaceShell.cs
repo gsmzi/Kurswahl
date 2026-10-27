@@ -72,7 +72,7 @@ public sealed partial class TeacherWindow
     {
         store?.Dispose(); store = null; session = null;
         distributionRoot.Text = ""; deliveryPreview.Children.Clear();
-        collections = []; collectionResults.Children.Clear(); detail.Children.Clear();
+        collections = []; conflictSelection.Clear(); dismissedConflicts.Clear(); conflict.IsChecked = false; collectionResults.Children.Clear(); detail.Children.Clear();
         importRows = []; importOrigin = null; table = null; mapping.Clear(); importResults.Children.Clear();
         var year = workspace?.Active;
         if (year is null) { ShowNewYear(); return; }
@@ -204,6 +204,8 @@ public sealed partial class TeacherWindow
                 try
                 {
                     var current = workspace.Active!;
+                    if (session!.Overview().Any(s => s.Record.Student.GraduationYear == current.Catalog.GraduationYear && s.Active is not null))
+                        throw new InvalidOperationException("Inzwischen liegen Kurswahlen vor. Änderungen nur über die Kursplanung mit Vorschau vornehmen.");
                     var enabled = current.Catalog.Offers.Where(o => o.Type == CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established).Select(o => o.Id).ToHashSet();
                     if (box.IsChecked == true) enabled.Add(offer.Id); else enabled.Remove(offer.Id);
                     var prepared = CatalogConfiguration.Prepare(current.Catalog, current.Catalog.GraduationYear, "demo-" + current.Catalog.GraduationYear + "-" + Guid.NewGuid().ToString("N")[..8], enabled);

@@ -86,7 +86,7 @@ public sealed partial class TeacherWindow : Window
         return files.FirstOrDefault()?.TryGetLocalPath();
     }
     private void Ready() { if (store is null || session is null) throw new InvalidOperationException("Bitte zuerst einen Jahrgang einrichten oder auswählen."); }
-    private void Refresh()
+    private void Refresh(bool preserveEditor = false)
     {
         if (session is null || store is null) return;
         roster.Children.Clear();
@@ -101,9 +101,12 @@ public sealed partial class TeacherWindow : Window
             var notes = string.Join(" · ", new[] { state.RequiresReselection ? "Nachwahl" : "", state.Record.Student.Departure == DepartureStatus.Active ? "" : state.Record.Student.Departure.ToString() }.Where(s => s.Length > 0));
             roster.Children.Add(TableLine(state.Record.Student.SyntheticDisplayName, state.Record.Student.ClassName, state.Validation?.Status.ToString() ?? "Ohne Wahl", notes, Button("Öffnen", () => ShowStudent(state))));
         }
-        profileTargets.ItemsSource = store.Students().Where(s => s.Student.GraduationYear == session.Catalog.GraduationYear).Select(s => new Target(s)).ToArray();
-        profileTargets.SelectAll();
-        if (personEditor.IsExpanded && selectedStudentId is not null && states.SingleOrDefault(s => s.Record.Student.ExternalStudentId == selectedStudentId) is { } current)
+        if (!preserveEditor)
+        {
+            profileTargets.ItemsSource = store.Students().Where(s => s.Student.GraduationYear == session.Catalog.GraduationYear).Select(s => new Target(s)).ToArray();
+            profileTargets.SelectAll();
+        }
+        if (!preserveEditor && personEditor.IsExpanded && selectedStudentId is not null && states.SingleOrDefault(s => s.Record.Student.ExternalStudentId == selectedStudentId) is { } current)
             ShowStudent(current);
     }
     private void ShowStudent(TeacherState state)
@@ -298,7 +301,7 @@ public sealed partial class TeacherWindow : Window
             {
                 var issued = store!.LatestProfile(target.Record.Student.ExternalStudentId);
                 if (issued is null) { reports.Add(target.Record.Student.ExternalStudentId + ": noch kein Profil erstellt"); continue; }
-                var entry = distribution.Distribute(target.Record, issued); reports.Add(entry.StudentId + ": " + entry.Status);
+                var entry = distribution.Distribute(target.Record, issued, session!.Catalog); reports.Add(entry.StudentId + ": " + entry.Status);
             }
             status.Text = string.Join(" · ", reports);
         }, "Kopiert profil.json in die bestätigten Wahlordner. Bei Zustellfehlern dieselbe Ausgabe erneut zustellen; vorhandene Kurswahlen werden nicht verändert."));

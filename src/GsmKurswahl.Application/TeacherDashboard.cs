@@ -19,7 +19,10 @@ public static class TeacherDashboardBuilder
                 || JsonSerializer.Serialize(profile.Prerequisites, DocumentJson.Options) != JsonSerializer.Serialize(r.Student.Prerequisites, DocumentJson.Options))
             { issue++; continue; }
             var last = logs.LastOrDefault(l => l.StudentId == r.Student.ExternalStudentId && l.ProfileRevision == profile.ProfileRevision);
-            if (last is not null && last.Status == "verteilt" && last.At >= profile.IssuedAt) delivered++;
+            var deliveredRecord = last is null ? null : store.StudentHistory(r.Student.ExternalStudentId).LastOrDefault(s => s.ChangedAt <= last.At);
+            if (last is not null && last.Status == "verteilt" && last.At >= profile.IssuedAt
+                && deliveredRecord is { MappingConfirmed: true }
+                && string.Equals(deliveredRecord.HomeDirectory, r.HomeDirectory, StringComparison.OrdinalIgnoreCase)) delivered++;
             else deliver++;
         }
         return new(states.Length, states.Count(s => !s.Record.MappingConfirmed), issue, deliver, delivered,

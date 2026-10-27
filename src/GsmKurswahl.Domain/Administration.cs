@@ -14,6 +14,7 @@ public sealed record IssuedProfile(StudentProfile Profile, byte[] ProfileBytes, 
 public interface IAdministrationStore : IDisposable
 {
     ImmutableArray<StudentRecord> Students();
+    ImmutableArray<StudentRecord> StudentHistory(string studentId);
     void SaveStudent(StudentRecord record, int? expectedVersion);
     ImmutableArray<ChoiceRevision> History(string studentId);
     void Append(ChoiceRevision revision, Guid? expectedActive);

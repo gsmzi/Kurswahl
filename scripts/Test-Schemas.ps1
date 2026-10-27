@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 foreach ($pair in @(
+    @('src/GsmKurswahl.StudentApp/appsettings.json', 'schemas/student-settings.v2.schema.json'),
     @('samples/schueler-demo.json', 'schemas/course-choice.v2.schema.json'),
     @('samples/fachangebot-demo.json', 'schemas/offer-catalog.v1.schema.json'),
     @('samples/profil-demo-unsigned.json', 'schemas/student-profile.v1.schema.json')

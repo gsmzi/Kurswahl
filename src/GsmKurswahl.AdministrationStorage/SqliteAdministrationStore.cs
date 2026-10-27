@@ -85,6 +85,7 @@ public sealed class SqliteAdministrationStore : IAdministrationStore
         if ((current is null or DBNull ? (int?)null : Convert.ToInt32(current)) != expectedVersion) throw new InvalidOperationException("Stammdaten wurden inzwischen geändert.");
         Execute("INSERT INTO students VALUES($p0,$p1,$p2)", record.Student.ExternalStudentId, record.Version, Json(record)); tx.Commit();
     }
+    public ImmutableArray<StudentRecord> StudentHistory(string studentId) => Read<StudentRecord>("SELECT body FROM students WHERE id=$p0 ORDER BY version", studentId);
     public ImmutableArray<ChoiceRevision> History(string studentId) => Read<ChoiceRevision>("SELECT body FROM revisions WHERE student=$p0 ORDER BY seq", studentId);
     public void Append(ChoiceRevision revision, Guid? expectedActive)
     {

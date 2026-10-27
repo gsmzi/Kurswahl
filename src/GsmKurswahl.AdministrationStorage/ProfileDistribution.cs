@@ -22,7 +22,7 @@ public sealed class ProfileDistribution(IAdministrationStore store)
         store.SaveProfile(issued);
         return issued;
     }
-    public DistributionEntry Distribute(StudentRecord record, IssuedProfile issued)
+    public DistributionEntry Distribute(StudentRecord record, IssuedProfile issued, OfferCatalog? catalog = null)
     {
         var status = "verteilt"; var detail = "Einzelprofil verteilt; Schülerwahlen unverändert.";
         try
@@ -50,6 +50,20 @@ public sealed class ProfileDistribution(IAdministrationStore store)
                 if (old.ProfileRevision == issued.Profile.ProfileRevision && !before.SequenceEqual(issued.ProfileBytes)) throw new InvalidDataException("Profil_abweichend");
             }
             Replace(path, issued.ProfileBytes, before);
+            if (catalog is not null)
+            {
+                ModelGuard.Catalog(catalog);
+                if (catalog.GraduationYear != record.Student.GraduationYear) throw new InvalidDataException("Profil_abweichend");
+                var catalogPath = Path.Combine(record.HomeDirectory, "fachangebot.json");
+                var oldCatalog = ReadExisting(catalogPath);
+                if (oldCatalog is not null)
+                {
+                    var parsed = JsonSerializer.Deserialize<OfferCatalog>(oldCatalog, DocumentJson.Options) ?? throw new JsonException();
+                    ModelGuard.Catalog(parsed);
+                    if (parsed.GraduationYear != catalog.GraduationYear) throw new InvalidDataException("Profil_abweichend");
+                }
+                Replace(catalogPath, JsonSerializer.SerializeToUtf8Bytes(catalog, DocumentJson.Options), oldCatalog);
+            }
         }
         catch (DirectoryNotFoundException) { status = "nicht_gefunden"; detail = "Bestätigtes Zielverzeichnis nicht erreichbar."; }
         catch (UnauthorizedAccessException) { status = "Zugriff_verweigert"; detail = "Keine Schreibberechtigung am Ziel."; }

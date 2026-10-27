@@ -9,6 +9,18 @@ public sealed class SignedProfileReader(ProfileTrust? trust = null, ICurrentIden
     private readonly ProfileTrust? configuredTrust = trust;
     private readonly ICurrentIdentityProvider? identityProvider = identity;
 
+    // Bootstrap an advisory identity from one explicitly selected personal directory, never from a shared roster.
+    public (string StudentId, ProfileContext Profile) ReadPersonal(string directory, int graduationYear)
+    {
+        var bytes = ReadBounded(Path.Combine(directory, "profil.json"));
+        RejectDuplicates(bytes);
+        var profile = JsonSerializer.Deserialize<StudentProfile>(bytes, JsonDocuments.Options) ?? throw new JsonException("Profil fehlt.");
+        if (!profile.StudentId.StartsWith("demo-", StringComparison.Ordinal)) throw new ArgumentException("Dieser Entwicklungsstand erlaubt nur synthetische demo-IDs.");
+        var context = Verify(bytes, profile.StudentId, graduationYear);
+        if (context.Status != ProfileStatus.Verified) throw new ArgumentException(context.Detail);
+        return (profile.StudentId, context);
+    }
+
     public ProfileContext Read(string directory, string studentId, int graduationYear)
     {
         try

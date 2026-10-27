@@ -135,7 +135,7 @@ public sealed partial class TeacherWindow
                     var latest = store.LatestProfile(current.Student.ExternalStudentId);
                     if (latest is null || latest.Profile.GraduationYear != current.Student.GraduationYear || System.Text.Json.JsonSerializer.Serialize(latest.Profile.Prerequisites, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(current.Student.Prerequisites, DocumentJson.Options))
                         latest = service.Issue(current);
-                    var result = service.Distribute(current, latest); if (result.Status == "verteilt") count++;
+                    var result = service.Distribute(current, latest, session!.Catalog); if (result.Status == "verteilt") count++;
                     reports.Add(current.Student.SyntheticDisplayName + ": " + result.Status);
                 }
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException) { reports.Add(record.Student.SyntheticDisplayName + ": " + ex.Message); }
@@ -148,11 +148,14 @@ public sealed partial class TeacherWindow
     }
     private void RenderCollectionStatus(int importedCount, IReadOnlyList<string> messages)
     {
+        static string Key(CollectionPreview p) => $"{p.Choice.StudentId}:{p.Origin.ContentHash}:{p.ExpectedActive}:{p.Student.Version}";
+        var selections = conflictSelection.ToDictionary(x => Key(x.Preview), x => x.Box.IsChecked == true);
+        if (collections.Any(p => !selections.ContainsKey(Key(p)))) conflict.IsChecked = false;
         conflictSelection.Clear(); collectionResults.Children.Clear();
         collectionResults.Children.Add(Text($"Automatisch eingelesen: {importedCount}. Offene Konflikte: {collections.Length}. Zuletzt geprüft: {DateTime.Now:t}"));
         foreach (var preview in collections)
         {
-            var box = new CheckBox { IsChecked = true };
+            var box = new CheckBox { IsChecked = selections.GetValueOrDefault(Key(preview), true) };
             conflictSelection.Add((box, preview));
             collectionResults.Children.Add(TableLine(preview.Student.Student.SyntheticDisplayName + " (" + preview.Choice.StudentId + ")", preview.Student.Student.ClassName, "Konflikt", preview.Conflict, box));
         }
@@ -190,7 +193,7 @@ public sealed partial class TeacherWindow
             collections = pending.ToImmutable();
             RenderCollectionStatus(count, messages);
             if (count > 0 || collections.Length > 0 || messages.Count > 0) status.Text = $"Automatische Sammlung: {count} neue Wahlen; {collections.Length + messages.Count} Hinweise unter Kurswahlen einsammeln.";
-            Refresh(); UpdateDashboard();
+            Refresh(preserveEditor: true); UpdateDashboard();
         }
         catch (Exception ex) { if (session == activeSession) status.Text = "Automatische Sammlung nicht abgeschlossen: " + ex.Message; }
         finally { collecting = false; }

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Schülerprogramm-Konfiguration v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "homeDirectory", "choiceDirectory", "choiceFileName", "catalogPath", "demoStudentId"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "homeDirectory": {"type": "string", "minLength": 1},
+    "choiceDirectory": {"type": "string"},
+    "choiceFileName": {"type": "string", "minLength": 6},
+    "catalogPath": {"type": "string", "minLength": 1},
+    "demoStudentId": {"const": ""}
+  }
+}
