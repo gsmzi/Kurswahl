@@ -115,6 +115,7 @@ public sealed partial class TeacherWindow
         visiblePage = "new"; heading.Text = "Willkommen in der Lehrerverwaltung"; RebuildNavigation();
         var panel = new StackPanel { Spacing = 16, MaxWidth = 900, HorizontalAlignment = HorizontalAlignment.Left };
         Intro(panel, "Abiturjahrgang einrichten", "Sie legen den Jahrgang einmal an. Danach öffnet das Programm automatisch den zuletzt aktiven Stand und zeigt die nächsten Aufgaben.");
+        panel.Children.Add(Button("Transportdatei öffnen …", ImportTransfer));
         panel.Children.Add(Text("Abiturjahrgang"));
         var year = new NumericUpDown { Name = "SetupYear", Value = 2029, Minimum = 2000, Maximum = 2200, FormatString = "0", Width = 180 };
         panel.Children.Add(year);
@@ -311,6 +312,7 @@ public sealed partial class TeacherWindow
             workspace = next; OpenActiveYear();
         }));
         settingsPanel.Children.Add(Text("Ein anderes Verzeichnis öffnet dessen Bestand oder beginnt dort eine neue Einrichtung. Vorhandene Daten werden nicht verschoben."));
+        settingsPanel.Children.Add(Button("Transportdatei öffnen …", ImportTransfer));
         settingsPanel.Children.Add(Button("Vorhandenen Lehrerbestand einmalig einbinden …", AttachExisting));
         if (workspace?.Active is { } active)
         {

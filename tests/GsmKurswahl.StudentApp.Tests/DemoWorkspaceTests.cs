@@ -39,6 +39,14 @@ public sealed class DemoWorkspaceTests
                 Assert.Contains(selections, s => s.OfferId == "GEO-BF" && s.Semesters.SequenceEqual(new[] { 3 }));
                 var snapshot = store.PlanningDocuments().First(); var analysis = CoursePlanning.Analyze(snapshot);
                 Assert.Equal(76, analysis.Relevant); Assert.Equal(68, CoursePlanning.Analyze(snapshot with { IncludeExpectedDepartures = false }).Relevant);
+                if (Environment.GetEnvironmentVariable("GSM_UI_SCREENSHOTS") is { Length: > 0 } pdfFolder)
+                {
+                    Directory.CreateDirectory(pdfFolder);
+                    File.WriteAllBytes(Path.Combine(pdfFolder, "wahlzahlen.pdf"), GsmKurswahl.ImportExport.PlanningPrint.Demand(2029, snapshot.Name, "Mit voraussichtlichen Abgängern", PlanningPresentation.DemandTable(snapshot)));
+                    var preview = CoursePlanning.PreviewCancellation(snapshot, ["BIO-LF-BILI"]);
+                    var change = preview.Changes.Where(c => !c.RemovedOffers.IsEmpty).OrderByDescending(c => c.Choice.Selections.Length).First();
+                    File.WriteAllBytes(Path.Combine(pdfFolder, "nachwahl.pdf"), GsmKurswahl.ImportExport.PlanningPrint.Reselection(states.Single(s => s.Record.Student.ExternalStudentId == change.StudentId).Record, change.Choice, preview.Catalog, change.RemovedOffers.ToArray()));
+                }
                 Assert.Equal(16, analysis.Combinations.Length); Assert.NotEmpty(analysis.Overlaps);
                 foreach (var id in new[] { "BIO-LF-BILI", "BIO-BF-BILI", "INF-BF", "PSY-WF", "SIA-SK", "F-LF", "L-LF" })
                     Assert.Contains(analysis.Demand, d => d.OfferId == id && d.All > 0);
@@ -90,6 +98,16 @@ public sealed class DemoWorkspaceTests
                 Assert.True(window.GetLogicalDescendants().OfType<TextBlock>().Any(t => t.Text?.StartsWith("67 planungsrelevant") == true), "Filter=" + Control<ComboBox>("PlanningIncludeDepartures").SelectedIndex + " / " + string.Join(" | ", window.GetLogicalDescendants().OfType<TextBlock>().Select(t => t.Text).Where(t => t?.Contains("planungsrelevant") == true)));
                 Control<ComboBox>("PlanningIncludeDepartures").SelectedIndex = 0;
                 Assert.Contains(window.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text?.StartsWith("75 planungsrelevant") == true);
+                Control<TabControl>("PlanningTabs").SelectedIndex = 2; window.UpdateLayout();
+                Control<CheckBox>("PlanningCancel_BIO_LF_BILI").IsChecked = true; Click("Streichung nur simulieren");
+                if (Environment.GetEnvironmentVariable("GSM_UI_SCREENSHOTS") is { Length: > 0 } impactScreenshots)
+                {
+                    using var frame = window.CaptureRenderedFrame(); Assert.NotNull(frame); frame.Save(Path.Combine(impactScreenshots, "streichung-vorschau.png"));
+                }
+                Click("Wahl"); Click("Schülerdateien verteilen");
+                Assert.Contains(window.GetLogicalDescendants().OfType<Button>(), b => b.Content?.ToString() == "Stand für pädagogisches Netz speichern …");
+                Click("Wahl"); Click("Kurswahlen einsammeln");
+                Assert.Contains(window.GetLogicalDescendants().OfType<Button>(), b => b.Content?.ToString() == "Stand für Verwaltungsnetz speichern …");
             }
             finally { window.Close(); }
         }

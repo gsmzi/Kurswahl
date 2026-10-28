@@ -19,3 +19,7 @@ foreach ($synthetic in @(
     if (-not $valid) { throw "Schemafehler: $($synthetic[1])" }
     Write-Output "Schema OK: $($synthetic[1])"
 }
+$catalog = Get-Content (Join-Path $root 'samples/fachangebot-demo.json') -Raw | ConvertFrom-Json
+$transfer = @{ schemaVersion = 1; createdAt = '2026-10-28T10:00:00Z'; year = @{ catalog = $catalog; databasePath = 'verwaltung.db'; step = 'complete'; actor = 'demo-transfer'; certificateThumbprint = ''; keyId = '' }; databaseHash = ('A' * 64) } | ConvertTo-Json -Depth 30
+if (-not ($transfer | Test-Json -SchemaFile (Join-Path $root 'schemas/teacher-transfer.v1.schema.json'))) { throw 'Transport-Schemafehler' }
+Write-Output 'Schema OK: schemas/teacher-transfer.v1.schema.json'

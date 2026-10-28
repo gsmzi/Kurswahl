@@ -3,6 +3,16 @@ namespace GsmKurswahl.Application.Tests;
 public class PlanningDisplayTests
 {
     [Fact]
+    public void FixedSchoolOffersAreHiddenButOptionalVariantsRemainCancellable()
+    {
+        foreach (var subject in new[] { "D", "M", "E" })
+        foreach (var type in new[] { GsmKurswahl.Domain.CourseType.Lf, GsmKurswahl.Domain.CourseType.Bf })
+            Assert.False(PlanningPresentation.CanCancel(GsmKurswahl.Tests.TestData.Offer(subject + "-" + type, subject, type)));
+        foreach (var subject in new[] { "G", "GK", "GEO", "SP", "ETH", "ER", "KR", "BK", "MU" })
+            Assert.False(PlanningPresentation.CanCancel(GsmKurswahl.Tests.TestData.Offer(subject + "-BF", subject, GsmKurswahl.Domain.CourseType.Bf)));
+        Assert.True(PlanningPresentation.CanCancel(GsmKurswahl.Tests.TestData.Offer("BIO-LF", "BIO", GsmKurswahl.Domain.CourseType.Lf)));
+    }
+    [Fact]
     public void CompressesOnlyIdenticalPeriodsAndKeepsIrregularSemestersVisible()
     {
         Assert.Equal("24", PlanningDisplay.PeriodCounts([24, 24, 24, 24]));

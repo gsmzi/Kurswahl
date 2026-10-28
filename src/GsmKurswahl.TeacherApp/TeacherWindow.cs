@@ -274,6 +274,7 @@ public sealed partial class TeacherWindow : Window
     private void BuildProfiles()
     {
         BuildSimpleDistribution();
+        profilePanel.Children.Insert(0, NetworkTransferHint(false));
         var advanced = new StackPanel { Spacing = 8 };
         Intro(advanced, "Persönliche Voraussetzungen einzeln bereitstellen", "Ein Profil sagt dem Schülerprogramm, welche Voraussetzungen bestätigt sind – etwa IMP oder bilingualer Bildungsgang. Das Lehrerprogramm legt die Datei profil.json im persönlichen Wahlordner ab.");
         advanced.Children.Add(Help("Wann brauche ich eine neue Ausgabe?", "Beim ersten Mal: Grundverzeichnis oben prüfen und gemeinsam verteilen (oder hier einzelne Personen auswählen).\n\nNach einer Vorbildungskorrektur: ein neues Profil erstellen und anschließend verteilen.\n\nNach einem Zustellfehler: nur die Verteilung wiederholen. Dafür braucht es keine neue Profilversion. Die gewählten Kurse stehen separat in aktuell.json und bleiben erhalten."));
@@ -311,8 +312,9 @@ public sealed partial class TeacherWindow : Window
     }
     private void BuildCollection()
     {
+        collectionPanel.Children.Add(NetworkTransferHint(true));
         Intro(collectionPanel, "Ausgefüllte Kurswahlen in den Lehrerbestand übernehmen", "Das Schülerprogramm speichert gewählte Fächer und Halbjahre als aktuell.json. Hier findet das Lehrerprogramm diese Dateien automatisch in den bestätigten persönlichen Wahlordnern. Jede Wahl wird gegen die aktuellen Lehrerstammdaten geprüft.");
-        collectionPanel.Children.Add(Help("Welche Datei muss ich auswählen?", "Hier ist keine einzelne Dateiauswahl nötig. Im Schülerbestand muss für jede Person der persönliche Wahlordner hinterlegt und bestätigt sein. In diesem Ordner wird aktuell.json gesucht.\n\nprofil.json und profil.sig enthalten Voraussetzungen und Echtheitssiegel, keine gewählten Kurse. Excel-/CSV-Schülerlisten gehören in den Schülerlisten-Import. Ein PDF-Kontrollbogen lässt sich nicht als Kurswahl einlesen."));
+        collectionPanel.Children.Add(Help("Welche Datei muss ich auswählen?", "Hier ist keine einzelne Dateiauswahl nötig. Im Schülerbestand muss für jede Person der persönliche Wahlordner hinterlegt und bestätigt sein. In diesem Ordner wird aktuell.json gesucht.\n\nprofil.json enthält persönliche Voraussetzungen, keine gewählten Kurse. Eine Zertifikatsdatei ist nicht erforderlich. Excel-/CSV-Schülerlisten gehören in den Schülerlisten-Import. Ein PDF-Kontrollbogen lässt sich nicht als Kurswahl einlesen."));
         collectionPanel.Children.Add(Text("Bei geöffneter App werden neue Wahlen alle 60 Sekunden automatisch eingelesen. Lehreränderungen und widersprüchliche Schülerrevisionen bleiben zur Entscheidung hier stehen."));
         collectionPanel.Children.Add(Button("Jetzt auf neue Kurswahlen prüfen", CollectAutomatically));
         collectionPanel.Children.Add(collectionResults); collectionPanel.Children.Add(conflict); collectionPanel.Children.Add(reason);

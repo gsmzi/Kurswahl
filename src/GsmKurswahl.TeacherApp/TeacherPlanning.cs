@@ -10,7 +10,7 @@ namespace GsmKurswahl.TeacherApp;
 public sealed partial class TeacherWindow
 {
     private bool planningIncludeExpected = true;
-    private int planningGroupSize = 24;
+    private PlanningDocument? renderedPlanningDocument;
     private void ShowPlanning()
     {
         Ready(); visiblePage = "planning";
@@ -32,31 +32,23 @@ public sealed partial class TeacherWindow
             Tab("Auswertung", analysisPanel), Tab("Gespeicherte Stände", historyPanel), Tab("Angebot ändern", changesPanel) }, SelectedIndex = 0 };
 
         var include = new ComboBox { ItemsSource = new[] { "Mit voraussichtlichen Abgängern", "Ohne voraussichtliche Abgänger" }, SelectedIndex = planningIncludeExpected ? 0 : 1, Name = "PlanningIncludeDepartures", MinWidth = 310 };
-        var size = new NumericUpDown { Minimum = 1, Maximum = 100, Value = planningGroupSize, FormatString = "0", Width = 110, Name = "PlanningGroupSize" };
-        ToolTip.SetTip(size, "Zielgröße für die aufgerundete Gruppenschätzung im Tooltip (keine Unterrichtsgruppen oder Schienen).");
         var name = new TextBox { Text = "Planung " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Watermark = "Name des Planungsstands", Name = "PlanningName" };
         parameters.Children.Add(Text("Name des zu speichernden Planungsstands")); parameters.Children.Add(name);
-        historyPanel.Children.Add(new Expander { Header = "Name und Gruppenschätzung", Content = parameters, IsExpanded = true });
+        historyPanel.Children.Add(new Expander { Header = "Name des Planungsstands", Content = parameters, IsExpanded = true });
         var report = new StackPanel { Spacing = 6, Name = "PlanningReport" };
-        PlanningDocument Current() => CoursePlanning.Capture(store!, session!.Catalog, Actor, name.Text ?? "", include.SelectedIndex == 0) with { TargetGroupSize = planningGroupSize };
+        PlanningDocument Current() => CoursePlanning.Capture(store!, session!.Catalog, Actor, name.Text ?? "", include.SelectedIndex == 0);
         PlanningDocument? displayed = null;
         var sourceLabel = new TextBlock { Text = "Aktueller Bestand", Foreground = Muted, VerticalAlignment = VerticalAlignment.Center, FontSize = 12 };
         var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
         toolbar.Children.Add(include);
-        toolbar.Children.Add(new TextBlock { Text = "Gruppengröße ≈", Foreground = Muted, VerticalAlignment = VerticalAlignment.Center, FontSize = 12 });
-        toolbar.Children.Add(size);
-        var currentButton = Button("Aktuell", () => { displayed = null; sourceLabel.Text = "Aktueller Bestand"; RenderPlanningReport(report, Current(), planningGroupSize); });
+        var currentButton = Button("Aktuell", () => { displayed = null; sourceLabel.Text = "Aktueller Bestand"; RenderPlanningReport(report, Current(), 24); });
         currentButton.Padding = new Thickness(10, 4); currentButton.MinHeight = 32; toolbar.Children.Add(currentButton); toolbar.Children.Add(sourceLabel);
+        toolbar.Children.Add(Button("Drucken …", () => PrintPlanning(renderedPlanningDocument ?? throw new InvalidOperationException("Zuerst Wahlzahlen anzeigen."))));
         panel.Children.Add(toolbar); panel.Children.Add(tabs);
         include.SelectionChanged += (_, _) => {
             planningIncludeExpected = include.SelectedIndex == 0;
             var document = (displayed ?? Current()) with { IncludeExpectedDepartures = planningIncludeExpected };
-            RenderPlanningReport(report, document, planningGroupSize);
-        };
-        size.ValueChanged += (_, _) => {
-            planningGroupSize = Math.Clamp((int)(size.Value ?? 24), 1, 100);
-            var document = (displayed ?? Current()) with { IncludeExpectedDepartures = include.SelectedIndex == 0, TargetGroupSize = planningGroupSize };
-            RenderPlanningReport(report, document, planningGroupSize);
+            RenderPlanningReport(report, document, 24);
         };
         historyPanel.Children.Add(Button("Planungsstand unveränderlich speichern", () => { planning.SavePlanningDocument(Current()); status.Text = "Planungsstand gespeichert. Aktive Wahlen unverändert."; ShowPlanning(); }));
         var savedItems = planning.PlanningDocuments().Select(d => new PlanningItem(d)).Reverse().ToArray();
@@ -70,7 +62,6 @@ public sealed partial class TeacherWindow
             var previous = (saved.SelectedItem as PlanningItem)?.Document ?? throw new ArgumentException("Planungsstand auswählen.");
             var second = (compareTarget.SelectedItem as PlanningItem)?.Document;
             displayed = previous; sourceLabel.Text = previous.Name;
-            planningGroupSize = previous.TargetGroupSize; size.Value = previous.TargetGroupSize;
             include.SelectedIndex = previous.IncludeExpectedDepartures ? 0 : 1;
             RenderPlanningReport(report, previous, previous.TargetGroupSize); tabs.SelectedIndex = 0;
             var targetDoc = (second ?? Current()) with { IncludeExpectedDepartures = previous.IncludeExpectedDepartures };
@@ -93,16 +84,12 @@ public sealed partial class TeacherWindow
             report.Children.Add(Text($"Personen: {before.All} → {after.All}; planungsrelevant: {before.Relevant} → {after.Relevant}. Gespeicherter Regelstand: {previous.RuleVersion}."));
         }));
         var offers = new WrapPanel { Orientation = Orientation.Horizontal };
-        var selection = session!.Catalog.Offers.Where(o => o.Status is OfferStatus.Offered or OfferStatus.Established)
-            .Select(o => (Offer: o, Box: new CheckBox { Content = $"{o.SubjectId} · {o.Type} · {o.Variant} · {o.Id}", Name = "PlanningCancel_" + o.Id.Replace('-', '_') })).ToArray();
+        var selection = session!.Catalog.Offers.Where(o => (o.Status is OfferStatus.Offered or OfferStatus.Established) && PlanningPresentation.CanCancel(o))
+            .OrderBy(o => o.SubjectId).ThenBy(o => o.Type)
+            .Select(o => (Offer: o, Box: new CheckBox { Content = $"{o.SubjectId} · {o.Type.ToString().ToUpperInvariant()}" + (o.Variant == CourseVariant.Bilingual ? " bilingual" : ""), Name = "PlanningCancel_" + o.Id.Replace('-', '_') })).ToArray();
         foreach (var row in selection) { row.Box.Width = 260; row.Box.Margin = new Thickness(0, 0, 8, 2); offers.Children.Add(row.Box); }
         changesPanel.Children.Add(new Expander { Header = "Angebotsvarianten zur Streichung wählen", Content = offers });
-        var impactFilterPanel = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4) };
-        var impactOutcomeFilter = new ComboBox { Name = "PlanningImpactOutcomeFilter", ItemsSource = new[] { "Alle Folgen", "nachwahl_nötig", "nach_streichung_weiterhin_gültig", "ungeprüfter_sonderfall", "ungültig" }, SelectedIndex = 0, MinWidth = 240, Margin = new Thickness(0, 0, 8, 4) };
-        var impactDepartureFilter = new ComboBox { Name = "PlanningImpactDepartureFilter", ItemsSource = new[] { "Alle Personen", "Nur aktive / planungsrelevante", "Nur Abgänger (abgänger)" }, SelectedIndex = 0, MinWidth = 220, Margin = new Thickness(0, 0, 8, 4) };
-        var impactAffectedOnly = new CheckBox { Name = "PlanningImpactOnlyAffected", Content = "Nur von Streichung betroffene Wahlen", IsChecked = true, Margin = new Thickness(0, 0, 8, 4) };
-        impactFilterPanel.Children.Add(impactOutcomeFilter); impactFilterPanel.Children.Add(impactDepartureFilter); impactFilterPanel.Children.Add(impactAffectedOnly);
-        var impact = new StackPanel { Spacing = 8, Name = "PlanningImpact" };
+        var impact = new StackPanel { Spacing = 2, Name = "PlanningImpact" };
         var reasonBox = new TextBox { Watermark = "Begründung der Entscheidung", Name = "PlanningReason" };
         var confirmation = new CheckBox { Content = "Diese Vorschau geprüft; Angebotsänderung und neue Verwaltungsrevisionen ausdrücklich übernehmen", Name = "PlanningConfirm" };
         CancellationPreview? preview = null;
@@ -114,66 +101,36 @@ public sealed partial class TeacherWindow
             foreach (var offer in preview.Catalog.Offers)
             {
                 var before = preview.Basis.Catalog.Offers.Single(o => o.Id == offer.Id);
-                if (before.Status != offer.Status) impact.Children.Add(Text($"{offer.Id}: {before.Status} → {offer.Status}"));
+                if (before.Status != offer.Status) impact.Children.Add(Text(offer.Status == OfferStatus.Cancelled ? "Entfällt: " + offer.Id : "Angebot geändert: " + offer.Id));
             }
-            var affectedCount = preview.Changes.Count(c => !c.RemovedOffers.IsEmpty);
-            var reselectionCount = preview.Changes.Count(c => !c.RemovedOffers.IsEmpty && c.Validation.Status == ReviewStatus.Invalid);
-            var stillValidCount = preview.Changes.Count(c => !c.RemovedOffers.IsEmpty && c.Validation.Status != ReviewStatus.Invalid);
-            impact.Children.Add(Text($"{affectedCount} betroffene Personen ({reselectionCount} nachwahl_nötig, {stillValidCount} nach_streichung_weiterhin_gültig). Vorschau basiert auf {preview.Basis.CreatedAt.LocalDateTime:g}."));
-            impact.Children.Add(impactFilterPanel);
-            var filtered = preview.Changes.Where(c =>
-            {
-                if (impactAffectedOnly.IsChecked == true && c.RemovedOffers.IsEmpty) return false;
-                var student = preview.Basis.Students.Single(s => s.Student.ExternalStudentId == c.StudentId);
-                var followUp = preview.Basis.FollowUps.Single(f => f.StudentId == c.StudentId);
-                var needsReselection = followUp.Required || c.Validation.Status == ReviewStatus.Invalid;
-                var stillValidAfterCancel = !c.RemovedOffers.IsEmpty && c.Validation.Status != ReviewStatus.Invalid;
-                var hasUncheckedSpecialCase = c.Validation.Messages.Any(m => m.Rule.Severity == ReviewStatus.NeedsReview && m.Rule.Id != "M2-RELEASE");
-                var outcomeMatch = impactOutcomeFilter.SelectedIndex switch
-                {
-                    1 => needsReselection,
-                    2 => stillValidAfterCancel,
-                    3 => hasUncheckedSpecialCase,
-                    4 => c.Validation.Status == ReviewStatus.Invalid,
-                    _ => true
-                };
-                var departureMatch = impactDepartureFilter.SelectedIndex switch
-                {
-                    1 => student.Student.Departure != DepartureStatus.ConfirmedDeparture && (planningIncludeExpected || student.Student.Departure == DepartureStatus.Active),
-                    2 => student.Student.Departure != DepartureStatus.Active,
-                    _ => true
-                };
-                return outcomeMatch && departureMatch;
-            }).ToArray();
-            foreach (var change in filtered)
+            var affected = preview.Changes.Where(c => !c.RemovedOffers.IsEmpty).ToArray();
+            impact.Children.Add(Text($"{affected.Length} betroffene Schüler · Vorschau, noch keine Änderung gespeichert"));
+            const string columns = "180,55,150,190,*";
+            impact.Children.Add(CompactLine(columns, [Text("Schüler"), Text("Klasse"), Text("Entfällt"), Text("Verbleibende LF"), Text("Verbleibende BF / Wahlfächer")]));
+            var rowIndex = 0;
+            foreach (var change in affected)
             {
                 var student = preview.Basis.Students.Single(s => s.Student.ExternalStudentId == change.StudentId);
-                var stateLabel = !change.RemovedOffers.IsEmpty && change.Validation.Status != ReviewStatus.Invalid
-                    ? $"{change.Validation.Status} (weiterhin strukturell gültig)"
-                    : change.Validation.Status == ReviewStatus.Invalid ? "Invalid (Nachwahl nötig)" : change.Validation.Status.ToString();
-                var noteLabel = change.RemovedOffers.IsEmpty ? "Unverändert" : "Entfällt: " + string.Join(", ", change.RemovedOffers);
-                impact.Children.Add(TableLine(student.Student.SyntheticDisplayName, student.Student.ClassName, stateLabel, noteLabel));
-                impact.Children.Add(Help("Prüfhinweise", string.Join("\n", change.Validation.Messages.Select(m => m.Rule.Id + ": " + m.Explanation))));
-                if (!change.ReplacementOffers.IsEmpty)
-                    impact.Children.Add(Help("Mögliche Angebote für eine Ersatzwahl (weiterhin vorläufig prüfen)", string.Join(", ", change.ReplacementOffers)));
+                var row = CompactLine(columns, [Text(student.Student.SyntheticDisplayName), Text(student.Student.ClassName),
+                    Text(string.Join(", ", change.RemovedOffers)), Text(PlanningPresentation.Choices(change.Choice, true)), Text(PlanningPresentation.Choices(change.Choice, false))]);
+                ToolTip.SetTip(row, string.Join("\n", change.Validation.Messages.Select(m => m.Explanation)));
+                impact.Children.Add(new Border { Child = row, Background = rowIndex++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White });
             }
-            impact.Children.Add(Text("Unbetroffene Wahlen erhalten nur die neue Angebotsversion; ursprüngliche Schülerwünsche bleiben in der Historie. Abgängerfilter wirkt ausschließlich auf Analysen, nicht auf die tatsächliche Streichung."));
             if (preview.Restoring) impact.Children.Add(Text("Die Wiederherstellung betrifft das Angebot. Entfernte Schülerwünsche werden nicht automatisch eingetragen; eine Wahl kann anschließend im Schülerbestand aus ihrer Historie wiederhergestellt werden."));
         }
-        impactOutcomeFilter.SelectionChanged += (_, _) => RenderImpact();
-        impactDepartureFilter.SelectionChanged += (_, _) => RenderImpact();
-        impactAffectedOnly.IsCheckedChanged += (_, _) => RenderImpact();
-        changesPanel.Children.Add(Button("Streichung nur simulieren", () =>
+        var simulationActions = new WrapPanel { Orientation = Orientation.Horizontal };
+        changesPanel.Children.Add(simulationActions);
+        simulationActions.Children.Add(Button("Streichung nur simulieren", () =>
         {
             preview = CoursePlanning.PreviewCancellation(Current(), selection.Where(s => s.Box.IsChecked == true).Select(s => s.Offer.Id));
             RenderImpact();
         }));
-        changesPanel.Children.Add(Button("Angebot des gespeicherten Stands als Wiederherstellung simulieren", () =>
+        historyPanel.Children.Add(Button("Angebot des gespeicherten Stands als Wiederherstellung simulieren", () =>
         {
             var previous = (saved.SelectedItem as PlanningItem)?.Document ?? throw new ArgumentException("Planungsstand auswählen.");
-            preview = CoursePlanning.PreviewOfferRestoration(Current(), previous); RenderImpact();
+            preview = CoursePlanning.PreviewOfferRestoration(Current(), previous); RenderImpact(); tabs.SelectedIndex = 2;
         }));
-        changesPanel.Children.Add(Button("Vorschau als separates Szenario speichern", () =>
+        simulationActions.Children.Add(Button("Vorschau als separates Szenario speichern", () =>
         {
             if (preview is null) throw new InvalidOperationException("Zuerst simulieren.");
             if (!planning.PlanningDocuments().Any(d => d.Id == preview.Basis.Id)) planning.SavePlanningDocument(preview.Basis);
@@ -186,20 +143,28 @@ public sealed partial class TeacherWindow
             if (preview is null) throw new InvalidOperationException("Zuerst eine Vorschau erstellen.");
             CoursePlanning.Confirm(planning, preview, Actor, reasonBox.Text ?? "", confirmation.IsChecked == true);
             session = new TeacherSession(store!, preview.Catalog, Actor);
+            var hasRemoved = preview.Changes.Any(c => !c.RemovedOffers.IsEmpty);
             var committedCatalog = preview.Catalog; preview = null; confirmation.IsChecked = false;
             workspace!.Update(workspace.Active! with { Catalog = committedCatalog });
             Refresh(preserveEditor: true); ShowPlanning();
-            status.Text = "Angebotsänderung mit Revisionen gespeichert. Aktuelles Fachangebot über Schülerdateien verteilen erneut ausgeben. Offene Nachwahlen im Schülerbestand bearbeiten.";
+            status.Text = "Angebotsänderung gespeichert. Aktuelles Fachangebot erneut verteilen.";
+            if (hasRemoved)
+            {
+                try { status.Text += " Nachwahlbögen erstellt: " + CreateReselectionSheets(); }
+                catch (Exception ex) { status.Text = "Streichung ist gespeichert. Nachwahlbögen konnten nicht vollständig erstellt werden: " + ex.Message + ". Über Nachwahlbögen erneut erstellen wiederholen."; }
+            }
         })));
+        changesPanel.Children.Add(Button("Nachwahlbögen erneut erstellen", () => { var folder = CreateReselectionSheets(); status.Text = "Nachwahlbögen: " + folder; }));
+        changesPanel.Children.Add(Button("Nachwahlbögen öffnen", OpenReselectionFolder));
         analysisPanel.Children.Add(report);
-        RenderPlanningReport(report, Current(), planningGroupSize);
+        RenderPlanningReport(report, Current(), 24);
         var wide = Width >= 1150;
         void UpdatePlanningWidth(object? sender, AvaloniaPropertyChangedEventArgs args)
         {
             if (args.Property != WidthProperty) return;
             if (wide == (Width >= 1150)) return;
             wide = Width >= 1150;
-            RenderPlanningReport(report, (displayed ?? Current()) with { IncludeExpectedDepartures = include.SelectedIndex == 0 }, planningGroupSize);
+            RenderPlanningReport(report, (displayed ?? Current()) with { IncludeExpectedDepartures = include.SelectedIndex == 0 }, 24);
         }
         PropertyChanged += UpdatePlanningWidth;
         panel.DetachedFromVisualTree += (_, _) => PropertyChanged -= UpdatePlanningWidth;
@@ -210,6 +175,7 @@ public sealed partial class TeacherWindow
     }
     private void RenderPlanningReport(StackPanel panel, PlanningDocument document, int groupSize)
     {
+        renderedPlanningDocument = document;
         panel.Children.Clear(); var analysis = CoursePlanning.Analyze(document, groupSize);
         panel.Children.Add(Text($"{analysis.Relevant} planungsrelevant aus {analysis.All} Personen · {analysis.ExpectedDepartures} voraussichtliche / {analysis.ConfirmedDepartures} bestätigte Abgänger · {analysis.WithoutChoice} ohne Wahl"));
         var legend = new TextBlock { Text = "Zahl = durchgehend · KS1/2 bei Abweichungen · 1:… bis 4:… = Halbjahre · bestätigte Abgänger ausgeschlossen", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = Muted };
@@ -243,7 +209,7 @@ public sealed partial class TeacherWindow
                     var text = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, Name = "Demand_" + offer.Id.Replace('-', '_'), FontSize = 13,
                         FontWeight = FontWeight.SemiBold, Foreground = scheduled.Any(n => n > 0) ? Accent : Muted };
                     ToolTip.SetTip(text, offer.Id + " · " + offer.Status + "\n" + string.Join("\n", analysis.Demand.Where(d => d.OfferId == offer.Id)
-                        .Select(d => $"HJ {d.Semester}: {d.Relevant} verbleibend / {d.All} insgesamt · Gruppen ≈ {d.EstimatedGroups}")));
+                        .Select(d => $"HJ {d.Semester}: {d.Relevant} verbleibend / {d.All} insgesamt")));
                     content.Children.Add(text);
                 }
                 return content;

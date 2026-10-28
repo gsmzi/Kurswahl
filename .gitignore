@@ -14,3 +14,4 @@ TestResults/
 *.p12
 *.key
 docs/Kursstufenorganisationserlasse*KOE*.pdf
+/output/pdf/
