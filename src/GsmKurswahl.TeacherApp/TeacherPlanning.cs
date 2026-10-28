@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using GsmKurswahl.Application;
 using GsmKurswahl.Domain;
+using GsmKurswahl.ImportExport;
 
 namespace GsmKurswahl.TeacherApp;
 
@@ -44,6 +45,14 @@ public sealed partial class TeacherWindow
         var currentButton = Button("Aktuell", () => { displayed = null; sourceLabel.Text = "Aktueller Bestand"; RenderPlanningReport(report, Current(), 24); });
         currentButton.Padding = new Thickness(10, 4); currentButton.MinHeight = 32; toolbar.Children.Add(currentButton); toolbar.Children.Add(sourceLabel);
         toolbar.Children.Add(Button("Drucken …", () => PrintPlanning(renderedPlanningDocument ?? throw new InvalidOperationException("Zuerst Wahlzahlen anzeigen."))));
+        ExportTable DemandExport()
+        {
+            var d = renderedPlanningDocument ?? throw new InvalidOperationException("Zuerst Wahlzahlen anzeigen.");
+            return new(["Stand", "Zeitpunkt", "Szenario", "Voraussichtliche Abgänger einbeziehen", "Fach", "LF", "LF bili", "BF", "BF bili", "Wahl"],
+                [.. PlanningPresentation.DemandTable(d).Select(r => new[] { d.Name, d.CreatedAt.ToString("O"), d.IsScenario.ToString(), d.IncludeExpectedDepartures.ToString() }.Concat(r).ToArray())]);
+        }
+        analysisPanel.Children.Add(Button("Angezeigte Wahlzahlen als CSV …", () => ExportTableFile(DemandExport(), false, "Wahlzahlen")));
+        analysisPanel.Children.Add(Button("Angezeigte Wahlzahlen als XLSX …", () => ExportTableFile(DemandExport(), true, "Wahlzahlen")));
         panel.Children.Add(toolbar); panel.Children.Add(tabs);
         include.SelectionChanged += (_, _) => {
             planningIncludeExpected = include.SelectedIndex == 0;

@@ -32,7 +32,7 @@ public sealed partial class TeacherWindow
     public TeacherWindow(string? workspaceRoot = null)
     {
         explicitWorkspaceRoot = workspaceRoot;
-        Title = "GSM-Kurswahl | Lehrerverwaltung · M4"; Width = 1400; Height = 900; MinWidth = 900; MinHeight = 600;
+        Title = "GSM-Kurswahl | Lehrerverwaltung · M5"; Width = 1400; Height = 900; MinWidth = 900; MinHeight = 600;
         BuildVisualShell();
         var people = new DockPanel();
         var left = new StackPanel { Spacing = 8 }; left.Children.Add(filter); left.Children.Add(followupFilter); left.Children.Add(statusFilter); left.Children.Add(roster);
@@ -103,6 +103,7 @@ public sealed partial class TeacherWindow
             navigation.Children.Add(Button("Wahl", ShowElection));
             navigation.Children.Add(Button("Wahlergebnisse", ShowResults));
             navigation.Children.Add(Button("Kursplanung", ShowPlanning));
+            navigation.Children.Add(Button("Abgleich / Abschluss", ShowReconciliation));
         }
         else
             navigation.Children.Add(Button("Zur Einrichtung", () => { if (store is null) LoadWorkspace(); else ShowCurrentStep(); }));

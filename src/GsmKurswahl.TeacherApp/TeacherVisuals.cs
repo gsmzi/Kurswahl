@@ -71,6 +71,7 @@ public sealed partial class TeacherWindow
                 "Übersicht" => visiblePage == "start", "Wahl" => visiblePage is "wahl" or "offer" or "import" or "profiles" or "collection" or "people",
                 "Wahlergebnisse" => visiblePage == "results",
                 "Kursplanung" => visiblePage == "planning",
+                "Abgleich / Abschluss" => visiblePage == "asv",
                 "Jahrgang verwalten" => visiblePage is "manage" or "catalog", "Einstellungen" => visiblePage == "settings",
                 "Hilfe" => visiblePage == "help", "Zur Einrichtung" => visiblePage is "new" or "offer" or "import" or "profiles", _ => false
             };

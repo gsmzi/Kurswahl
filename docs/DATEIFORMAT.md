@@ -45,3 +45,9 @@ Beide Dateien werden über temporäre Dateien im jeweiligen Zielverzeichnis, Flu
 ### Vereinfachter Import/Assistent
 
 Keine Änderung der JSON-Strukturen oder Schema-Versionen. Neue Jahrgänge starten weiterhin bei `offer`, danach `import` und `mapping` (gemeinsame Verteilung). Bereits gespeichertes `review` öffnet ebenfalls die Verteilung; bestehende Daten werden nicht migriert. Der Tabellenadapter akzeptiert zusätzlich `firstName`, `lastName` und `folder`. Vor Bestätigung kann das bestehende Home-Feld einen relativen Pfad `Klasse/Nachname.Vorname` enthalten; nach Verteilerbestätigung wird der absolute geprüfte Pfad als neue Stammdatenrevision gespeichert.
+
+## M5 (28.10.2026)
+
+Allgemeiner Tabellenvertrag `choice-table-v1`: sechs frei zuordenbare Spalten studentId/year/subject/type/variant/semester, eine Zeile je Halbjahreskurs. Kein ASV-Formatschema; Details in M5_ABSCHLUSS.md. Kein neues Schülerwahl-, Profil- oder Katalogschema.
+
+Verwaltungsdatenbank: optionale, ausdrücklich ausgelöste Erweiterung 2 → 3 mit append-only `transfer_receipts`. Vermerksschema 1: ID, StudentId, ChoiceRevisionId, StudentVersion, CatalogVersion, RuleVersion, At, Actor, Entered, Note. Alte Vermerke werden nicht geändert oder gelöscht. Wahl-/Stammdatenänderungen entwerten ihre aktuelle Zuordnung. Schema 1/2 bleibt ohne Aktivierung unverändert; unbekannte Datenbank-/Vermerksschemata werden abgewiesen. Transportmanifest bleibt v1; vollständige SQLite-Backups unterstützen DB-Schema 1, 2 und 3.

@@ -71,7 +71,7 @@ public static class WorkspaceTransfer
         using (var check = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = database, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString()))
         {
             check.Open(); using var command = check.CreateCommand(); command.CommandText = "PRAGMA user_version";
-            if (Convert.ToInt32(command.ExecuteScalar()) is not (1 or 2)) throw new InvalidDataException("Unbekannte oder unversionierte Transportdatenbank; keine Migration.");
+            if (Convert.ToInt32(command.ExecuteScalar()) is not (1 or 2 or 3)) throw new InvalidDataException("Unbekannte oder unversionierte Transportdatenbank; keine Migration.");
         }
         // Attach validates DB schema and graduation year before registering it.
         workspace.Attach(manifest.Year.Catalog, database, manifest.Year.Actor);

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "gsmkurswahl.domain": {
+        "type": "Project"
+      },
+      "gsmkurswahl.rules": {
+        "type": "Project",
+        "dependencies": {
+          "GsmKurswahl.Domain": "[1.0.0, )"
+        }
+      }
+    },
+    "net10.0/win-x64": {}
+  }
+}

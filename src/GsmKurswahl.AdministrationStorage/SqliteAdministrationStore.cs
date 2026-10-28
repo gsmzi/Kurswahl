@@ -22,7 +22,7 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
         {
             db.Open();
             var version = Convert.ToInt32(Scalar("PRAGMA user_version"));
-            if (version is not (0 or 1 or 2)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
+            if (version is not (0 or 1 or 2 or 3)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
             if (version == 0)
             {
                 if (Convert.ToInt32(Scalar("SELECT count(*) FROM sqlite_master WHERE type='table'")) != 0)

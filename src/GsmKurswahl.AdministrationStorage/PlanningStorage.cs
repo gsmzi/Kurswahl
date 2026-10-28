@@ -5,7 +5,7 @@ namespace GsmKurswahl.AdministrationStorage;
 
 public sealed partial class SqliteAdministrationStore
 {
-    public bool PlanningEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) == 2;
+    public bool PlanningEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) is 2 or 3;
     public void EnablePlanning()
     {
         if (PlanningEnabled) return;

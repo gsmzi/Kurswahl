@@ -85,3 +85,11 @@ Nutzerauftrag ersetzt die Einzelbestätigung durch vorausgewählte Sammelüberna
 - Zielgruppengröße 24 ist ein änderbarer Demo-Planungsparameter, keine rechtliche oder schulorganisatorische Festlegung. Keine tatsächlichen Parallelgruppen oder automatischen Schienen.
 - Wiederherstellung eines Planungsangebots stellt dessen Status wieder her; entfernte Schülerwünsche werden über die vorhandene individuelle Historie bewusst übernommen. Keine automatische Vollbestandsrücksetzung.
 - Allgemeine fachliche Freigaben, Schulnetz-/Berechtigungsprüfung und ASV-Musterdatei bleiben offen. Die M4-Planung hebt `needs_review` nicht auf.
+
+## M5 – aktueller Ausbau (28.10.2026)
+
+Die vorherige Beschränkung auf Modelle/Schnittstellen wurde vom Nutzer ausdrücklich aufgehoben. Allgemeiner CSV/XLSX-Abgleich, Einzelübernahme mit Historie, gefilterte Tabellenexporte, manuelle revisionsgebundene Übertragungsvermerke (explizites DB-Schema 3), Backup-Wiederherstellung und Release-Skript sind implementiert. Bedienung/Grenzen: M5_ABSCHLUSS.md.
+
+Offen bleiben: anonymisierte ASV-Musterdatei und Feldsemantik für einen spezifischen Adapter; fachliche Freigabe 2029/Endwahl; reale schulische ACLs und Pilot mit synthetischen Konten; zuständige Personen und verbindliche Backup-/Aufbewahrungs-/Löschfristen; Start des Releasepakets auf Zielgerät ohne SDK, Paketlizenz und vollständige Drittanbieter-Notices vor endgültiger Auslieferung. Der allgemeine Abgleich benötigt vollständige Belegungen je enthaltener Person; ein rein zeilenbasiertes Format kann leere Wahlen nicht darstellen. Neuzugänge werden zuerst über Stammdatenimport angelegt, dann erneut abgeglichen. Sammelentscheidungen sind nicht implementiert; Einzelbestätigung ist der verfügbare Weg. Kein Produktivbetrieb oder ASV-Schreibzugriff freigegeben.
+
+M5-Publish aktualisiert: Selbstenthaltende Windows-x64-Ausgabe beider Apps mit .NET 10.0.14 jetzt erfolgreich erstellt (separate Runtime-Lockdateien). Der historische Hinweis auf nicht verfügbare Runtimepakete ist damit für den lokalen Build ersetzt; Zielgerätetest ohne SDK steht weiterhin aus.

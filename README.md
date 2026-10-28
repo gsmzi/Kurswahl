@@ -1,6 +1,6 @@
 # GSM-Kurswahl
 
-Deutschsprachige Avalonia-Desktopanwendungen für die schulinterne Kurswahl. M1 ist abgenommen; aktueller Ausbau ist **M3**, erster Einsatzjahrgang **Abitur 2029**. Grundlage: [Anforderungen](docs/GSM_Kurswahl_Anforderungen_Codex.md).
+Deutschsprachige Avalonia-Desktopanwendungen für die schulinterne Kurswahl. M1 ist abgenommen; aktueller Ausbau ist **M5 (Erprobung)**, erster Einsatzjahrgang **Abitur 2029**. Grundlage: [Anforderungen](docs/GSM_Kurswahl_Anforderungen_Codex.md).
 
 ## Aktueller Stand
 
@@ -140,3 +140,11 @@ Die Transportdatei enthält den aktiven Jahrgang mit Stammdaten, Voraussetzungen
 **Drucken …** in der Kursplanung speichert die angezeigte Fächer-/Wahlzahlenmatrix einschließlich Abgängerfilter und Stand als A4-PDF und öffnet sie im PDF-Programm. Dort kann über Strg+P auf Papier gedruckt werden. Die UI zeigt keine Gruppengröße oder geschätzten Gruppen mehr; das historische Datenfeld bleibt für gespeicherte Planungsstände kompatibel.
 
 Die Streichungsauswahl blendet D/M/E für BF und LF sowie die fest vorgesehenen BF G, GK, GEO, SP, ETH, ER, KR, BK und MU aus (schulische Planungspräferenz, keine neue Rechtsregel). Die Vorschau zeigt alle betroffenen Schüler mit entfallenden und verbleibenden Wahlen als Tabelle. Prüfhinweise stehen im Tooltip. Nach bestätigter Übernahme werden eine gemeinsame PDF und eine bearbeitbare Word-Datei (.docx) mit allen betroffenen Schülern unter `Nachwahlboegen` im aktuellen Verwaltungsverzeichnis erstellt. Jeder Schüler beginnt auf einer neuen Seite mit Absage, verbleibender Wahl, Nachwahl-/Umwahlfeld und Unterschrift; sortiert nach Klasse und Name. **Nachwahlbögen öffnen** öffnet den Ordner. **Nachwahlbögen erneut erstellen** erzeugt die Bögen aus den gespeicherten Streichungsrevisionen erneut; ein Schreibfehler macht die gespeicherte Streichung nicht rückgängig. Die Bögen fordern eine Rückmeldung an; die Regelprüfung entscheidet weiterhin separat, ob die verbleibende Wahl strukturell unvollständig ist.
+
+## M5: Abgleich und Abschluss (28.10.2026)
+
+Unter **Abgleich / Abschluss** stehen ein allgemeiner CSV/XLSX-Kurswahlabgleich mit frei zuordenbaren Spalten, Einzelbestätigung und neuer Lehrerrevision, gefilterte Belegungs-/Abgleichsexporte sowie manuelle ASV-Übertragungsvermerke bereit. Der konkrete ASV-Adapter wartet auf eine anonymisierte Musterdatei. Verbindliche Gegenprüfung nutzt aktuelle geschützte Stammdaten; `needs_review` bleibt erhalten.
+
+Übertragungsvermerke benötigen die ausdrücklich aktivierte Erweiterung von Datenbankschema 2 auf 3. Vorher sichern; ältere Programme können Schema 3 nicht öffnen. Sicherung/Wiederherstellung verwendet den bestehenden vollständigen Jahrgangstransport; Wiederherstellung stets als neuer lokaler Bestand. Die Kursplanung exportiert angezeigte Nachfragezahlen jetzt auch nach CSV/XLSX.
+
+Bedienung, Formate, Backup-/Wiederherstellungsablauf und Schulnetz-Pilotplan: [M5-Abschluss](docs/M5_ABSCHLUSS.md). Synthetisches, bewusst unvollständiges Prüffallsample: `samples/kursabgleich-demo.csv`. Releasevorbereitung: `./scripts/Publish-Release.ps1` (frameworkabhängiges Erprobungspaket, benötigt .NET 10); optional `-SelfContained` für Windows x64. Keine Produktivfreigabe und kein Deployment.

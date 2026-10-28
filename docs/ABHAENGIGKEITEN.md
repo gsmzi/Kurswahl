@@ -57,3 +57,9 @@ Keine neuen Pakete und keine Änderungen an Paketversionen oder Lockdateien. Kur
 - 28.10.2026: Netzwechsel-/Planungsdruck ergänzt ohne neue NuGet-Pakete. PDF-Erstellung nutzt weiterhin SkiaSharp 2.88.9; ZIP/SHA-256 und SQLite-Backup verwenden bestehende Framework-/Paketabhängigkeiten. Lockdateien unverändert.
 
 - 28.10.2026: Gemeinsame Nachwahl-DOCX nutzt System.IO.Compression und System.Xml.Linq aus .NET 10. Keine zusätzlichen NuGet-Pakete oder Änderungen an Lockdateien. Word wurde nur zur manuellen Layoutprüfung eingesetzt und ist keine Laufzeitvoraussetzung.
+
+## M5 (28.10.2026)
+
+Keine neuen Pakete oder Paketversionsänderungen. XLSX-Export nutzt .NET ZIP/XML, CSV .NET-Textfunktionen, Herkunftsnachweis SHA-256. Lockdateien bleiben unverändert. Release-Skript erstellt ausdrücklich Erprobungspakete; eigene Lizenz und Drittanbieter-Notices bleiben vor endgültiger Auslieferung offen. Tatsächlicher Publish-/Auditstatus im Testprotokoll; keine neue Sicherheitsfreigabe aus alten Auditergebnissen ableiten.
+
+M5-Abschluss: separate `packages.win-x64.lock.json` für die acht ausgelieferten Projekte ergänzt; bisherige `packages.lock.json` unverändert. Windows-Publish nutzt diese Runtime-Lockdateien im Locked-Modus und pinnt die selbstenthaltende .NET-Runtime auf 10.0.14. Beide Anwendungen erfolgreich für win-x64 publiziert. NuGet-Audit (`dotnet list GSM-Kurswahl.sln package --vulnerable --include-transitive --no-restore`) am 28.10.2026 erfolgreich: alle 14 Projekte laut NuGet.org ohne bekannte anfällige Pakete. Keine umfassende Sicherheits-/Produktivfreigabe.
