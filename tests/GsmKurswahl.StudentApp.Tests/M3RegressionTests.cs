@@ -44,7 +44,7 @@ public sealed class M3RegressionTests : IDisposable
         var workspace = Workspace(Record()); var window = new TeacherWindow(workspace.Root);
         try
         {
-            window.Show(); Click(window, "Schülerbestand"); Click(window, "Öffnen");
+            window.Show(); Click(window, "Wahl"); Click(window, "Schülerbestand"); Click(window, "Öffnen");
             Control<ComboBox>(window, "PrereqImp").SelectedItem = Knowledge.Yes;
             await Collect(window);
             Assert.Equal(Knowledge.Yes, Control<ComboBox>(window, "PrereqImp").SelectedItem);

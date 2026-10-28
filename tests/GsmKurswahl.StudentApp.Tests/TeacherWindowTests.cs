@@ -46,11 +46,11 @@ public class TeacherWindowTests
             window.JumpToWorkflowStep(2); window.UpdateLayout();
             Assert.Equal("Aktueller Schritt", State(2));
             Click("Später verteilen · Übersicht öffnen");
-            Assert.Equal("Zustellungen offen", State(2)); Capture("teacher-dashboard");
+            Assert.False(window.GetLogicalDescendants().OfType<StackPanel>().Single(p => p.Name == "WorkflowProgress").IsVisible); Capture("teacher-dashboard"); Click("Wahl"); Assert.Equal("Zustellungen offen", State(2));
             window.Width = 900; window.Height = 600; window.UpdateLayout(); Capture("teacher-compact");
             var strip = window.GetLogicalDescendants().OfType<StackPanel>().Single(p => p.Name == "WorkflowProgress");
             var steps = strip.GetLogicalDescendants().OfType<Border>().Where(b => b.Name?.StartsWith("WorkflowStep") == true).ToArray();
-            Assert.Equal(3, steps.Length);
+            Assert.Equal(4, steps.Length);
             Assert.All(steps, step => Assert.InRange(step.Bounds.Width, 100, strip.Bounds.Width / 3));
             Click("Einstellungen"); Click("Hilfe"); Click("Übersicht");
             Assert.Equal("Zustellungen offen", State(2));
@@ -143,7 +143,7 @@ public class TeacherWindowTests
         try
         {
             window.Show(); window.UpdateLayout();
-            Assert.Contains("M3", window.Title);
+            Assert.Contains("Lehrerverwaltung", window.Title);
             Assert.Contains(window.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text == "Abiturjahrgang einrichten");
             window.GetLogicalDescendants().OfType<Button>().Single(b => b.Name == "CreateYear").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             window.UpdateLayout();
@@ -221,7 +221,7 @@ public class TeacherWindowTests
                 window.GetLogicalDescendants().OfType<Button>().Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 window.UpdateLayout();
             }
-            Click("Schülerbestand");
+            Click("Wahl"); Click("Schülerbestand");
             Click("Öffnen");
             var userBox = window.GetLogicalDescendants().OfType<TextBox>().Single(t => t.Name == "StudentUsername");
             userBox.Text = "DEMO\\test2";

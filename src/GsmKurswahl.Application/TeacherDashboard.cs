@@ -11,6 +11,7 @@ public static class TeacherDashboardBuilder
     {
         var states = session.Overview().Where(s => s.Record.Student.GraduationYear == session.Catalog.GraduationYear).ToArray();
         var logs = store.DistributionLog();
+        var catalogChangedAt = (store as IPlanningStore)?.PlanningCatalogChangedAt();
         var issue = 0; var deliver = 0; var delivered = 0;
         foreach (var state in states.Where(s => s.Record.MappingConfirmed))
         {
@@ -21,6 +22,7 @@ public static class TeacherDashboardBuilder
             var last = logs.LastOrDefault(l => l.StudentId == r.Student.ExternalStudentId && l.ProfileRevision == profile.ProfileRevision);
             var deliveredRecord = last is null ? null : store.StudentHistory(r.Student.ExternalStudentId).LastOrDefault(s => s.ChangedAt <= last.At);
             if (last is not null && last.Status == "verteilt" && last.At >= profile.IssuedAt
+                && (catalogChangedAt is null || last.At >= catalogChangedAt)
                 && deliveredRecord is { MappingConfirmed: true }
                 && string.Equals(deliveredRecord.HomeDirectory, r.HomeDirectory, StringComparison.OrdinalIgnoreCase)) delivered++;
             else deliver++;

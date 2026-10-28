@@ -79,3 +79,9 @@ Nutzerauftrag ersetzt die Einzelbestätigung durch vorausgewählte Sammelüberna
 - Persönliche Voraussetzungen (`PriorEducation`) und Abgangsstatus (`DepartureStatus`) sind im Personenbereich (`ShowStudent`) direkt bearbeitbar; relative Schülerordner bleiben beim Speichern unbestätigter Zuordnungen erhalten.
 - Die drei Schrittkarten der Verlaufsleiste (`Fächer auswählen`, `Schülerliste importieren`, `Dateien verteilen`) sind direkt anklickbar; die redundanten Sprungbuttons darunter wurden entfernt.
 - Offene Rückfrage mit dem Nutzer: Phasenmodell beim Einsammeln vs. Lehrerbearbeitung (Schüler-Wahlphase übernimmt automatisch neuere Schülerstände; ab Lehrer-Bearbeitungsphase ist der Lehrerbestand verbindlich).
+
+### M4-Erprobung
+
+- Zielgruppengröße 24 ist ein änderbarer Demo-Planungsparameter, keine rechtliche oder schulorganisatorische Festlegung. Keine tatsächlichen Parallelgruppen oder automatischen Schienen.
+- Wiederherstellung eines Planungsangebots stellt dessen Status wieder her; entfernte Schülerwünsche werden über die vorhandene individuelle Historie bewusst übernommen. Keine automatische Vollbestandsrücksetzung.
+- Allgemeine fachliche Freigaben, Schulnetz-/Berechtigungsprüfung und ASV-Musterdatei bleiben offen. Die M4-Planung hebt `needs_review` nicht auf.

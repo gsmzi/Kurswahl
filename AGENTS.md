@@ -1,6 +1,6 @@
 # Dauerhafte Entwicklungsanweisungen
 
-- Zuerst `docs/GSM_Kurswahl_Anforderungen_Codex.md` vollständig lesen. M1 bis M5 in dieser Reihenfolge bearbeiten; M1 abgenommen, M2 technisch vorhanden mit dokumentierten fachlichen Freigabegrenzen; aktueller Umfang: M3 (Nutzerauftrag 26.10.2026, Fortsetzung 27.10.2026).
+- Zuerst `docs/GSM_Kurswahl_Anforderungen_Codex.md` vollständig lesen. M1 bis M5 in dieser Reihenfolge bearbeiten; M1 abgenommen, M2 technisch vorhanden mit dokumentierten fachlichen Freigabegrenzen; aktueller Umfang: M4 nach M3-Reviewkorrekturen (Nutzerauftrag 27./28.10.2026).
 - C#/.NET 10 LTS, Avalonia. Domain ohne UI/Dateisystem; Rules nur auf Domain; Storage und ImportExport nur auf Domain; Application auf Domain/Rules. Beide Desktopprogramme nutzen diese gemeinsamen Komponenten. Keine Rechtsregeln in UI oder Importadaptern.
 - Ausschließlich synthetische Personen und Accounts in Code, Tests, Samples und Protokollen. Keine Signierschlüssel, Echtdaten, Diagnosen oder konkreten Schulnetzpfade einchecken.
 - Unbekannt ist nicht falsch und nicht erfüllt: explizit `needs_review`. M1 darf niemals verbindlich grün oder eingereicht melden. Vorbildung aus Wahl-JSON ist keine Vertrauensquelle. Profilprüfung folgt in M2, Profilerzeugung/-verteilung (ohne Zertifikats-/SID-Pflicht gemäß Nutzerentscheidung 27.10.2026) in M3.
@@ -10,4 +10,4 @@
 - Lehrerrevisionen sind unabhängig von Schülerdateien, append-only mit Herkunft und vollständigem Snapshot. Wiederherstellung erzeugt neue Revision. Import benötigt Vorschau und bestätigte Übernahme; ASV-Adapter erst anhand anonymisierter Musterdatei.
 - Nach jedem abgeschlossenen Entwicklungsschritt verfügbare Tests ausführen und tatsächliche Ergebnisse inklusive Fehlern in `docs/TESTPROTOKOLL.md` dokumentieren. Abschließend Restore, Release-Build, gesamte Testsuite und verfügbaren UI-Smoke-Test ausführen. Keine erfolgreichen Tests behaupten, die nicht liefen.
 - Pakete explizit pinnen, Lockdateien behalten, Lizenz-/Sicherheitsstand in `docs/ABHAENGIGKEITEN.md` pflegen. Keine automatischen Onlinezugriffe der Desktopanwendungen.
-- Änderungen im bestehenden Arbeitsverzeichnis erhalten. Keine ungefragten Deployments; M4–M5 nur als dokumentierte Schnittstellen/Modelle. M3 umfasst die getrennte AdministrationStorage-Komponente (nur Domain-Abhängigkeit), die nicht vom Schülerprogramm referenziert werden darf.
+- Änderungen im bestehenden Arbeitsverzeichnis erhalten. Keine ungefragten Deployments; M5 nur als dokumentierte Schnittstellen/Modelle. M3 umfasst die getrennte AdministrationStorage-Komponente (nur Domain-Abhängigkeit), die nicht vom Schülerprogramm referenziert werden darf.

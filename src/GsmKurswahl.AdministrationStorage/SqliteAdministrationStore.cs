@@ -6,7 +6,7 @@ using Microsoft.Data.Sqlite;
 namespace GsmKurswahl.AdministrationStorage;
 
 /// <summary>One local writer. SQLite transactions and immutable rows protect administrative history.</summary>
-public sealed class SqliteAdministrationStore : IAdministrationStore
+public sealed partial class SqliteAdministrationStore : IAdministrationStore, IPlanningStore
 {
     private readonly FileStream lease;
     private readonly SqliteConnection db;
@@ -22,7 +22,7 @@ public sealed class SqliteAdministrationStore : IAdministrationStore
         {
             db.Open();
             var version = Convert.ToInt32(Scalar("PRAGMA user_version"));
-            if (version is not (0 or 1)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
+            if (version is not (0 or 1 or 2)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
             if (version == 0)
             {
                 if (Convert.ToInt32(Scalar("SELECT count(*) FROM sqlite_master WHERE type='table'")) != 0)

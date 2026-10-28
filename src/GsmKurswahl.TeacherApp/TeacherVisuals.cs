@@ -55,19 +55,22 @@ public sealed partial class TeacherWindow
     private static Button Primary(Button button) { button.Classes.Add("primary"); return button; }
     private void UpdateVisualNavigation()
     {
+        workflowProgress.IsVisible = visiblePage is "wahl" or "offer" or "import" or "profiles" or "collection" or "people" or "new";
         sectionLabel.Text = visiblePage switch
         {
             "offer" => "EINRICHTUNG  /  FACHANGEBOT", "import" => "SCHÜLERLISTE  /  IMPORT & ABGLEICH",
             "profiles" => "SCHÜLERDATEIEN  /  VERTEILUNG", "collection" => "KURSWAHLEN  /  EINGANG & KONFLIKTE",
-            "people" => "SCHÜLERBESTAND", "settings" => "EINSTELLUNGEN", "help" => "HILFE & DATEIEN",
-            "manage" => "JAHRGANG VERWALTEN", "catalog" => "FACHANGEBOT", "new" => "WILLKOMMEN", _ => "JAHRGANGSÜBERSICHT"
+            "wahl" => "WAHL / VORBEREITEN & EINSAMMELN", "results" => "WAHLERGEBNISSE", "people" => "WAHL / SCHÜLERBESTAND", "settings" => "EINSTELLUNGEN", "help" => "HILFE & DATEIEN",
+            "planning" => "KURSPLANUNG / SZENARIEN & ANALYSE", "manage" => "JAHRGANG VERWALTEN", "catalog" => "FACHANGEBOT", "new" => "WILLKOMMEN", _ => "JAHRGANGSÜBERSICHT"
         };
         foreach (var button in navigation.Children.OfType<Button>())
         {
             button.Classes.Add("nav");
             var selected = button.Content?.ToString() switch
             {
-                "Übersicht" => visiblePage == "start", "Schülerbestand" => visiblePage == "people",
+                "Übersicht" => visiblePage == "start", "Wahl" => visiblePage is "wahl" or "offer" or "import" or "profiles" or "collection" or "people",
+                "Wahlergebnisse" => visiblePage == "results",
+                "Kursplanung" => visiblePage == "planning",
                 "Jahrgang verwalten" => visiblePage is "manage" or "catalog", "Einstellungen" => visiblePage == "settings",
                 "Hilfe" => visiblePage == "help", "Zur Einrichtung" => visiblePage is "new" or "offer" or "import" or "profiles", _ => false
             };
@@ -83,14 +86,14 @@ public sealed partial class TeacherWindow
         var setup = active?.Step;
         var stage = setup switch { YearSetupStep.Offer => 0, YearSetupStep.Import => 1, YearSetupStep.Mapping or YearSetupStep.Review => 2, _ => -1 };
         var distributed = summary is { Students: > 0 } && summary.Delivered == summary.Students;
-        string[] titles = ["Fächer auswählen", "Schülerliste importieren", "Dateien verteilen"];
-        string[] descriptions = ["Leistungsfachangebot festlegen", "Liste gemeinsam übernehmen", "Laufwerk wählen und zustellen"];
-        var strip = new Grid { ColumnDefinitions = new ColumnDefinitions("*,28,*,28,*") };
-        for (var i = 0; i < 3; i++)
+        string[] titles = ["Fächer auswählen", "Schülerliste importieren", "Dateien verteilen", "Wahlen einsammeln"];
+        string[] descriptions = ["Leistungsfachangebot festlegen", "Liste gemeinsam übernehmen", "Laufwerk wählen und zustellen", "Wahleingang und Konflikte prüfen"];
+        var strip = new Grid { ColumnDefinitions = new ColumnDefinitions("*,16,*,16,*,16,*") };
+        for (var i = 0; i < 4; i++)
         {
             var stepIndex = i;
-            var complete = active is not null && (i == 0 ? setup != YearSetupStep.Offer : i == 1 ? stage > 1 || setup == YearSetupStep.Complete && summary?.Students > 0 : distributed);
-            var current = stage == i || setup == YearSetupStep.Complete && i == 2 && !distributed;
+            var complete = active is not null && (i == 0 ? setup != YearSetupStep.Offer : i == 1 ? stage > 1 || setup == YearSetupStep.Complete && summary?.Students > 0 : i == 2 ? distributed : summary is { Students: > 0 } && summary.Choices == summary.Students && collections.IsEmpty);
+            var current = stage == i || setup == YearSetupStep.Complete && (i == 2 && !distributed || i == 3 && distributed && !complete);
             var state = current ? "Aktueller Schritt" : complete ? "Erledigt" : "Noch offen";
             if (setup == YearSetupStep.Complete && i == 2 && !distributed) state = "Zustellungen offen";
             var caption = new StackPanel { Spacing = 3 };
@@ -106,7 +109,7 @@ public sealed partial class TeacherWindow
             AutomationProperties.SetName(tile, $"Schritt {i + 1}: {titles[i]}. {state}.");
             ToolTip.SetTip(tile, descriptions[i] + ". Anklicken, um direkt zu diesem Schritt zu wechseln. Die Anzeige beschreibt den Arbeitsablauf, keine fachliche Freigabe.");
             Grid.SetColumn(tile, i * 2); strip.Children.Add(tile);
-            if (i < 2)
+            if (i < 3)
             {
                 var connector = new Border { Height = 2, Background = complete ? Accent : Line, VerticalAlignment = VerticalAlignment.Center };
                 Grid.SetColumn(connector, i * 2 + 1); strip.Children.Add(connector);
@@ -118,6 +121,9 @@ public sealed partial class TeacherWindow
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*") };
         (string Value, string Label)[] values = [(summary.Students.ToString(), "Schüler im Jahrgang"), ($"{summary.Delivered} / {summary.Students}", "Profile zugestellt"), (summary.Choices.ToString(), "Wahlen eingelesen"), (summary.Reviews.ToString(), "Fachlich zu klären")];
+        if (summary.Students > 0 && summary.Choices == summary.Students)
+            values = [(summary.Students.ToString(), "Schüler im Jahrgang"), (summary.Choices.ToString(), "Wahlen eingelesen"),
+                (summary.Reselections.ToString(), "Offene Nachwahlen"), (summary.Reviews.ToString(), "Fachlich zu klären")];
         for (var i = 0; i < values.Length; i++)
         {
             var body = new StackPanel { Spacing = 5 };

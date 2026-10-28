@@ -49,3 +49,7 @@ Neue **lehrerseitige** Abhängigkeit: Microsoft.Data.Sqlite **10.0.14** (MIT), t
 Erster Versuch mit Microsoft.Data.Sqlite 10.0.0 wurde wegen NU1903 in SQLitePCLRaw.lib.e_sqlite3 2.1.11 verworfen (GHSA-2m69-gcr7-jv3q), nicht durch Deaktivieren des Audits umgangen. 10.0.14 löst 2.1.13 auf; erfolgreicher Restore. Quellen: [Microsoft.Data.Sqlite](https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.14), [Microsoft-Dokumentation](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/), [SQLitePCLRaw](https://www.nuget.org/packages/SQLitePCLRaw.core/2.1.13). Abschließender Audit siehe TESTPROTOKOLL.md. Keine Onlinezugriffe der Desktopanwendungen.
 
 M3-Abschlussaudit 27.10.2026 erfolgreich: für alle 14 Projekte einschließlich transitiver Abhängigkeiten keine bekannten anfälligen Pakete laut NuGet.org. Locked-Restore, Release-Build und 168 Tests erfolgreich; Details/Fehlversuche im Testprotokoll.
+
+## M4 / 28.10.2026
+
+Keine neuen Pakete und keine Änderungen an Paketversionen oder Lockdateien. Kursplanung verwendet den vorhandenen Regelkern und die lehrerseitige SQLite-Komponente. Keine neuen Onlinezugriffe. Der letzte Paket-Audit bleibt der oben dokumentierte M3-Audit; für M4 wird daraus keine neue Sicherheitsfreigabe abgeleitet.

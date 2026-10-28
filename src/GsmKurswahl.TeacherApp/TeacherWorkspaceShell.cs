@@ -32,7 +32,7 @@ public sealed partial class TeacherWindow
     public TeacherWindow(string? workspaceRoot = null)
     {
         explicitWorkspaceRoot = workspaceRoot;
-        Title = "GSM-Kurswahl | Lehrerverwaltung · M3"; Width = 1400; Height = 900; MinWidth = 900; MinHeight = 600;
+        Title = "GSM-Kurswahl | Lehrerverwaltung · M4"; Width = 1400; Height = 900; MinWidth = 900; MinHeight = 600;
         BuildVisualShell();
         var people = new DockPanel();
         var left = new StackPanel { Spacing = 8 }; left.Children.Add(filter); left.Children.Add(followupFilter); left.Children.Add(statusFilter); left.Children.Add(roster);
@@ -78,6 +78,13 @@ public sealed partial class TeacherWindow
         if (year is null) { ShowNewYear(); return; }
         try { store = workspace!.OpenActive(); }
         catch (Exception ex) { ShowStartupError(ex); return; }
+        // A committed planning decision and all corresponding revisions live in one SQLite transaction.
+        // The workspace catalog is only synchronized after that transaction, including after a crash.
+        if (store is IPlanningStore planning && planning.ActivePlanningCatalog() is { } authoritative && year.Catalog.Version != authoritative.Version)
+        {
+            year = year with { Catalog = authoritative };
+            workspace!.Update(year);
+        }
         actor.Text = year.Actor;
         session = new TeacherSession(store, year.Catalog, year.Actor);
         heading.Text = "Abitur " + year.Catalog.GraduationYear;
@@ -93,8 +100,9 @@ public sealed partial class TeacherWindow
         if (workspace?.Active?.Step == YearSetupStep.Complete)
         {
             navigation.Children.Add(Button("Übersicht", () => ShowPage("start")));
-            navigation.Children.Add(Button("Schülerbestand", () => ShowPage("people")));
-            navigation.Children.Add(Button("Jahrgang verwalten", ShowManage));
+            navigation.Children.Add(Button("Wahl", ShowElection));
+            navigation.Children.Add(Button("Wahlergebnisse", ShowResults));
+            navigation.Children.Add(Button("Kursplanung", ShowPlanning));
         }
         else
             navigation.Children.Add(Button("Zur Einrichtung", () => { if (store is null) LoadWorkspace(); else ShowCurrentStep(); }));
@@ -172,6 +180,7 @@ public sealed partial class TeacherWindow
                 else
                     SetStep(YearSetupStep.Mapping);
             }
+            else if (index == 3) ShowPage("collection");
             UpdateDashboard(); UpdateVisualNavigation(); UpdateWorkflowProgress();
         }
         catch (Exception ex) { status.Text = "Vorgang nicht abgeschlossen: " + ex.Message; }
@@ -230,6 +239,7 @@ public sealed partial class TeacherWindow
     }
     private void ShowPage(string page)
     {
+        if (page == "results") { ShowResults(); return; }
         visiblePage = page;
         if (page == "start") UpdateDashboard();
         if (page is "people" or "profiles") Refresh();
@@ -243,13 +253,15 @@ public sealed partial class TeacherWindow
         dashboardPanel.Children.Clear(); UpdateWorkflowProgress();
         dashboardPanel.Children.Add(new TextBlock { Text = "Ihr aktueller Jahrgang", FontSize = 23, FontWeight = FontWeight.SemiBold, Foreground = Ink });
         string next; string action; string target;
-        if (summary.Students == 0) { next = "Für diesen Jahrgang fehlen noch Schüler."; action = "Schülerliste importieren"; target = "import"; }
+        if (collections.Length > 0) { next = $"{collections.Length} Wahlkonflikte benötigen eine Entscheidung."; action = "Konflikte prüfen"; target = "collection"; }
+        else if (summary.Students > 0 && summary.Choices == summary.Students) { next = "Die Kurswahlen liegen vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot."; action = "Wahlergebnisse ansehen"; target = "results"; }
+        else if (summary.Students == 0) { next = "Für diesen Jahrgang fehlen noch Schüler."; action = "Schülerliste importieren"; target = "import"; }
         else if (summary.UnconfirmedMappings > 0) { next = $"{summary.UnconfirmedMappings} Ordnerzuordnungen müssen noch geprüft werden."; action = "Schülerdateien verteilen"; target = "profiles"; }
         else if (summary.ProfilesToIssue > 0) { next = $"Für {summary.ProfilesToIssue} Personen fehlen aktuelle Profile."; action = "Schülerprofile bereitstellen"; target = "profiles"; }
         else if (summary.ProfilesToDeliver > 0) { next = $"{summary.ProfilesToDeliver} Profile sind noch zuzustellen oder erneut zu verteilen."; action = "Zustellung bearbeiten"; target = "profiles"; }
         else if (collections.Length > 0) { next = $"Für {collections.Length} Personen liegen offene Wahlkonflikte zur Entscheidung vor."; action = "Konflikte prüfen"; target = "collection"; }
         else if (summary.Choices < summary.Students) { next = $"Für {summary.Students - summary.Choices} Personen wurde noch keine Kurswahl eingelesen."; action = "Kurswahlen einsammeln"; target = "collection"; }
-        else { next = "Alle Personen haben einen eingelesenen Wahlstand. Prüfen Sie offene Fälle oder sammeln Sie neue Änderungen ein."; action = "Schülerbestand prüfen"; target = "people"; }
+        else { next = "Die Kurswahlen liegen vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot."; action = "Wahlergebnisse ansehen"; target = "results"; }
         var primary = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         var guidance = new StackPanel { Spacing = 6, Margin = new Thickness(0, 0, 20, 0), VerticalAlignment = VerticalAlignment.Center };
         guidance.Children.Add(new TextBlock { Text = "Als Nächstes", FontSize = 17, FontWeight = FontWeight.SemiBold, Foreground = Accent });
@@ -262,10 +274,9 @@ public sealed partial class TeacherWindow
         dashboardPanel.Children.Add(new TextBlock { Text = "Weitere Aufgaben", FontWeight = FontWeight.SemiBold });
         var tasks = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var task in new[] {
-            Button("Schülerprofile bereitstellen / Zustellung wiederholen", () => ShowPage("profiles")),
-            Button("Kurswahlen einsammeln", () => ShowPage("collection")),
-            Button("Schülerbestand ansehen und bearbeiten", () => ShowPage("people")),
-            Button("Schülerliste aktualisieren", () => ShowPage("import"), "Erneuter Import mit Vorschau. Bestehende Änderungen werden nicht automatisch überschrieben.") })
+            Button("Wahl organisieren", ShowElection),
+            Button("Wahlergebnisse ansehen", ShowResults),
+            Button("Kursplanung öffnen", ShowPlanning) })
         { task.Margin = new Thickness(0, 0, 10, 10); tasks.Children.Add(task); }
         dashboardPanel.Children.Add(tasks);
     }
@@ -287,6 +298,7 @@ public sealed partial class TeacherWindow
         RebuildNavigation();
         visiblePage = "settings"; settingsPanel.Children.Clear();
         Intro(settingsPanel, "Einstellungen", "Speicherort und technische Einrichtung werden hier einmalig festgelegt. Im Alltag öffnet sich Ihr gespeicherter Jahrgang automatisch.");
+        if (workspace?.Active is not null) settingsPanel.Children.Add(Button("Jahrgang verwalten", ShowManage));
         settingsPanel.Children.Add(Text("Verwaltungsverzeichnis: " + (workspace?.Root ?? explicitWorkspaceRoot ?? TeacherWorkspace.DefaultRoot)));
         settingsPanel.Children.Add(Button("Anderes lokales Verwaltungsverzeichnis öffnen …", async () =>
         {

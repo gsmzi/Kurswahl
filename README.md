@@ -96,3 +96,37 @@ Lehrer-Alltag: Fächer auswählen → Schülerliste tabellarisch und gesammelt �
 Die gemeinsame Schüler-App verwendet jetzt Konfigurationsschema 2: keine feste Schüler-ID und kein zusätzlicher Demo-Unterordner. Die Lehrer-App verteilt `profil.json` und das aktuelle `fachangebot.json` direkt in den bestätigten persönlichen Wahlordner; dort entsteht auch `aktuell.json`. Start: `GsmKurswahl.StudentApp.exe --wahlordner "C:\Demo\10a\Muster.Demo"`. Alternativ setzt die Schulumgebung `GSM_KURSWAHL_HOME` auf den persönlichen Ordner; ohne Vorgabe gilt das Benutzer-Home. Der Beispielpfad ist rein synthetisch.
 
 Die ID wird aus genau diesem Einzelprofil gelesen. Sie ist keine Berechtigungsbestätigung; die Lehrerverwaltung prüft Zuordnung, Vorbildung und Angebot erneut. Fehlende/ungültige Profile verhindern den Start in einem geratenen Schülerkontext und verändern keine vorhandene Wahl. Konfigurationen mit Schema 1 behalten ihre feste demo-ID und ihren Unterordner; sie werden nicht automatisch migriert. Unbekannte Versionen werden abgewiesen.
+
+## M4-Kursplanung (28.10.2026)
+
+Unter **Kursplanung** zuerst die Erweiterung des lokalen Lehrerbestands ausdrücklich aktivieren. Sie ergänzt Datenbankschema 1 um Planungsstände und Entscheidungen (Schema 2); es gibt keine automatische Migration beim Start. Ältere Programme können die erweiterte Datenbank nicht öffnen.
+
+- **Auswertung:** Nachfrage je Angebotskennung (einschließlich LF/BF und normal/bilingual) und Halbjahr, LF-Kombinationen und gemeinsame Belegungen. „Alle“, „Abgänger“ und „planungsrelevant“ werden getrennt gezeigt. Bestätigte Abgänger zählen nie zur Planung; voraussichtliche sind umschaltbar. Die Zielgruppengröße liefert nur eine aufgerundete Schätzung, keine Untis-Gruppen oder Stundenplanung.
+- **Planungsstände:** vollständiger Jahrgangsstand mit Angebot, Verwaltungsrevisionen, Stammdaten/Voraussetzungen, Nachwahlvermerken, Regelversion und Analyseparametern. Unveränderlich speichern und mit dem aktuellen Stand vergleichen. Szenarien werden ausdrücklich als solche angezeigt und verändern keine aktiven Wahlen.
+- **Streichung:** genaue Angebotsvarianten wählen, simulieren, betroffene Personen und Regelmeldungen prüfen. Ersatzangebote sind vorläufige Vorschläge; nichts wird automatisch gewählt. Nur Vorschau plus Bestätigung und Begründung übernehmen die Änderung. Inzwischen geänderte Stammdaten, Wahlen oder Nachwahlvermerke erzwingen eine neue Vorschau.
+- **Übernahme:** Angebot, neue Verwaltungsrevisionen und Nachwahlvermerke werden gemeinsam in einer SQLite-Transaktion gespeichert. Originale Schülerwünsche bleiben in der Historie. Auch unbetroffene Wahlen erhalten die neue Angebotsversion, damit sie keinen künstlichen Versionsfehler bekommen. Das aktuelle Fachangebot anschließend erneut über die Schülerdateiverteilung zustellen; die Übersicht zeigt den Bedarf.
+- **Rücknahme:** ein gespeichertes Angebot als Wiederherstellung simulieren und ausdrücklich übernehmen. Das erzeugt neue Revisionen. Entfernte Schülerwünsche werden anschließend bei Bedarf einzeln aus der Wahlhistorie wiederhergestellt; Nachwahlen werden nicht automatisch als erledigt markiert.
+
+Bestehende fachliche Freigabegrenzen bleiben bestehen: `needs_review` ist keine verbindlich gültige Wahl. ASV-Adapter, Exportpaket und Schulnetz-Pilot gehören weiterhin zu M5.
+
+## Fertiger Testjahrgang mit 80 Schülern
+
+`Testversion-80-Schueler.cmd` im Projektordner doppelklicken. Die Testversion öffnet einen getrennten Bestand unter `artifacts/demo-80`; sie ändert den normalen Verwaltungsort nicht. Beim ersten Start werden 80 synthetische Schüler samt Vorbildung, vollständigen Kurswahlen, persönlichen Dateien und Planungsständen angelegt. Weitere Starts erhalten eigene Änderungen. Vorhandene nicht als Demo markierte Ordner werden nicht überschrieben.
+
+Vier Klassen (10a–10d) mit je 20 Personen, 16 LF-Kombinationen, normale/bilinguale BIO-Angebote, Fremdsprachen, Informatik, Psychologie und SIA. 68 aktive, 8 voraussichtliche und 4 bestätigte Abgänger: die Auswertung zählt je Filter 76 oder 68 planungsrelevante Personen. Zwei Ausgangsstände und das separate Szenario „BIO LF bilingual entfällt“ stehen unter Kursplanung bereit.
+
+Alle 80 Wahlen werden beim Erzeugen mit dem produktiven Regelkern auf Invalid-Meldungen geprüft. Sie sind strukturell vollständig; `needs_review` bleibt wegen offener Jahrgangsfreigabe bestehen. Keine verbindliche Abgabe wird fingiert. Daten ausschließlich synthetisch. Das Startskript baut bei fehlender EXE mit .NET 10; nach Quellcodeänderungen die Testversion wie oben beschrieben neu bauen.
+
+## Arbeitsphasen und kompakte Kursplanung (28.10.2026)
+
+Die obere Navigation lautet jetzt **Übersicht → Wahl → Wahlergebnisse → Kursplanung**. Unter Wahl stehen Fachauswahl, Schülerimport/Vorbildung, Verteilung und Einsammeln bereit. Nur dort wird der vierstufige Verlauf angezeigt. Jahrgangsverwaltung liegt unter Einstellungen.
+
+Wahlergebnisse zeigt die eingelesenen Kurswahlen als Tabelle mit LF, BF/Wahlfächern und direkt änderbarem Abgängerstatus. Voraussetzungen und Kontozuordnungen stehen weiterhin unter Wahl → Schülerbestand zur Verfügung; die verbindliche Prüfung nutzt sie unverändert. Offene Nachwahlen/ungültige Wahlen sind markiert, Prüfdetails stehen im Tooltip.
+
+Die Kursplanung zeigt alle Fächer in einer kompakten Matrix mit separaten Spalten für LF/BF und bilinguale Varianten. Im breiten Fenster stehen zwei Tabellenblöcke nebeneinander; im schmalen Fenster ein Block. Der Abgängerfilter liegt direkt oben und aktualisiert die Zahlen sofort. Bestätigte Abgänger bleiben ausgeschlossen. Eine Zahl bezeichnet identische Halbjahreszahlen; abweichende KS1-/KS2-Zahlen werden getrennt dargestellt. Unterschiedliche Einzelhalbjahre (z. B. GK/GEO) bleiben explizit sichtbar. Null bedeutet keine Nachfrage, ein Strich bedeutet kein entsprechendes Angebot/Zeitraum.
+
+LF-Kombinationen, Überschneidungen und Gruppenschätzungen bleiben in aufklappbaren Details bzw. Tooltips erreichbar. Der bestehende Demo-Start verwendet jetzt artifacts/compact-ui-build und öffnet weiterhin denselben Bestand unter artifacts/demo-80. Eine noch laufende alte Testversion vor dem erneuten Start schließen.
+
+### Zusätzlicher GK-/Geo-Testbestand
+
+Testversion-GK-Geo.cmd öffnet 80 synthetische Schüler in einem separaten Bestand unter artifacts/demo-80-gk-geo. Enthalten sind GK-BF in HJ 1, HJ 1/2, HJ 1/3/4 und HJ 1–4 sowie Geo-BF nur HJ 3 bzw. HJ 3/4. Verkürzte Einzelhalbjahresbelegungen sind W-LF-Schülern zugeordnet. Bisherige Testdaten bleiben erhalten. GK/Geo werden in Ergebnissen und Planung ausdrücklich nach Halbjahr angezeigt.
