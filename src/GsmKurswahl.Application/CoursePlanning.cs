@@ -115,7 +115,10 @@ public static class CoursePlanning
 
     public static void Confirm(IPlanningStore store, CancellationPreview preview, string actor, string reason, bool confirmed)
     {
-        if (!confirmed || string.IsNullOrWhiteSpace(reason) || string.IsNullOrWhiteSpace(actor)) throw new ArgumentException("Bestätigte Vorschau, Bearbeiter und Begründung erforderlich.");
+        if (!confirmed) throw new ArgumentException("Bitte die geprüfte Vorschau mit dem Kontrollkästchen bestätigen.");
+        if (string.IsNullOrWhiteSpace(actor)) throw new ArgumentException("Die Bearbeiterkennung fehlt. Bitte unter Einstellungen ergänzen.");
+        if (string.IsNullOrWhiteSpace(reason)) reason = (preview.Restoring ? "Angebotsstand wiederhergestellt" : "Angebote gestrichen")
+            + ": " + string.Join(", ", preview.CancelledOffers);
         var revisions = preview.Changes.Select(c => new ChoiceRevision(Guid.NewGuid(), c.ExpectedActive, c.StudentId, DateTimeOffset.UtcNow, actor,
             ActorRole.Teacher, preview.Restoring ? RevisionSource.Restoration : RevisionSource.OfferCancellation, reason.Trim(), preview.Catalog.Version, ChoiceValidator.Version, c.Choice,
             [.. c.RemovedOffers.Select(id => new SelectionChange(id, preview.Basis.Choices.Single(r => r.StudentId == c.StudentId).Snapshot.Selections.Single(s => s.OfferId == id).Semesters, []))], null)).ToImmutableArray();

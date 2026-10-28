@@ -19,7 +19,24 @@ public static class PlanningPrint
 
     public static byte[] Reselection(StudentRecord student, CourseChoice remaining, OfferCatalog catalog, string[] removed)
     {
-        using var pdf = new Paper("Nachwahl - " + remaining.StudentId, remaining.GraduationYear);
+        return Reselections([new(student, remaining, removed)], catalog);
+    }
+
+    public static byte[] Reselections(IEnumerable<ReselectionPrintItem> items, OfferCatalog catalog)
+    {
+        var rows = items.OrderBy(x => x.Student.Student.ClassName).ThenBy(x => x.Student.Student.SyntheticDisplayName).ThenBy(x => x.Remaining.StudentId).ToArray();
+        if (rows.Length == 0) throw new ArgumentException("Keine Nachwahlbögen vorhanden.");
+        using var pdf = new Paper("Nachwahl - " + rows[0].Remaining.StudentId, catalog.GraduationYear);
+        for (var i = 0; i < rows.Length; i++)
+        {
+            if (i > 0) pdf.StartStudent("Nachwahl - " + rows[i].Remaining.StudentId);
+            WriteReselection(pdf, rows[i].Student, rows[i].Remaining, catalog, rows[i].Removed);
+        }
+        return pdf.Finish();
+    }
+
+    private static void WriteReselection(Paper pdf, StudentRecord student, CourseChoice remaining, OfferCatalog catalog, string[] removed)
+    {
         pdf.Title("Deine Kurswahl: Nachwahl");
         pdf.Paragraph(student.Student.SyntheticDisplayName + "  |  Klasse " + student.Student.ClassName);
         pdf.Paragraph("Folgende gewählte Kurse können leider nicht angeboten werden:");
@@ -43,7 +60,6 @@ public static class PlanningPrint
         pdf.BlankLines(3);
         pdf.Paragraph("Die endgültige Belegbarkeit wird durch die Oberstufenberatung geprüft.", true);
         pdf.Signature();
-        return pdf.Finish();
     }
 
     private sealed class Paper : IDisposable
@@ -53,7 +69,7 @@ public static class PlanningPrint
         private readonly SKPaint text, bold, muted, line, fill;
         private SKCanvas canvas = null!;
         private readonly int year;
-        private readonly string title;
+        private string title;
         private float y;
         private int page;
         private bool finished;
@@ -78,6 +94,7 @@ public static class PlanningPrint
             canvas.DrawText(title + "  |  " + DateTime.Now.ToString("dd.MM.yyyy") + "  |  Seite " + page, Left, 818, muted);
             y = 62;
         }
+        public void StartStudent(string label) { title = label; NewPage(); }
         public void Ensure(float height) { if (y + height > Bottom) NewPage(); }
         public void Title(string value) { bold.TextSize = 22; Paragraph(value, false, bold); bold.TextSize = 14; }
         public void Heading(string value) { Ensure(45); y += 8; Paragraph(value, false, bold); }

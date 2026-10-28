@@ -22,9 +22,12 @@ public sealed class PlanningWindowTests
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
         using (var store = workspace.OpenActive())
         {
-            store.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            foreach (var (id, name) in new[] { ("demo-001", "Demo Eins"), ("demo-002", "Demo Zwei") })
+            {
+            store.SaveStudent(new(1, new(Guid.NewGuid(), id, name, "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
             new TeacherSession(store, TestData.WorkflowCatalog, "demo-beratung").Save(TestData.Choice with
-            { Selections = [TestData.Select(TestData.WorkflowCatalog.Offers.Single(o => o.Id == "BIO-LF"))] }, null, RevisionSource.StudentSubmission, "Demo Abgabe");
+            { StudentId = id, Selections = [TestData.Select(TestData.WorkflowCatalog.Offers.Single(o => o.Id == "BIO-LF"))] }, null, RevisionSource.StudentSubmission, "Demo Abgabe");
+            }
         }
         var window = new TeacherWindow(root);
         try
@@ -48,12 +51,23 @@ public sealed class PlanningWindowTests
             Control<CheckBox>("PlanningCancel_BIO_LF").IsChecked = true; Click("Streichung nur simulieren");
             Assert.Single(store.History("demo-001"));
             Assert.Contains(Control<StackPanel>("PlanningImpact").GetLogicalDescendants().OfType<TextBlock>(), t => t.Text == "Demo Eins");
-            Control<TextBox>("PlanningReason").Text = "Demo Kurs kommt nicht zustande";
+            Assert.DoesNotContain(window.GetLogicalDescendants().OfType<TextBox>(), c => c.Name == "PlanningReason");
             Click("Geprüfte Angebotsänderung im Lehrerbestand übernehmen"); Assert.Single(store.History("demo-001"));
             Control<CheckBox>("PlanningConfirm").IsChecked = true;
             Click("Geprüfte Angebotsänderung im Lehrerbestand übernehmen");
             Assert.Equal(2, store.History("demo-001").Length);
             Assert.Single(Directory.GetFiles(Path.Combine(root, "Nachwahlboegen"), "*.pdf", SearchOption.AllDirectories));
+            var word = Assert.Single(Directory.GetFiles(Path.Combine(root, "Nachwahlboegen"), "*.docx", SearchOption.AllDirectories));
+            using (var zip = System.IO.Compression.ZipFile.OpenRead(word))
+            using (var xml = zip.GetEntry("word/document.xml")!.Open())
+            {
+                var document = System.Xml.Linq.XDocument.Load(xml);
+                System.Xml.Linq.XNamespace w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+                Assert.Single(document.Descendants(w + "pageBreakBefore"));
+                Assert.Equal(2, document.Descendants(w + "tbl").Count());
+                Assert.Contains("Demo Eins", document.ToString()); Assert.Contains("Demo Zwei", document.ToString());
+            }
+            Assert.Equal(2, store.History("demo-002").Length);
             Assert.Equal(OfferStatus.Cancelled, new TeacherWorkspace(root).Active!.Catalog.Offers.Single(o => o.Id == "BIO-LF").Status);
             if (Environment.GetEnvironmentVariable("GSM_UI_SCREENSHOTS") is { Length: > 0 } screenshots)
             {

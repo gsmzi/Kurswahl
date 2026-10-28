@@ -64,7 +64,8 @@ public sealed class PlanningTests : IDisposable
             Seed(store); store.EnablePlanning(); var basis = Capture(store); snapshotId = basis.Id;
             var preview = CoursePlanning.PreviewCancellation(basis, ["BIO-LF-BILI"]);
             Assert.Throws<ArgumentException>(() => CoursePlanning.Confirm(store, preview, "demo-beratung", "Demo Streichung", false));
-            CoursePlanning.Confirm(store, preview, "demo-beratung", "Demo Streichung", true);
+            CoursePlanning.Confirm(store, preview, "demo-beratung", "", true);
+            Assert.Equal("Angebote gestrichen: BIO-LF-BILI", store.History("demo-001")[1].Reason);
             Assert.Equal(2, store.History("demo-001").Length);
             Assert.Equal(RevisionSource.StudentSubmission, store.History("demo-001")[0].Source);
             Assert.Equal(RevisionSource.OfferCancellation, store.History("demo-001")[1].Source);

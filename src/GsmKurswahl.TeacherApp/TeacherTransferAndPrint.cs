@@ -79,13 +79,11 @@ public sealed partial class TeacherWindow
         if (rows.Length == 0) throw new InvalidOperationException("Keine betroffenen Wahlen zur aktuellen Streichung vorhanden.");
         var folder = Path.Combine(workspace!.Root, "Nachwahlboegen", DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(folder);
-        foreach (var row in rows)
-        {
-            var r = row.Revision!;
-            static string Label(string value) => new string(value.Where(c => char.IsLetterOrDigit(c) || c is '-' or '_').Take(60).ToArray());
-            WriteNew(Path.Combine(folder, "Nachwahl-" + Label(row.Student.Student.ClassName) + "-" + Label(row.Student.Student.SyntheticDisplayName) + "-" + row.Student.Student.Id.ToString("N") + ".pdf"),
-                PlanningPrint.Reselection(row.Student, r.Snapshot, session!.Catalog, r.Changes.Where(c => c.Before.Length > 0 && c.After.Length == 0).Select(c => c.OfferId).ToArray()));
-        }
+        var items = rows.Select(row => new ReselectionPrintItem(row.Student, row.Revision!.Snapshot,
+            row.Revision.Changes.Where(c => c.Before.Length > 0 && c.After.Length == 0).Select(c => c.OfferId).ToArray())).ToArray();
+        var fileName = "Nachwahlboegen-Abitur-" + session!.Catalog.GraduationYear;
+        WriteNew(Path.Combine(folder, fileName + ".pdf"), PlanningPrint.Reselections(items, session.Catalog));
+        WriteNew(Path.Combine(folder, fileName + ".docx"), ReselectionWord.Render(items, session.Catalog));
         return folder;
     }
     private void OpenReselectionFolder()

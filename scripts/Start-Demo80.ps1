@@ -1,7 +1,7 @@
 param([switch]$PrepareOnly, [switch]$GkGeo)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
-$buildRoot = Join-Path $projectRoot 'artifacts/compact-ui-build'
+$buildRoot = Join-Path $projectRoot 'artifacts/combined-print-build'
 $exe = Join-Path $buildRoot 'bin/GsmKurswahl.TeacherApp/release/GsmKurswahl.TeacherApp.exe'
 $demoRoot = Join-Path $projectRoot 'artifacts/demo-80'
 if ($GkGeo) { $demoRoot = Join-Path $projectRoot 'artifacts/demo-80-gk-geo' }

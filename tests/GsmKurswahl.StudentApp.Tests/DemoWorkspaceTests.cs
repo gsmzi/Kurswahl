@@ -44,8 +44,10 @@ public sealed class DemoWorkspaceTests
                     Directory.CreateDirectory(pdfFolder);
                     File.WriteAllBytes(Path.Combine(pdfFolder, "wahlzahlen.pdf"), GsmKurswahl.ImportExport.PlanningPrint.Demand(2029, snapshot.Name, "Mit voraussichtlichen Abgängern", PlanningPresentation.DemandTable(snapshot)));
                     var preview = CoursePlanning.PreviewCancellation(snapshot, ["BIO-LF-BILI"]);
-                    var change = preview.Changes.Where(c => !c.RemovedOffers.IsEmpty).OrderByDescending(c => c.Choice.Selections.Length).First();
-                    File.WriteAllBytes(Path.Combine(pdfFolder, "nachwahl.pdf"), GsmKurswahl.ImportExport.PlanningPrint.Reselection(states.Single(s => s.Record.Student.ExternalStudentId == change.StudentId).Record, change.Choice, preview.Catalog, change.RemovedOffers.ToArray()));
+                    var items = preview.Changes.Where(c => !c.RemovedOffers.IsEmpty).Select(c => new GsmKurswahl.ImportExport.ReselectionPrintItem(
+                        states.Single(s => s.Record.Student.ExternalStudentId == c.StudentId).Record, c.Choice, c.RemovedOffers.ToArray())).ToArray();
+                    File.WriteAllBytes(Path.Combine(pdfFolder, "nachwahl-gesamt.pdf"), GsmKurswahl.ImportExport.PlanningPrint.Reselections(items, preview.Catalog));
+                    File.WriteAllBytes(Path.Combine(pdfFolder, "nachwahl-gesamt.docx"), GsmKurswahl.ImportExport.ReselectionWord.Render(items, preview.Catalog));
                 }
                 Assert.Equal(16, analysis.Combinations.Length); Assert.NotEmpty(analysis.Overlaps);
                 foreach (var id in new[] { "BIO-LF-BILI", "BIO-BF-BILI", "INF-BF", "PSY-WF", "SIA-SK", "F-LF", "L-LF" })

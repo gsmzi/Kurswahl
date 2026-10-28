@@ -90,7 +90,6 @@ public sealed partial class TeacherWindow
         foreach (var row in selection) { row.Box.Width = 260; row.Box.Margin = new Thickness(0, 0, 8, 2); offers.Children.Add(row.Box); }
         changesPanel.Children.Add(new Expander { Header = "Angebotsvarianten zur Streichung wählen", Content = offers });
         var impact = new StackPanel { Spacing = 2, Name = "PlanningImpact" };
-        var reasonBox = new TextBox { Watermark = "Begründung der Entscheidung", Name = "PlanningReason" };
         var confirmation = new CheckBox { Content = "Diese Vorschau geprüft; Angebotsänderung und neue Verwaltungsrevisionen ausdrücklich übernehmen", Name = "PlanningConfirm" };
         CancellationPreview? preview = null;
         foreach (var item in selection) item.Box.IsCheckedChanged += (_, _) => { preview = null; confirmation.IsChecked = false; impact.Children.Clear(); };
@@ -137,11 +136,12 @@ public sealed partial class TeacherWindow
             planning.SavePlanningDocument(CoursePlanning.Scenario(preview, name.Text ?? ""));
             status.Text = "Szenario gespeichert; aktive Wahlen unverändert."; ShowPlanning();
         }));
-        changesPanel.Children.Add(impact); changesPanel.Children.Add(reasonBox); changesPanel.Children.Add(confirmation);
+        changesPanel.Children.Add(impact);
+        changesPanel.Children.Add(confirmation);
         changesPanel.Children.Add(Primary(Button("Geprüfte Angebotsänderung im Lehrerbestand übernehmen", () =>
         {
             if (preview is null) throw new InvalidOperationException("Zuerst eine Vorschau erstellen.");
-            CoursePlanning.Confirm(planning, preview, Actor, reasonBox.Text ?? "", confirmation.IsChecked == true);
+            CoursePlanning.Confirm(planning, preview, Actor, "", confirmation.IsChecked == true);
             session = new TeacherSession(store!, preview.Catalog, Actor);
             var hasRemoved = preview.Changes.Any(c => !c.RemovedOffers.IsEmpty);
             var committedCatalog = preview.Catalog; preview = null; confirmation.IsChecked = false;

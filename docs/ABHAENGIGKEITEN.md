@@ -55,3 +55,5 @@ M3-Abschlussaudit 27.10.2026 erfolgreich: für alle 14 Projekte einschließlich 
 Keine neuen Pakete und keine Änderungen an Paketversionen oder Lockdateien. Kursplanung verwendet den vorhandenen Regelkern und die lehrerseitige SQLite-Komponente. Keine neuen Onlinezugriffe. Der letzte Paket-Audit bleibt der oben dokumentierte M3-Audit; für M4 wird daraus keine neue Sicherheitsfreigabe abgeleitet.
 
 - 28.10.2026: Netzwechsel-/Planungsdruck ergänzt ohne neue NuGet-Pakete. PDF-Erstellung nutzt weiterhin SkiaSharp 2.88.9; ZIP/SHA-256 und SQLite-Backup verwenden bestehende Framework-/Paketabhängigkeiten. Lockdateien unverändert.
+
+- 28.10.2026: Gemeinsame Nachwahl-DOCX nutzt System.IO.Compression und System.Xml.Linq aus .NET 10. Keine zusätzlichen NuGet-Pakete oder Änderungen an Lockdateien. Word wurde nur zur manuellen Layoutprüfung eingesetzt und ist keine Laufzeitvoraussetzung.
