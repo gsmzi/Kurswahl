@@ -67,5 +67,25 @@ public sealed class TeacherWorkspaceTests : IDisposable
         Assert.Equal(other, new TeacherWorkspaceLocation(root).Load());
         Directory.Delete(other); Assert.Throws<DirectoryNotFoundException>(() => settings.Load());
     }
+    [Fact]
+    public void Version2DatabaseUpgradesSeamlesslyToVersion3AndPreservesRecords()
+    {
+        Directory.CreateDirectory(root); var path = Path.Combine(root, "v2.db");
+        using (var db = new SqliteAdministrationStore(path))
+            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+        using (var raw = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()))
+        {
+            raw.Open(); using var cmd = raw.CreateCommand();
+            cmd.CommandText = "DROP TRIGGER IF EXISTS transfer_receipts_no_update; DROP TRIGGER IF EXISTS transfer_receipts_no_delete; DROP TABLE IF EXISTS transfer_receipts; PRAGMA user_version = 2;";
+            cmd.ExecuteNonQuery();
+        }
+        using (var upgraded = new SqliteAdministrationStore(path))
+        {
+            Assert.True(upgraded.PlanningEnabled);
+            Assert.True(upgraded.TransferTrackingEnabled);
+            Assert.Equal("Demo Eins", upgraded.Students().Single().Student.SyntheticDisplayName);
+        }
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

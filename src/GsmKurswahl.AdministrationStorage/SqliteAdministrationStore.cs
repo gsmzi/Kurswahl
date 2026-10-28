@@ -22,7 +22,7 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
         {
             db.Open();
             var version = Convert.ToInt32(Scalar("PRAGMA user_version"));
-            if (version is not (0 or 3)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
+            if (version is not (0 or 1 or 2 or 3)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
             if (version == 0)
             {
                 if (Convert.ToInt32(Scalar("SELECT count(*) FROM sqlite_master WHERE type='table'")) != 0)
@@ -37,6 +37,26 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
                     CREATE TABLE planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
                     CREATE TABLE planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
                     CREATE TABLE transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+                    PRAGMA user_version=3;
+                    COMMIT;
+                    """);
+            }
+            else if (version == 1)
+            {
+                Execute("""
+                    BEGIN IMMEDIATE;
+                    CREATE TABLE IF NOT EXISTS planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
+                    CREATE TABLE IF NOT EXISTS planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+                    CREATE TABLE IF NOT EXISTS transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+                    PRAGMA user_version=3;
+                    COMMIT;
+                    """);
+            }
+            else if (version == 2)
+            {
+                Execute("""
+                    BEGIN IMMEDIATE;
+                    CREATE TABLE IF NOT EXISTS transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
                     PRAGMA user_version=3;
                     COMMIT;
                     """);

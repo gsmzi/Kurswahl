@@ -482,3 +482,16 @@ M3-Korrekturen zuvor separat als 07c83c9 committet. Die M4-Änderungen liegen an
     - Storage: 76 / 76
     - StudentApp (inkl. Avalonia-Headless-UI): 26 / 26
   - Ausschließlich synthetische Personen und Kennungen verwendet.
+
+
+### Nahtloses Schema-Upgrade für bestehende lokale Testbestände (28.10.2026)
+
+- Fehleranalyse nach Nutzertest: Beim Start von `Testversion-80-Schueler.cmd` bzw. `Testversion-GK-Geo.cmd` erschien die Fehlermeldung „Unbekannte Verwaltungsschemaversion; keine Migration.“, weil die vorhandenen lokalen Testdatenbanken in `artifacts/demo-80` und `artifacts/demo-80-gk-geo` auf Schema-Version 2 lagen.
+- Behebung:
+  - `SqliteAdministrationStore.cs` akzeptiert neben 0 und 3 nun auch Schemaversion 1 und 2 und aktualisiert diese beim Öffnen atomar und abwärtskompatibel auf Schema 3 (`transfer_receipts` anlegen, `PRAGMA user_version = 3`), ohne bestehende Daten zu verändern.
+  - `WorkspaceTransfer.cs` akzeptiert beim Transportimport nun ebenfalls Datenbanken der Versionen 1, 2 und 3.
+  - Neuer automatisierter Regressionstest `Version2DatabaseUpgradesSeamlesslyToVersion3AndPreservesRecords` in `TeacherWorkspaceTests.cs`.
+- Testergebnisse:
+  - Release-Build: **0 Warnungen, 0 Fehler**.
+  - Gesamte Testsuite: **230/230 bestanden** (Storage: 77/77, alle 6 Testprojekte grün).
+  - Testbestände `artifacts/demo-80` und `artifacts/demo-80-gk-geo` öffnen fehlerfrei.
