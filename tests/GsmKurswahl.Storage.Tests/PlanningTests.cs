@@ -151,4 +151,36 @@ public sealed class PlanningTests : IDisposable
         Assert.Equal("verteilt", distributor.Distribute(record, issued, preview.Catalog).Status);
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, new TeacherSession(store, preview.Catalog, "demo")).Delivered);
     }
+    [Fact]
+    public void ElectiveCancellationKeepsValidChoiceWithoutReselectionAndPrioritizesValidReplacements()
+    {
+        var fullCatalog = GsmKurswahl.Storage.JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "../../../../../samples/fachangebot-demo.json")));
+        fullCatalog = fullCatalog with { Offers = [.. fullCatalog.Offers.Select(o => o.Id == "I-BF" ? o with { Status = OfferStatus.Offered } : o)] };
+        using var store = new SqliteAdministrationStore(Database); store.EnablePlanning();
+        var cohort = DemoCohort.Create(fullCatalog);
+        // Pick one student with PSY-WF (extra 2 courses above 42) and one with BIO-LF-BILI.
+        var psyStudent = cohort.First(c => c.Choice.Selections.Any(s => s.OfferId == "PSY-WF") && c.Choice.Selections.Sum(s => s.Semesters.Length) >= 44);
+        var biliStudent = cohort.First(c => c.Choice.Selections.Any(s => s.OfferId == "BIO-LF-BILI") && c.Record.Student.ExternalStudentId != psyStudent.Record.Student.ExternalStudentId);
+        var restrictedPrereq = biliStudent.Record.Student.Prerequisites with { ItalianProfile = Knowledge.Yes, ContinuedLanguages = ["E"] };
+        store.SaveStudent(psyStudent.Record, null);
+        store.SaveStudent(biliStudent.Record with { Student = biliStudent.Record.Student with { Prerequisites = restrictedPrereq } }, null);
+        var session = new TeacherSession(store, fullCatalog, "demo-beratung");
+        session.Save(psyStudent.Choice, null, RevisionSource.StudentSubmission, "Demo Abgabe PSY");
+        session.Save(biliStudent.Choice, null, RevisionSource.StudentSubmission, "Demo Abgabe BILI");
+
+        var basis = CoursePlanning.Capture(store, fullCatalog, "demo-beratung", "Basis", true);
+        var preview = CoursePlanning.PreviewCancellation(basis, ["PSY-WF", "BIO-LF-BILI"]);
+        var psyChange = preview.Changes.Single(c => c.StudentId == psyStudent.Record.Student.ExternalStudentId);
+        var biliChange = preview.Changes.Single(c => c.StudentId == biliStudent.Record.Student.ExternalStudentId);
+        Assert.Equal(ReviewStatus.NeedsReview, psyChange.Validation.Status);
+        Assert.Equal(ReviewStatus.Invalid, biliChange.Validation.Status);
+        Assert.Equal("BIO-LF", biliChange.ReplacementOffers.First());
+        Assert.DoesNotContain("I-BF", biliChange.ReplacementOffers);
+
+        CoursePlanning.Confirm(store, preview, "demo-beratung", "PSY-WF und BIO-LF-BILI gestrichen", true);
+        Assert.False(store.Reselection(psyStudent.Record.Student.ExternalStudentId).Required);
+        Assert.Contains("weiterhin strukturell gültig", store.Reselection(psyStudent.Record.Student.ExternalStudentId).Note);
+        Assert.True(store.Reselection(biliStudent.Record.Student.ExternalStudentId).Required);
+        Assert.Contains("Nachwahl erforderlich", store.Reselection(biliStudent.Record.Student.ExternalStudentId).Note);
+    }
 }

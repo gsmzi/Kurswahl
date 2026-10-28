@@ -82,12 +82,19 @@ public static class CoursePlanning
                 Selections = [.. revision.Snapshot.Selections.Where(s => !ids.Contains(s.OfferId))] };
             var profile = new ProfileContext(ProfileStatus.Verified, student.Student.Prerequisites);
             var validation = new ChoiceValidator().Validate(choice, catalog, profile);
-            var removed = revision.Snapshot.Selections.Where(s => ids.Contains(s.OfferId)).Select(s => s.OfferId).ToImmutableArray();
+            var removedOffers = revision.Snapshot.Selections.Where(s => ids.Contains(s.OfferId)).Select(s => basis.Catalog.Offers.Single(o => o.Id == s.OfferId)).ToArray();
+            var removed = removedOffers.Select(o => o.Id).ToImmutableArray();
+            var needsLf = removedOffers.Any(o => o.Type == CourseType.Lf);
+            var languages = AcademicRules.Languages(profile);
             // Suggestions are only personally permitted offers, never an automatic replacement or a promise of a legal complete choice.
             var replacements = catalog.Offers.Where(o => o.Status is OfferStatus.Offered or OfferStatus.Established
                 && !choice.Selections.Any(s => s.SubjectId == o.SubjectId)
+                && (o.SubjectId is not ("I" or "GR" or "SPA" or "RU" or "POR") || languages.Contains(o.SubjectId))
                 && new ChoiceValidator().GetAvailability(o, profile).CanSelect)
-                .Select(o => o.Id).Order(StringComparer.Ordinal).ToImmutableArray();
+                .OrderByDescending(o => removedOffers.Any(r => r.SubjectId == o.SubjectId && r.Type == o.Type))
+                .ThenByDescending(o => needsLf ? o.Type == CourseType.Lf : o.Type != CourseType.Lf)
+                .ThenBy(o => o.Id, StringComparer.Ordinal)
+                .Select(o => o.Id).ToImmutableArray();
             return new PlanningChange(revision.StudentId, revision.Id, choice, validation, removed, removed.IsEmpty ? [] : replacements);
         }).ToImmutableArray();
         return new(basis, catalog, ids, changes, restoring);
@@ -115,7 +122,9 @@ public static class CoursePlanning
         var followUps = preview.Changes.Where(c => !c.RemovedOffers.IsEmpty).Select(c =>
         {
             var old = preview.Basis.FollowUps.Single(f => f.StudentId == c.StudentId);
-            return old with { Required = old.Required || c.Validation.Status != ReviewStatus.Valid, Note = actor + ": " + reason.Trim() + " · Prüfung: " + c.Validation.Status };
+            var requiresReselection = c.Validation.Status == ReviewStatus.Invalid;
+            var statusNote = requiresReselection ? "Nachwahl erforderlich (invalid)" : "nach Streichung weiterhin strukturell gültig (" + c.Validation.Status + ")";
+            return old with { Required = old.Required || requiresReselection, Note = actor + ": " + reason.Trim() + " · " + statusNote };
         }).ToImmutableArray();
         store.CommitCancellation(preview, actor, reason.Trim(), revisions, followUps);
     }

@@ -59,6 +59,8 @@ public sealed partial class TeacherWindow
                     ItemsSource = new[] { "Aktiv", "Voraussichtlich", "Bestätigt" }, SelectedIndex = (int)record.Student.Departure,
                     MinHeight = 28, Padding = new Thickness(6, 2), HorizontalAlignment = HorizontalAlignment.Stretch };
                 var updating = false;
+                var line = CompactLine(columns, [student, Text(record.Student.ClassName), Text(lf), Text(bf), departure]);
+                void UpdateLineTip() => ToolTip.SetTip(line, "Mündliche Planung: " + string.Join(", ", choice.PlannedOralSubjects) + " · Abgängerstatus: " + record.Student.Departure + " · " + (state.RequiresReselection ? "Nachwahl / Klärung offen" : "Wahl erfasst") + " · Prüfstand: " + state.Validation?.Status);
                 departure.SelectionChanged += (_, _) =>
                 {
                     if (updating || departure.SelectedIndex < 0 || departure.SelectedIndex == (int)record.Student.Departure) return;
@@ -67,6 +69,7 @@ public sealed partial class TeacherWindow
                         var next = record with { Student = record.Student with { Departure = (DepartureStatus)departure.SelectedIndex },
                             Version = record.Version + 1, ChangedAt = DateTimeOffset.UtcNow, Actor = Actor };
                         store!.SaveStudent(next, record.Version); record = next;
+                        UpdateLineTip(); Refresh(preserveEditor: true);
                         status.Text = record.Student.SyntheticDisplayName + ": Abgängerstatus gespeichert. Kursplanung berücksichtigt die Änderung.";
                     }
                     catch (Exception ex)
@@ -75,8 +78,7 @@ public sealed partial class TeacherWindow
                         status.Text = "Abgängerstatus nicht gespeichert: " + ex.Message + " Wahlergebnisse erneut öffnen.";
                     }
                 };
-                var line = CompactLine(columns, [student, Text(record.Student.ClassName), Text(lf), Text(bf), departure]);
-                ToolTip.SetTip(line, "Mündliche Planung: " + string.Join(", ", choice.PlannedOralSubjects) + " · " + (state.RequiresReselection ? "Nachwahl / Klärung offen" : "Wahl erfasst") + " · Prüfstand: " + state.Validation?.Status);
+                UpdateLineTip();
                 rows.Children.Add(new Border { Background = index++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White, Child = line });
             }
         }
