@@ -5,18 +5,11 @@ namespace GsmKurswahl.AdministrationStorage;
 
 public sealed partial class SqliteAdministrationStore
 {
-    public bool PlanningEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) is 2 or 3;
-    public void EnablePlanning()
-    {
-        if (PlanningEnabled) return;
-        // Only called by the explicit activation button. The existing rows remain unchanged.
-        using var tx = db.BeginTransaction();
-        Execute("CREATE TABLE planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL); CREATE TABLE planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);");
-        foreach (var table in new[] { "planning_snapshots", "planning_decisions" })
-            Execute($"CREATE TRIGGER {table}_no_update BEFORE UPDATE ON {table} BEGIN SELECT RAISE(ABORT,'append-only'); END; CREATE TRIGGER {table}_no_delete BEFORE DELETE ON {table} BEGIN SELECT RAISE(ABORT,'append-only'); END;");
-        Execute("PRAGMA user_version=2"); tx.Commit();
-    }
-    private void RequirePlanning() { if (!PlanningEnabled) throw new InvalidOperationException("Kursplanung zuerst ausdrücklich aktivieren (Datenbankschema 2)."); }
+    // Since 28.10.2026 every administrative database is created directly with schema 3 (planning and
+    // transfer receipts included). Older schema versions are rejected on open; there is no migration.
+    public bool PlanningEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) == 3;
+    public void EnablePlanning() { }
+    private void RequirePlanning() { if (!PlanningEnabled) throw new InvalidOperationException("Unbekannte Verwaltungsschemaversion."); }
     private static void ValidatePlanning(PlanningDocument document)
     {
         if (document.SchemaVersion != 1 || document.Id == Guid.Empty || document.CreatedAt == default || string.IsNullOrWhiteSpace(document.Name)

@@ -19,6 +19,67 @@ public sealed partial class TeacherWindow
     private static readonly IBrush Line = Brush.Parse("#DAE3E9");
     private readonly StackPanel workflowProgress = new() { Name = "WorkflowProgress", Spacing = 10 };
     private readonly TextBlock sectionLabel = new() { FontSize = 12, Foreground = Muted, FontWeight = FontWeight.SemiBold };
+    private readonly Button yearSwitchButton = new() { Content = "Jahrgang wechseln / neu …", Name = "SwitchYearHeader", Padding = new Thickness(10, 4), MinHeight = 28, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private Border statusBanner = null!;
+
+    internal static string FormatStatus(ReviewStatus? status) => status switch
+    {
+        ReviewStatus.Valid => "Formal gültig",
+        ReviewStatus.NeedsReview => "Fachlich zu klären",
+        ReviewStatus.Invalid => "Regelverstoß",
+        _ => "Ohne Wahl"
+    };
+    internal static string FormatKnowledge(Knowledge value) => value switch
+    {
+        Knowledge.Yes => "Ja",
+        Knowledge.No => "Nein",
+        _ => "Unbekannt"
+    };
+    internal static string FormatDeparture(DepartureStatus status) => status switch
+    {
+        DepartureStatus.ExpectedDeparture => "Voraussichtlich",
+        DepartureStatus.ConfirmedDeparture => "Bestätigt",
+        _ => "Aktiv"
+    };
+    internal static string FormatCourseType(CourseType type) => type switch
+    {
+        CourseType.Lf => "LF",
+        CourseType.Bf => "BF",
+        CourseType.Elective => "Wahlfach",
+        _ => "Seminarkurs"
+    };
+    internal static string FormatVariant(CourseVariant variant) => variant == CourseVariant.Bilingual ? "bilingual" : "normal";
+    internal static string FormatOfferStatus(OfferStatus status) => status switch
+    {
+        OfferStatus.Offered => "angeboten",
+        OfferStatus.Established => "fest eingerichtet",
+        OfferStatus.Cancelled => "entfällt",
+        _ => "geplant"
+    };
+    internal static string FormatRevisionSource(RevisionSource source) => source switch
+    {
+        RevisionSource.StudentSubmission => "Schülerabgabe",
+        RevisionSource.TeacherEdit => "Lehreränderung",
+        RevisionSource.OfferCancellation => "Kursstreichung",
+        RevisionSource.AsvReconciliation => "Externer Abgleich",
+        RevisionSource.Restoration => "Wiederherstellung",
+        _ => source.ToString()
+    };
+    internal static string FormatActorRole(ActorRole role) => role switch
+    {
+        ActorRole.Student => "Schüler",
+        ActorRole.Teacher => "Oberstufenberatung",
+        _ => "System"
+    };
+    internal static string FormatReconciliationKind(ReconciliationKind kind) => kind switch
+    {
+        ReconciliationKind.Identical => "Identisch",
+        ReconciliationKind.Changed => "Abweichend",
+        ReconciliationKind.OnlyInternal => "Nur im Lehrerbestand",
+        ReconciliationKind.OnlyExternal => "Nur in externer Datei",
+        ReconciliationKind.InvalidIdentity => "Unklare Kennung / Dublette",
+        _ => kind.ToString()
+    };
 
     private void BuildVisualShell()
     {
@@ -30,7 +91,14 @@ public sealed partial class TeacherWindow
         var brand = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         var titles = new StackPanel { Spacing = 4 };
         titles.Children.Add(new TextBlock { Text = "GSM  /  KURSWAHL · LEHRERVERWALTUNG", FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Accent, LetterSpacing = 1.4 });
-        titles.Children.Add(heading); brand.Children.Add(titles);
+        var headingRow = new WrapPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        heading.Margin = new Thickness(0, 0, 14, 0);
+        headingRow.Children.Add(heading);
+        ToolTip.SetTip(yearSwitchButton, "Zwischen eingerichteten Abiturjahrgängen wechseln, das Fachangebot ansehen oder im neuen Schuljahr einen weiteren Abiturjahrgang anlegen.");
+        yearSwitchButton.Click += (_, _) => ShowManage();
+        headingRow.Children.Add(yearSwitchButton);
+        titles.Children.Add(headingRow);
+        brand.Children.Add(titles);
         var badge = new Border { Background = Brush.Parse("#FFF1D9"), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 6), VerticalAlignment = VerticalAlignment.Center,
             Child = new TextBlock { Text = "Erprobungsbetrieb", Foreground = Brush.Parse("#785311"), FontSize = 12, FontWeight = FontWeight.SemiBold } };
         ToolTip.SetTip(badge, "Nur synthetische Daten. Fachliche Freigabe offen; keine verbindliche Abgabe.");
@@ -40,9 +108,33 @@ public sealed partial class TeacherWindow
         header.Margin = new Thickness(0, 0, 0, 12);
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         var footer = new StackPanel { Spacing = 4, Margin = new Thickness(0, 12, 0, 0) };
-        footer.Children.Add(new ScrollViewer { Content = status, MaxHeight = 54 });
+        status.FontSize = 13; status.Foreground = Ink; status.FontWeight = FontWeight.Medium;
+        statusBanner = new Border
+        {
+            Background = Brush.Parse("#EDF2F6"), BorderBrush = Line, BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 6),
+            Child = new ScrollViewer { Content = status, MaxHeight = 54 }
+        };
+        status.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != TextBlock.TextProperty) return;
+            var msg = status.Text ?? "";
+            var isError = msg.Contains("nicht abgeschlossen", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("nicht gespeichert", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("Bitte ", StringComparison.OrdinalIgnoreCase);
+            var isSuccess = !isError && (msg.Contains("gespeichert", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("verteilt", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("übernommen", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("exportiert", StringComparison.OrdinalIgnoreCase)
+                || msg.Contains("angelegt", StringComparison.OrdinalIgnoreCase));
+            statusBanner.Background = isError ? Brush.Parse("#FCEBEB") : isSuccess ? Brush.Parse("#E6F4EA") : Brush.Parse("#EDF2F6");
+            statusBanner.BorderBrush = isError ? Brush.Parse("#E09B9B") : isSuccess ? Accent : Line;
+            status.Foreground = isError ? Brush.Parse("#8C1D1D") : isSuccess ? Brush.Parse("#13544E") : Ink;
+        };
+        footer.Children.Add(statusBanner);
         footer.Children.Add(new TextBlock { Text = "Synthetische Daten · fachliche Freigabe offen · keine verbindliche Abgabe", FontSize = 11, Foreground = Muted });
-        status.FontSize = 12; status.Foreground = Muted;
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         var content = new DockPanel();
         sectionLabel.Margin = new Thickness(8, 0, 8, 12); DockPanel.SetDock(sectionLabel, Dock.Top); content.Children.Add(sectionLabel); content.Children.Add(pageHost);
@@ -55,13 +147,14 @@ public sealed partial class TeacherWindow
     private static Button Primary(Button button) { button.Classes.Add("primary"); return button; }
     private void UpdateVisualNavigation()
     {
+        yearSwitchButton.IsVisible = workspace?.Active is not null && visiblePage != "new";
         workflowProgress.IsVisible = visiblePage is "wahl" or "offer" or "import" or "profiles" or "collection" or "people" or "new";
         sectionLabel.Text = visiblePage switch
         {
             "offer" => "EINRICHTUNG  /  FACHANGEBOT", "import" => "SCHÜLERLISTE  /  IMPORT & ABGLEICH",
             "profiles" => "SCHÜLERDATEIEN  /  VERTEILUNG", "collection" => "KURSWAHLEN  /  EINGANG & KONFLIKTE",
             "wahl" => "WAHL / VORBEREITEN & EINSAMMELN", "results" => "WAHLERGEBNISSE", "people" => "WAHL / SCHÜLERBESTAND", "settings" => "EINSTELLUNGEN", "help" => "HILFE & DATEIEN",
-            "planning" => "KURSPLANUNG / SZENARIEN & ANALYSE", "manage" => "JAHRGANG VERWALTEN", "catalog" => "FACHANGEBOT", "new" => "WILLKOMMEN", _ => "JAHRGANGSÜBERSICHT"
+            "planning" => "KURSPLANUNG / SZENARIEN & ANALYSE", "manage" => "JAHRGANG VERWALTEN", "catalog" => "FACHANGEBOT", "new" => "WILLKOMMEN", "asv" => "ABGLEICH / ABSCHLUSS", _ => "JAHRGANGSÜBERSICHT"
         };
         foreach (var button in navigation.Children.OfType<Button>())
         {
@@ -121,16 +214,25 @@ public sealed partial class TeacherWindow
     private static Control SummaryCards(TeacherDashboard summary)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*") };
-        (string Value, string Label)[] values = [(summary.Students.ToString(), "Schüler im Jahrgang"), ($"{summary.Delivered} / {summary.Students}", "Profile zugestellt"), (summary.Choices.ToString(), "Wahlen eingelesen"), (summary.Reviews.ToString(), "Fachlich zu klären")];
+        (string Value, string Label, string Tip)[] values = [
+            (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen."),
+            ($"{summary.Delivered} / {summary.Students}", "Profile zugestellt", "Anzahl der Personen, deren aktuelles persönliches Profil (profil.json) und Fachangebot erfolgreich im Wahlordner abgelegt wurden."),
+            (summary.Choices.ToString(), "Wahlen eingelesen", "Anzahl der Personen, für die bereits eine Kurswahl im Lehrerbestand vorliegt."),
+            (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen, Sonderfällen (z. B. Sportersatz, Religion/Ethik) oder Regelverstößen.")];
         if (summary.Students > 0 && summary.Choices == summary.Students)
-            values = [(summary.Students.ToString(), "Schüler im Jahrgang"), (summary.Choices.ToString(), "Wahlen eingelesen"),
-                (summary.Reselections.ToString(), "Offene Nachwahlen"), (summary.Reviews.ToString(), "Fachlich zu klären")];
+            values = [
+                (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen."),
+                (summary.Choices.ToString(), "Wahlen eingelesen", "Alle Schüler dieses Jahrgangs haben eine erfasste Kurswahl."),
+                (summary.Reselections.ToString(), "Offene Nachwahlen", "Schüler, die nach einer Kursstreichung oder wegen eines Regelverstoßes erneut wählen müssen."),
+                (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen, Sonderfällen oder Regelverstößen.")];
         for (var i = 0; i < values.Length; i++)
         {
             var body = new StackPanel { Spacing = 5 };
             body.Children.Add(new TextBlock { Text = values[i].Value, FontSize = 28, FontWeight = FontWeight.SemiBold, Foreground = i == 3 && summary.Reviews > 0 ? Brush.Parse("#946312") : Accent });
             body.Children.Add(new TextBlock { Text = values[i].Label, FontSize = 12, Foreground = Muted, TextWrapping = TextWrapping.Wrap });
-            var card = Surface(body); card.Margin = new Thickness(i == 0 ? 0 : 8, 0, 0, 0); Grid.SetColumn(card, i); grid.Children.Add(card);
+            var card = Surface(body); card.Margin = new Thickness(i == 0 ? 0 : 8, 0, 0, 0);
+            ToolTip.SetTip(card, values[i].Tip);
+            Grid.SetColumn(card, i); grid.Children.Add(card);
         }
         return grid;
     }

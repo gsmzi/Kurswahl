@@ -35,7 +35,6 @@ public sealed class ReconciliationWindowTests
             }
             window.Show(); Click("Abgleich / Abschluss");
             Assert.Contains(window.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text?.Contains("needs_review/invalid") == true);
-            Click("Übertragungsvermerke aktivieren · Datenbankschema 3");
             var note = window.GetLogicalDescendants().OfType<TextBox>().Single(t => t.Watermark == "Bearbeitungsvermerk / Ausnahmegrund");
             note.Text = "Synthetischer Probelauf"; Click("Manuelle ASV-Eingabe dokumentieren");
             Assert.Contains(window.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text?.Contains("manuell_uebertragen") == true);

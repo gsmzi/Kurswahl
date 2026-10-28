@@ -38,7 +38,7 @@ public sealed class PlanningWindowTests
                 window.UpdateLayout();
             }
             T Control<T>(string name) where T : Avalonia.Controls.Control => window.GetLogicalDescendants().OfType<T>().Distinct().Single(c => c.Name == name);
-            window.Show(); Click("Kursplanung"); Click("Kursplanung aktivieren · Datenbankschema 2");
+            window.Show(); Click("Kursplanung");
             var store = (SqliteAdministrationStore)typeof(TeacherWindow).GetField("store", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
             Assert.True(store.PlanningEnabled);
             Assert.DoesNotContain(window.GetLogicalDescendants().OfType<NumericUpDown>(), c => c.Name == "PlanningGroupSize");

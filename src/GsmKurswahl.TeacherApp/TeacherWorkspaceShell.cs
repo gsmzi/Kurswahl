@@ -34,9 +34,19 @@ public sealed partial class TeacherWindow
         explicitWorkspaceRoot = workspaceRoot;
         Title = "GSM-Kurswahl | Lehrerverwaltung · M5"; Width = 1400; Height = 900; MinWidth = 900; MinHeight = 600;
         BuildVisualShell();
-        var people = new DockPanel();
-        var left = new StackPanel { Spacing = 8 }; left.Children.Add(filter); left.Children.Add(followupFilter); left.Children.Add(statusFilter); left.Children.Add(roster);
-        personEditor.Content = Scroll(detail); DockPanel.SetDock(personEditor, Dock.Bottom); people.Children.Add(personEditor); people.Children.Add(Scroll(left));
+        // Split view: list on the left, the selected person on the right (no small bottom drawer).
+        var people = new Grid { ColumnDefinitions = new ColumnDefinitions("*,16,1.3*") };
+        var left = new StackPanel { Spacing = 8 };
+        var filterRow = new WrapPanel { Orientation = Orientation.Horizontal };
+        filter.Width = 240; filter.Margin = new Thickness(0, 0, 10, 6);
+        followupFilter.Margin = new Thickness(0, 0, 10, 6); followupFilter.VerticalAlignment = VerticalAlignment.Center;
+        statusFilter.MinWidth = 190; statusFilter.Margin = new Thickness(0, 0, 0, 6);
+        ToolTip.SetTip(statusFilter, "Formal gültig: keine offenen Punkte · Fachlich zu klären: Vorbildung oder Sonderfall offen · Regelverstoß: Belegung widerspricht einer Regel · Ohne Wahl: noch keine Kurswahl eingelesen.");
+        filterRow.Children.Add(filter); filterRow.Children.Add(followupFilter); filterRow.Children.Add(statusFilter);
+        left.Children.Add(filterRow); left.Children.Add(roster);
+        var leftScroll = Scroll(left); Grid.SetColumn(leftScroll, 0); people.Children.Add(leftScroll);
+        personEditor.Content = Scroll(detail);
+        Grid.SetColumn(personEditor, 2); people.Children.Add(personEditor);
         peopleView = people; importView = Scroll(importPanel); profileView = Scroll(profilePanel); collectionView = Scroll(collectionPanel); dashboardView = Scroll(dashboardPanel);
         settingsView = Scroll(settingsPanel); manageView = Scroll(managePanel); catalogView = Scroll(catalogPanel);
         BuildImport(); BuildProfiles(); BuildCollection();
@@ -99,16 +109,16 @@ public sealed partial class TeacherWindow
         navigation.Children.Clear();
         if (workspace?.Active?.Step == YearSetupStep.Complete)
         {
-            navigation.Children.Add(Button("Übersicht", () => ShowPage("start")));
-            navigation.Children.Add(Button("Wahl", ShowElection));
-            navigation.Children.Add(Button("Wahlergebnisse", ShowResults));
-            navigation.Children.Add(Button("Kursplanung", ShowPlanning));
-            navigation.Children.Add(Button("Abgleich / Abschluss", ShowReconciliation));
+            navigation.Children.Add(Button("Übersicht", () => ShowPage("start"), "Startseite mit dem nächsten empfohlenen Arbeitsschritt und den wichtigsten Zahlen des Jahrgangs."));
+            navigation.Children.Add(Button("Wahl", ShowElection, "Wahl vorbereiten und durchführen: Fächer, Schülerliste, Schülerbestand, Schülerdateien verteilen, Kurswahlen einsammeln."));
+            navigation.Children.Add(Button("Wahlergebnisse", ShowResults, "Alle eingelesenen Kurswahlen in einer Tabelle; Abgänger markieren, per Klick zur Person springen."));
+            navigation.Children.Add(Button("Kursplanung", ShowPlanning, "Wahlzahlen je Fach und Halbjahr, Planungsstände sichern, Kursstreichungen simulieren und Nachwahlbögen erstellen."));
+            navigation.Children.Add(Button("Abgleich / Abschluss", ShowReconciliation, "Tabellen exportieren, externe Kurswahllisten vergleichen, manuelle ASV-Eingabe vermerken, Jahrgang sichern."));
         }
         else
-            navigation.Children.Add(Button("Zur Einrichtung", () => { if (store is null) LoadWorkspace(); else ShowCurrentStep(); }));
-        navigation.Children.Add(Button("Einstellungen", ShowSettings));
-        navigation.Children.Add(Button("Hilfe", () => { visiblePage = "help"; pageHost.Content = Scroll(BuildOrientation()); }));
+            navigation.Children.Add(Button("Zur Einrichtung", () => { if (store is null) LoadWorkspace(); else ShowCurrentStep(); }, "Zurück zum geführten Einrichtungsassistenten."));
+        navigation.Children.Add(Button("Einstellungen", ShowSettings, "Speicherort, Jahrgang wechseln oder neu anlegen, Bearbeiterkennung, Transportdatei öffnen."));
+        navigation.Children.Add(Button("Hilfe", () => { visiblePage = "help"; pageHost.Content = Scroll(BuildOrientation()); UpdateVisualNavigation(); }, "Jahresablauf, Fachbegriffe und Dateitypen erklärt."));
         UpdateVisualNavigation();
     }
     private void ShowNewYear()
@@ -276,9 +286,11 @@ public sealed partial class TeacherWindow
         dashboardPanel.Children.Add(new TextBlock { Text = "Weitere Aufgaben", FontWeight = FontWeight.SemiBold });
         var tasks = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var task in new[] {
-            Button("Wahl organisieren", ShowElection),
-            Button("Wahlergebnisse ansehen", ShowResults),
-            Button("Kursplanung öffnen", ShowPlanning) })
+            Button("Wahl organisieren", ShowElection, "Schülerliste, Schülerdateien und Wahleingang verwalten."),
+            Button("Schülerbestand und Sonderfälle", () => ShowPage("people"), "Einzelne Personen öffnen: Vorbildung, Nachwahl, Lehreränderung und Historie."),
+            Button("Wahlergebnisse ansehen", ShowResults, "Alle eingelesenen Wahlen kompakt prüfen und Abgänger markieren."),
+            Button("Kursplanung öffnen", ShowPlanning, "Wahlzahlen auswerten und Kursstreichungen simulieren."),
+            Button("Abgleich / Abschluss öffnen", ShowReconciliation, "Exporte, externer Abgleich und Vermerke zur ASV-Eingabe.") })
         { task.Margin = new Thickness(0, 0, 10, 10); tasks.Children.Add(task); }
         dashboardPanel.Children.Add(tasks);
     }

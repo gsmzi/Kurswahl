@@ -40,7 +40,7 @@ public sealed class PlanningTests : IDisposable
         Assert.DoesNotContain(preview.Changes.Single(c => c.StudentId == "demo-001").Choice.Selections, s => s.OfferId == "BIO-LF-BILI");
         Assert.Contains(preview.Changes.Single(c => c.StudentId == "demo-002").Choice.Selections, s => s.OfferId == "BIO-LF");
         Assert.Equal(before, JsonSerializer.Serialize(store.History("demo-001"), DocumentJson.Options));
-        Assert.False(store.PlanningEnabled);
+        Assert.True(store.PlanningEnabled);
     }
     [Fact]
     public void DepartureFilterOnlyChangesPlanningNumbersAndGroupEstimate()

@@ -6,14 +6,7 @@ namespace GsmKurswahl.AdministrationStorage;
 public sealed partial class SqliteAdministrationStore
 {
     public bool TransferTrackingEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) == 3;
-    public void EnableTransferTracking()
-    {
-        if (TransferTrackingEnabled) return;
-        if (!PlanningEnabled) throw new InvalidOperationException("Zuerst Kursplanung aktivieren (Schema 2).");
-        using var tx = db.BeginTransaction();
-        Execute("CREATE TABLE transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL); CREATE TRIGGER transfer_receipts_no_update BEFORE UPDATE ON transfer_receipts BEGIN SELECT RAISE(ABORT,'append-only'); END; CREATE TRIGGER transfer_receipts_no_delete BEFORE DELETE ON transfer_receipts BEGIN SELECT RAISE(ABORT,'append-only'); END; PRAGMA user_version=3;");
-        tx.Commit();
-    }
+    public void EnableTransferTracking() { }
     public ImmutableArray<TransferReceipt> TransferReceipts()
     {
         if (!TransferTrackingEnabled) return [];
@@ -23,7 +16,7 @@ public sealed partial class SqliteAdministrationStore
     }
     public void RecordTransfer(TransferReceipt receipt)
     {
-        if (!TransferTrackingEnabled) throw new InvalidOperationException("Übertragungsvermerke zuerst aktivieren (Schema 3).");
+        if (!TransferTrackingEnabled) throw new InvalidOperationException("Unbekannte Verwaltungsschemaversion.");
         if (receipt.SchemaVersion != 1 || receipt.Id == Guid.Empty || receipt.At == default || string.IsNullOrWhiteSpace(receipt.Actor) || string.IsNullOrWhiteSpace(receipt.Note))
             throw new ArgumentException("Unvollständiger Übertragungsvermerk.");
         using var tx = db.BeginTransaction();

@@ -20,7 +20,6 @@ public sealed record PlanningAnalysis(int All, int ExpectedDepartures, int Confi
 public interface IPlanningStore
 {
     bool PlanningEnabled { get; }
-    // Explicit, user-triggered upgrade; existing databases are never silently migrated.
     void EnablePlanning();
     ImmutableArray<PlanningDocument> PlanningDocuments();
     void SavePlanningDocument(PlanningDocument document);

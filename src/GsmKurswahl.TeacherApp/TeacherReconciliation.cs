@@ -39,11 +39,6 @@ public sealed partial class TeacherWindow
         panel.Children.Add(Button("Gefilterte Belegungen als CSV …", () => ExportTableFile(TableExport.Choices(States()), false, "Belegungen")));
         panel.Children.Add(Button("Gefilterte Belegungen als XLSX …", () => ExportTableFile(TableExport.Choices(States()), true, "Belegungen")));
         var sql = (SqliteAdministrationStore)store!;
-        if (!sql.TransferTrackingEnabled)
-        {
-            panel.Children.Add(Text("Übertragungsvermerke benötigen Datenbankschema 3. Zuerst Sicherung erstellen; ältere Programme können Schema 3 nicht öffnen."));
-            panel.Children.Add(Button("Übertragungsvermerke aktivieren · Datenbankschema 3", () => { sql.EnableTransferTracking(); ShowReconciliation(); }));
-        }
         var receiptRows = new StackPanel { Spacing = 6, Name = "AsvReceiptRows" };
         ExportTable ReceiptTable()
         {
@@ -66,7 +61,7 @@ public sealed partial class TeacherWindow
             {
                 var row = tableRows[s.Record.Student.ExternalStudentId];
                 receiptRows.Children.Add(Text($"{row[0]} · {row[2]} · {row[3]}"));
-                if (!sql.TransferTrackingEnabled || s.Active is null) continue;
+                if (s.Active is null) continue;
                 var note = new TextBox { Watermark = "Bearbeitungsvermerk / Ausnahmegrund" }; receiptRows.Children.Add(note);
                 void Record(bool entered)
                 {
@@ -98,11 +93,28 @@ public sealed partial class TeacherWindow
         var panel = new StackPanel { Spacing = 8 };
         Intro(panel, "Spalten zuordnen", "Zuordnung bezieht sich nur auf die eingelesene Datei. Fachkennungen müssen zum aktuellen Katalog passen. Keine geratenen ASV-Spalten.");
         var picks = new Dictionary<string, ComboBox>();
-        foreach (var field in ChoiceTableImport.Fields)
+        (string Field, string Label, string Tip)[] fieldMeta = [
+            ("studentId", "Schüler-ID *", "Eindeutiger Identifikator des Schülers / Pseudonym laut Schülerliste."),
+            ("year", "Abiturjahrgang *", "Vierstellige Jahreszahl des Abiturjahrgangs (z. B. 2026)."),
+            ("subject", "Fachkürzel *", "Fachkürzel laut Fachangebot (z. B. D, M, E, BIO)."),
+            ("type", "Kursart *", "Kursart: LF (Leistungsfach), BF (Basisfach), Wahlfach oder Seminarkurs."),
+            ("variant", "Variante *", "Normal oder Bilingual."),
+            ("semester", "Halbjahr *", "Halbjahr 1 bis 4.")
+        ];
+        foreach (var (field, label, tip) in fieldMeta)
         {
-            panel.Children.Add(Text(field));
-            var picker = new ComboBox { ItemsSource = new[] { "— auswählen —" }.Concat(imported.Headers).ToArray(), SelectedIndex = imported.Headers.IndexOf(field) + 1 };
-            picks.Add(field, picker); panel.Children.Add(picker);
+            var header = Text(label);
+            ToolTip.SetTip(header, tip);
+            panel.Children.Add(header);
+            var picker = new ComboBox
+            {
+                ItemsSource = new[] { "— auswählen —" }.Concat(imported.Headers).ToArray(),
+                SelectedIndex = imported.Headers.IndexOf(field) + 1,
+                Width = 260
+            };
+            ToolTip.SetTip(picker, tip);
+            picks.Add(field, picker);
+            panel.Children.Add(picker);
         }
         var complete = new CheckBox { Content = "Die Datei enthält pro enthaltener Schüler-ID die vollständige Belegung." }; panel.Children.Add(complete);
         panel.Children.Add(Button("Abgleich nur als Vorschau anzeigen", () =>
@@ -120,8 +132,9 @@ public sealed partial class TeacherWindow
     {
         var panel = new StackPanel { Spacing = 8 };
         Intro(panel, "Abweichungen prüfen", "Übernahme nur einzeln nach Prüfung. Jede Übernahme erzeugt eine neue Lehrerrevision mit Herkunft; ursprüngliche Schülerwünsche bleiben erhalten.");
-        var filter = new ComboBox { ItemsSource = new[] { "Alle" }.Concat(Enum.GetNames<ReconciliationKind>()).ToArray(), SelectedIndex = 0 }; panel.Children.Add(filter);
-        ReconciliationItem[] Items() => preview.Items.Where(i => filter.SelectedIndex == 0 || i.Kind.ToString() == (string?)filter.SelectedItem).ToArray();
+        var kinds = Enum.GetValues<ReconciliationKind>();
+        var filter = new ComboBox { ItemsSource = new[] { "Alle" }.Concat(kinds.Select(FormatReconciliationKind)).ToArray(), SelectedIndex = 0 }; panel.Children.Add(filter);
+        ReconciliationItem[] Items() => preview.Items.Where(i => filter.SelectedIndex == 0 || FormatReconciliationKind(i.Kind) == (string?)filter.SelectedItem).ToArray();
         ExportTable Differences() => new(["studentId", "difference", "review", "internal", "external", "detail"], [.. Items().Select(i => new[] {
             i.StudentId, i.Kind.ToString(), TableExport.Status(i.Validation?.Status), Describe(i.Internal?.Snapshot.Selections ?? []), Describe(i.External?.Selections ?? []), i.Detail })]);
         panel.Children.Add(Button("Gefilterten Abgleich als CSV …", () => ExportTableFile(Differences(), false, "Abgleich")));
@@ -133,7 +146,7 @@ public sealed partial class TeacherWindow
             rows.Children.Clear();
             foreach (var item in Items())
             {
-                rows.Children.Add(Text(item.StudentId + " · " + item.Kind + (applied.Contains(item.StudentId) ? " · übernommen" : "")));
+                rows.Children.Add(Text($"{item.StudentId} · {FormatReconciliationKind(item.Kind)}{(applied.Contains(item.StudentId) ? " · übernommen" : "")}"));
                 rows.Children.Add(Text(item.Detail));
                 rows.Children.Add(Text("Intern: " + Describe(item.Internal?.Snapshot.Selections ?? [])));
                 rows.Children.Add(Text("Extern: " + Describe(item.External?.Selections ?? [])));

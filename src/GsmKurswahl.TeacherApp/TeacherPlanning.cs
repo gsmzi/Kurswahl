@@ -18,12 +18,6 @@ public sealed partial class TeacherWindow
         var panel = new StackPanel { Spacing = 6 };
         pageHost.Content = Scroll(panel); UpdateVisualNavigation();
         var planning = (IPlanningStore)store!;
-        if (!planning.PlanningEnabled)
-        {
-            panel.Children.Add(Text("Die Kursplanung ergänzt den lokalen Lehrerbestand um unveränderliche Planungsstände und Entscheidungen (Datenbankschema 1 → 2). Bestehende Daten bleiben erhalten. Ältere Programmversionen können Schema 2 nicht öffnen."));
-            panel.Children.Add(Primary(Button("Kursplanung aktivieren · Datenbankschema 2", () => { planning.EnablePlanning(); ShowPlanning(); })));
-            return;
-        }
         var parameters = new StackPanel { Spacing = 8 };
 
         var analysisPanel = new StackPanel { Spacing = 10 };
@@ -95,9 +89,22 @@ public sealed partial class TeacherWindow
         var offers = new WrapPanel { Orientation = Orientation.Horizontal };
         var selection = session!.Catalog.Offers.Where(o => (o.Status is OfferStatus.Offered or OfferStatus.Established) && PlanningPresentation.CanCancel(o))
             .OrderBy(o => o.SubjectId).ThenBy(o => o.Type)
-            .Select(o => (Offer: o, Box: new CheckBox { Content = $"{o.SubjectId} · {o.Type.ToString().ToUpperInvariant()}" + (o.Variant == CourseVariant.Bilingual ? " bilingual" : ""), Name = "PlanningCancel_" + o.Id.Replace('-', '_') })).ToArray();
-        foreach (var row in selection) { row.Box.Width = 260; row.Box.Margin = new Thickness(0, 0, 8, 2); offers.Children.Add(row.Box); }
-        changesPanel.Children.Add(new Expander { Header = "Angebotsvarianten zur Streichung wählen", Content = offers });
+            .Select(o =>
+            {
+                var subjectName = session.Catalog.Subjects.FirstOrDefault(s => s.Id == o.SubjectId)?.Name ?? o.SubjectId;
+                var variantText = o.Variant == CourseVariant.Bilingual ? " bilingual" : "";
+                var box = new CheckBox
+                {
+                    Content = $"{o.SubjectId} · {subjectName} ({FormatCourseType(o.Type)}{variantText})",
+                    Name = "PlanningCancel_" + o.Id.Replace('-', '_'),
+                    Width = 320,
+                    Margin = new Thickness(0, 0, 8, 4)
+                };
+                ToolTip.SetTip(box, $"Fachangebot {o.Id}: {subjectName} als {FormatCourseType(o.Type)}{(o.Variant == CourseVariant.Bilingual ? " (bilingual)" : "")}");
+                return (Offer: o, Box: box);
+            }).ToArray();
+        foreach (var row in selection) { offers.Children.Add(row.Box); }
+        changesPanel.Children.Add(new Expander { Header = "Angebotsvarianten zur Streichung wählen", Content = offers, IsExpanded = true });
         var impact = new StackPanel { Spacing = 2, Name = "PlanningImpact" };
         var confirmation = new CheckBox { Content = "Diese Vorschau geprüft; Angebotsänderung und neue Verwaltungsrevisionen ausdrücklich übernehmen", Name = "PlanningConfirm" };
         CancellationPreview? preview = null;
@@ -163,8 +170,28 @@ public sealed partial class TeacherWindow
                 catch (Exception ex) { status.Text = "Streichung ist gespeichert. Nachwahlbögen konnten nicht vollständig erstellt werden: " + ex.Message + ". Über Nachwahlbögen erneut erstellen wiederholen."; }
             }
         })));
-        changesPanel.Children.Add(Button("Nachwahlbögen erneut erstellen", () => { var folder = CreateReselectionSheets(); status.Text = "Nachwahlbögen: " + folder; }));
-        changesPanel.Children.Add(Button("Nachwahlbögen öffnen", OpenReselectionFolder));
+        var followUpCard = new Border
+        {
+            Background = Brush.Parse("#F0F7FF"),
+            BorderBrush = Brush.Parse("#B8D5E5"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 10, 0, 0)
+        };
+        var followUpStack = new StackPanel { Spacing = 6 };
+        followUpStack.Children.Add(new TextBlock { Text = "📋 Nächste Schritte nach einer Angebotsstreichung:", FontWeight = FontWeight.SemiBold });
+        followUpStack.Children.Add(Text("1. Nachwahlbögen ausdrucken und den betroffenen Schülern aushändigen."));
+        followUpStack.Children.Add(Text("2. Aktualisiertes Fachangebot bereitstellen (unter „Profile & Verteilung“ als Angebot exportieren)."));
+        followUpStack.Children.Add(Text("3. Sobald Schüler neu gewählt haben, die Nachwahlen im Personen-Editor eintragen."));
+        var followUpButtons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
+        followUpButtons.Children.Add(Button("Nachwahlbögen-Ordner öffnen", OpenReselectionFolder));
+        followUpButtons.Children.Add(Button("Nachwahlbögen jetzt erstellen", () => { var folder = CreateReselectionSheets(); status.Text = "Nachwahlbögen erstellt: " + folder; }));
+        followUpButtons.Children.Add(Button("Zur Profil-Verteilung wechseln", () => ShowPage("profiles")));
+        followUpStack.Children.Add(followUpButtons);
+        followUpCard.Child = followUpStack;
+        changesPanel.Children.Add(followUpCard);
+
         analysisPanel.Children.Add(report);
         RenderPlanningReport(report, Current(), 24);
         var wide = Width >= 1150;
@@ -187,8 +214,23 @@ public sealed partial class TeacherWindow
         renderedPlanningDocument = document;
         panel.Children.Clear(); var analysis = CoursePlanning.Analyze(document, groupSize);
         panel.Children.Add(Text($"{analysis.Relevant} planungsrelevant aus {analysis.All} Personen · {analysis.ExpectedDepartures} voraussichtliche / {analysis.ConfirmedDepartures} bestätigte Abgänger · {analysis.WithoutChoice} ohne Wahl"));
-        var legend = new TextBlock { Text = "Zahl = durchgehend · KS1/2 bei Abweichungen · 1:… bis 4:… = Halbjahre · bestätigte Abgänger ausgeschlossen", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = Muted };
-        panel.Children.Add(legend);
+        var legendBox = new Border
+        {
+            Background = Brush.Parse("#EBF2F7"),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(10, 8),
+            Margin = new Thickness(0, 4, 0, 8)
+        };
+        legendBox.Child = new TextBlock
+        {
+            Text = "ℹ️ Lesehilfe: Eine einzelne Zahl bedeutet durchgehend in allen 4 Halbjahren belegt. " +
+                   "Format „KS1/KS2“ zeigt Kursstufe 1 (HJ 1+2) / Kursstufe 2 (HJ 3+4). " +
+                   "Format „1:… 2:…“ schlüsselt einzelne Halbjahre auf. Bestätigte Abgänger sind ausgeschlossen.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 11,
+            Foreground = Brush.Parse("#1E3A5F")
+        };
+        panel.Children.Add(legendBox);
         const string columns = "1.8*,.55*,.7*,1.25*,1*,1.1*";
         var subjects = document.Catalog.Subjects.OrderBy(s => s.Name, StringComparer.CurrentCulture).ToArray();
         var split = Width >= 1150;
@@ -196,7 +238,19 @@ public sealed partial class TeacherWindow
         var blocks = new[] { new StackPanel(), new StackPanel() };
         for (var b = 0; b < (split ? 2 : 1); b++)
         {
-            var header = CompactLine(columns, [Text("Fach"), Text("LF"), Text("LF bili"), Text("BF"), Text("BF bili"), Text("Wahl")]);
+            Control HeaderCol(string label, string tip)
+            {
+                var t = Text(label); t.FontWeight = FontWeight.SemiBold;
+                ToolTip.SetTip(t, tip); return t;
+            }
+            var header = CompactLine(columns, [
+                HeaderCol("Fach", "Fachkürzel und Fachbezeichnung"),
+                HeaderCol("LF", "Leistungsfach (5-stündig, schriftliche Abiturprüfung)"),
+                HeaderCol("LF bili", "Leistungsfach bilingual (in englischer Sprache unterrichtet)"),
+                HeaderCol("BF", "Basisfach (3-stündig, mündliche Abiturprüfung möglich)"),
+                HeaderCol("BF bili", "Basisfach bilingual (in englischer Sprache unterrichtet)"),
+                HeaderCol("Wahl", "Wahlfächer und Seminarkurse")
+            ]);
             blocks[b].Children.Add(new Border { Background = SoftAccent, Child = header });
             Grid.SetColumn(blocks[b], b * 2); matrix.Children.Add(blocks[b]);
         }

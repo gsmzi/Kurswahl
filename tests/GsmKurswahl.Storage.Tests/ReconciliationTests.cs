@@ -65,8 +65,7 @@ public sealed class ReconciliationTests : IDisposable
         using var store = Seed();
         var active = store.History("demo-001").Single();
         var receipt = new TransferReceipt(1, Guid.NewGuid(), "demo-001", active.Id, 1, catalog.Version, active.RuleVersion, DateTimeOffset.UtcNow, "demo-test", true, "Synthetische manuelle Eingabe");
-        Assert.Throws<InvalidOperationException>(() => store.RecordTransfer(receipt));
-        store.EnablePlanning(); store.EnableTransferTracking(); Assert.True(store.PlanningEnabled);
+        Assert.True(store.PlanningEnabled); Assert.True(store.TransferTrackingEnabled);
         store.RecordTransfer(receipt); store.RecordTransfer(receipt with { Id = Guid.NewGuid(), Entered = false, Note = "Erneut prüfen" });
         Assert.Equal(2, store.TransferReceipts().Length);
         new TeacherSession(store, catalog, "demo-test").Save(active.Snapshot, active.Id, RevisionSource.TeacherEdit, "Nach Vermerk geändert");

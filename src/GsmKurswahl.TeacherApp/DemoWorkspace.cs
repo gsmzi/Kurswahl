@@ -41,7 +41,6 @@ public static class DemoWorkspace
             var preview = session.Preview(row.Choice, row.Choice.StudentId, new(path, contentToken, "demo-80-v1", DateTimeOffset.UtcNow, ""));
             session.Confirm(preview, true, false, "Synthetischer Testbestand; strukturell geprüft, keine verbindliche Abgabe");
         }
-        store.EnablePlanning();
         var baseline = CoursePlanning.Capture(store, catalog, "demo-generator", "Ausgangsstand · 80 synthetische Schüler", true);
         store.SavePlanningDocument(baseline);
         store.SavePlanningDocument(baseline with { Id = Guid.NewGuid(), Name = "Vergleich · ohne voraussichtliche Abgänger", IncludeExpectedDepartures = false });

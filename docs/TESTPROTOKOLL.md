@@ -454,3 +454,31 @@ M3-Korrekturen zuvor separat als 07c83c9 committet. Die M4-Änderungen liegen an
 - 80-Schüler-Teststarter auf artifacts/m5-ui-build umgestellt, bestehende Demo-Verwaltungsbestände erhalten. Kein Deployment, Commit oder Push. Echte ASV-Musterdatei, Schulnetz-Pilot und fachliche Abnahme weiterhin offen.
 - Zusätzlicher Paket-Smoke: veröffentlichte selbstenthaltende Lehrer-EXE mit --prepare-demo-80 in isoliertem artifacts/release-smoke-Verzeichnis gestartet, Exitcode 0 und synthetischer 80er-Bestand erzeugt. Dies prüft Paketstart/SQLite/Katalog und ersetzt keinen nativen UI-Test auf einem Schulgerät. git diff --check nach Entfernen zusätzlicher Leerzeilen erfolgreich.
 - Finales Paket mit aktualisierten Dokumenten und expliziter Runtime-Pinnung: artifacts/releases/M5-demo-20261028-191534-e417d469.zip; SHA-256 CE83C19FC898E8366857212D1F7512643E4793FBEED5E1F747D6091D2C73ACAF. ZIP-Inhalt vollständig gegen SHA256.json geprüft: 481 Dateien korrekt.
+
+
+### Usability-Überarbeitung und direkte Schema-3-Initialisierung (28.10.2026)
+
+- Vollständige Überarbeitung der Benutzeroberfläche für Gelegenheitsnutzer (Oberstufenberatung, jährliche Nutzung) gemäß Nutzerfreigabe („Alte Datenbanken gibt es nicht mehr. Brauchen also nicht beachtet zu werden“):
+  - Direkte Schema-3-Initialisierung neuer SQLite-Verwaltungsdatenbanken mit allen Tabellen und Triggern; Entfernung technischer Schema-Wechsel-Schaltflächen in Kursplanung und Abgleich.
+  - Split-View im Personen-Editor: Schülerliste links und vollständiger Editor rechts auf voller Höhe mit strukturierten Oberflächenkarten (Konto/Wahlordner, Vorbildung mit Tooltips/Dropdowns, Prüfhinweise & Nachwahl, Kurswahl durch die Beratung ändern, vollständige Historie).
+  - Durchgängig verständliche deutsche Bezeichnungen, Tooltips und Formatierungshelfer für Enums (`ReviewStatus`, `Knowledge`, `DepartureStatus`, `CourseType`, `OfferStatus`, `RevisionSource`, `ActorRole`, `ReconciliationKind`).
+  - Mündliche Prüfungsfächer als Auswahllisten (`ComboBox`) mit Klarnamen statt Freitext-Kürzeln.
+  - Explizite deutsche Feldbezeichnungen und Tooltips beim externen Kurswahlabgleich (`Schüler-ID *`, `Abiturjahrgang *`, `Fachkürzel *`, `Kursart *`, `Variante *`, `Halbjahr *`).
+  - Lesehilfe/Legende und Spaltenkopf-Tooltips in der Kursplanungsmatrix.
+  - Nachfolge-Aktionskarte nach Kursstreichungen mit direkten Aktionen zum Öffnen/Erstellen der Nachwahlbögen und Wechsel zur Profilverteilung.
+  - Farbcodiertes Statusbanner (Erfolg grün, Fehler rot, neutral grau) für sofortige visuelle Rückmeldung.
+- Zwischenbefunde und Korrekturen:
+  - `TeacherPlanning.cs`: `ShowProfiles` korrigiert zu `() => ShowPage("profiles")`.
+  - `TeacherWorkspaceShell.cs`: Mehrdeutige Schaltfläche "Abgleich / Abschluss" im Dashboard zu "Abgleich / Abschluss öffnen" präzisiert, um Eindeutigkeit mit der Hauptnavigation zu sichern.
+  - `TeacherWindow.cs`: TabControl im Editor durch direkte strukturierte Oberflächenkarten (`Surface`) ersetzt, wodurch die Controls im logischen Avalonia-Baum eindeutig und ohne doppelte Traversierung zugänglich sind.
+  - Tests auf Schema-3-Standard aktualisiert (`PlanningTests.cs`, `ReconciliationTests.cs`, `PlanningWindowTests.cs`, `ReconciliationWindowTests.cs`).
+- Testergebnisse:
+  - Release-Build: **0 Warnungen, 0 Fehler**.
+  - Gesamte Testsuite: **229/229 bestanden**, keine übersprungen:
+    - Domain: 8 / 8
+    - Application: 39 / 39
+    - Rules: 57 / 57
+    - ImportExport: 23 / 23
+    - Storage: 76 / 76
+    - StudentApp (inkl. Avalonia-Headless-UI): 26 / 26
+  - Ausschließlich synthetische Personen und Kennungen verwendet.

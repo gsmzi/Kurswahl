@@ -22,7 +22,7 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
         {
             db.Open();
             var version = Convert.ToInt32(Scalar("PRAGMA user_version"));
-            if (version is not (0 or 1 or 2 or 3)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
+            if (version is not (0 or 3)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
             if (version == 0)
             {
                 if (Convert.ToInt32(Scalar("SELECT count(*) FROM sqlite_master WHERE type='table'")) != 0)
@@ -34,11 +34,14 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
                     CREATE TABLE reselections (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
                     CREATE TABLE profiles (student TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(student,revision));
                     CREATE TABLE distributions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    PRAGMA user_version=1;
+                    CREATE TABLE planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
+                    CREATE TABLE planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+                    CREATE TABLE transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+                    PRAGMA user_version=3;
                     COMMIT;
                     """);
             }
-            foreach (var table in new[] { "students", "revisions", "reselections", "profiles", "distributions" })
+            foreach (var table in new[] { "students", "revisions", "reselections", "profiles", "distributions", "planning_snapshots", "planning_decisions", "transfer_receipts" })
                 Execute($"CREATE TRIGGER IF NOT EXISTS {table}_no_update BEFORE UPDATE ON {table} BEGIN SELECT RAISE(ABORT,'append-only'); END; CREATE TRIGGER IF NOT EXISTS {table}_no_delete BEFORE DELETE ON {table} BEGIN SELECT RAISE(ABORT,'append-only'); END;");
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
