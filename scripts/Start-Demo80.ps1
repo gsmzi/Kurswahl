@@ -1,16 +1,16 @@
 param([switch]$PrepareOnly, [switch]$GkGeo)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
-$buildRoot = Join-Path $projectRoot 'artifacts/m5-ui-build'
-$exe = Join-Path $buildRoot 'bin/GsmKurswahl.TeacherApp/release/GsmKurswahl.TeacherApp.exe'
+$exe = Join-Path $projectRoot 'src/GsmKurswahl.TeacherApp/bin/Release/net10.0/GsmKurswahl.TeacherApp.exe'
+if (-not (Test-Path -LiteralPath $exe)) {
+    $exe = Join-Path $projectRoot 'artifacts/m5-ui-build/bin/GsmKurswahl.TeacherApp/release/GsmKurswahl.TeacherApp.exe'
+}
 $demoRoot = Join-Path $projectRoot 'artifacts/demo-80'
 if ($GkGeo) { $demoRoot = Join-Path $projectRoot 'artifacts/demo-80-gk-geo' }
 if (-not (Test-Path -LiteralPath $exe)) {
     $env:AVALONIA_TELEMETRY_OPTOUT = '1'
-    dotnet restore (Join-Path $projectRoot 'GSM-Kurswahl.sln') --locked-mode --configfile (Join-Path $projectRoot 'NuGet.Config') --artifacts-path $buildRoot
-    if ($LASTEXITCODE -ne 0) { throw 'Restore fehlgeschlagen.' }
-    dotnet build (Join-Path $projectRoot 'src/GsmKurswahl.TeacherApp/GsmKurswahl.TeacherApp.csproj') -c Release --no-restore --artifacts-path $buildRoot
-    if ($LASTEXITCODE -ne 0) { throw 'Build fehlgeschlagen.' }
+    dotnet build (Join-Path $projectRoot 'src/GsmKurswahl.TeacherApp/GsmKurswahl.TeacherApp.csproj') -c Release --no-restore -maxcpucount:1
+    $exe = Join-Path $projectRoot 'src/GsmKurswahl.TeacherApp/bin/Release/net10.0/GsmKurswahl.TeacherApp.exe'
 }
 $mode = if ($PrepareOnly) { '--prepare-demo-80' } else { '--demo-80' }
 if ($PrepareOnly) {
