@@ -218,12 +218,14 @@ public sealed class MainWindow : Window
         panel.Children.Add(Text("Wenn du ein bisheriges Basisfach als Leistungsfach wählst, wird seine Basisfachbelegung automatisch entfernt. Gehe anschließend die weiteren Schritte erneut durch.", 13, color: Muted));
         if (session.LfChangeMessage.Length > 0) panel.Children.Add(Notice(session.LfChangeMessage, WarnSoft, Warn));
         var chosen = session.Choice.Selections.Where(s => s.Type == CourseType.Lf).ToArray();
-        panel.Children.Add(Text(chosen.Length < 3 ? $"{chosen.Length} von 3 gewählt – noch {3 - chosen.Length}" : $"{chosen.Length} von 3 gewählt", 15, FontWeight.SemiBold));
+        panel.Children.Add(Text(chosen.Length < 3 ? $"{chosen.Length} von 3 gewählt – noch {3 - chosen.Length}" : $"{chosen.Length} von 3 gewählt · zum Tauschen zuerst ein Leistungsfach abwählen", 15, FontWeight.SemiBold));
         if (chosen.Length >= 3 && session.StepError is { } stepError) panel.Children.Add(Notice(stepError, WarnSoft, Warn));
         var offers = session.LfOffers.Concat(session.Catalog.Offers.Where(o => o.Type == CourseType.Lf && chosen.Any(s => s.OfferId == o.Id))).Distinct();
         foreach (var offer in offers)
         {
-            var box = new CheckBox { Name = ControlName("Offer", offer.Id), Content = OfferLabel(offer), IsChecked = chosen.Any(s => s.OfferId == offer.Id), IsEnabled = !session.IsBusy };
+            var isChosen = chosen.Any(s => s.OfferId == offer.Id);
+            // A fourth LF cannot be checked; otherwise its basic course would be removed by accident.
+            var box = new CheckBox { Name = ControlName("Offer", offer.Id), Content = OfferLabel(offer), IsChecked = isChosen, IsEnabled = !session.IsBusy && (isChosen || chosen.Length < 3) };
             box.IsCheckedChanged += (_, _) => Edit(() => session.SetSelection(offer.Id, box.IsChecked == true ? offer.Schedule.Select(h => h.Semester) : []));
             panel.Children.Add(Option(box, box.IsChecked == true));
         }
@@ -267,7 +269,7 @@ public sealed class MainWindow : Window
         {
             if (task.Id == expanded && task.Choose > 0) { panel.Children.Add(TaskCard(task)); continue; }
             var answer = task.FulfilledBySubjects.Select(session.SubjectName)
-                .Concat(task.ChosenOfferIds.Select(id => session.SubjectName(session.Catalog.Offers.Single(o => o.Id == id).SubjectId))).ToArray();
+                .Concat(session.SelectedTaskOptions(task).Select(id => session.SubjectName(session.Catalog.Offers.Single(o => o.Id == id).SubjectId))).ToArray();
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
             row.Children.Add(Text(task.IsSatisfied ? $"✓ {task.Title}: {string.Join(", ", answer)}" : $"○ {task.Title} – offen", 14, color: task.IsSatisfied ? Done : Warn));
             if (task.Choose > 0)
@@ -290,13 +292,18 @@ public sealed class MainWindow : Window
         if (task.FulfilledBySubjects.Length > 0)
             card.Children.Add(Text("Bereits belegt: " + string.Join(", ", task.FulfilledBySubjects.Select(session.SubjectName)), 13, color: Done));
         card.Children.Add(Text(task.Hint, 13, color: Muted));
-        var hasLockedChoice = task.ChosenOfferIds.Any(id => session.IsRequiredSubject(session.Catalog.Offers.Single(o => o.Id == id).SubjectId));
+        // Every course already selected for the whole period is shown as chosen. Radio buttons only while
+        // a new answer simply replaces the single visible one; otherwise check boxes add or remove explicitly.
+        var selected = session.SelectedTaskOptions(task);
+        var replaces = session.ReplacesTaskAnswer(task);
+        if (selected.Length > 1)
+            card.Children.Add(Text("Du hast mehrere passende Kurse belegt. Abwählen entfernt den jeweiligen Kurs; andere Kurse bleiben erhalten.", 13, color: Muted));
         foreach (var offerId in task.OptionOfferIds.Union(task.ChosenOfferIds))
         {
             var offer = session.Catalog.Offers.Single(o => o.Id == offerId);
-            var chosen = task.ChosenOfferIds.Contains(offerId);
+            var chosen = selected.Contains(offerId);
             var locked = chosen && session.IsRequiredSubject(offer.SubjectId);
-            CreateToggle(out var toggle, task.IsExclusive && !hasLockedChoice, ControlName("Option", offerId), OfferLabel(offer) + (locked ? " · durch Prüfungsplanung gesetzt" : ""), chosen, task.Id);
+            CreateToggle(out var toggle, replaces, ControlName("Option", offerId), OfferLabel(offer) + (locked ? " · durch Prüfungsplanung gesetzt" : ""), chosen, task.Id);
             toggle.IsEnabled = !session.IsBusy && !locked && (chosen || task.OptionOfferIds.Contains(offerId));
             toggle.IsCheckedChanged += (_, _) =>
             {

@@ -133,7 +133,9 @@ public static class ChoiceWorkflow
         {
             var lf = choice.Selections.Where(s => s.Type == CourseType.Lf && subjects.Contains(s.SubjectId)).Select(s => s.SubjectId).ToImmutableArray();
             var choose = Math.Max(0, needed - lf.Length);
-            var matching = choice.Selections.Where(s => s.Type != CourseType.Lf && subjects.Contains(s.SubjectId) && four.All(s.Semesters.Contains))
+            // Unknown offers (e.g. from a loaded draft) stay visible as OFFER-SELECTION but never answer a task.
+            var matching = choice.Selections.Where(s => s.Type != CourseType.Lf && subjects.Contains(s.SubjectId) && four.All(s.Semesters.Contains)
+                    && catalog.Offers.Any(o => o.Id == s.OfferId))
                 .OrderByDescending(s => requiredSubjects.Contains(s.SubjectId))
                 .ThenByDescending(s => Sciences.Contains(s.SubjectId))
                 .Take(choose)
@@ -162,10 +164,10 @@ public static class ChoiceWorkflow
         var full = choice.Selections.Where(AcademicRules.Four).OrderByDescending(s => s.Type == CourseType.Lf)
             .ThenByDescending(s => requiredSubjects.Contains(s.SubjectId)).ToArray();
         var firstLanguage = tasks.Single(t => t.Id == "PLAN-AREA-LANGUAGE") is { } langTask
-            ? langTask.FulfilledBySubjects.Concat(langTask.ChosenOfferIds.Select(id => catalog.Offers.Single(o => o.Id == id).SubjectId)).FirstOrDefault()
+            ? langTask.FulfilledBySubjects.Concat(langTask.ChosenOfferIds.Select(id => choice.Selections.First(s => s.OfferId == id).SubjectId)).FirstOrDefault()
             : null;
         var firstScience = tasks.Single(t => t.Id == "PLAN-AREA-SCIENCE") is { } sciTask
-            ? sciTask.FulfilledBySubjects.Concat(sciTask.ChosenOfferIds.Select(id => catalog.Offers.Single(o => o.Id == id).SubjectId)).FirstOrDefault()
+            ? sciTask.FulfilledBySubjects.Concat(sciTask.ChosenOfferIds.Select(id => choice.Selections.First(s => s.OfferId == id).SubjectId)).FirstOrDefault()
             : null;
         var secondary = full.Where(s => s.SubjectId != firstLanguage && s.SubjectId != firstScience
             && (languages.Contains(s.SubjectId) || Sciences.Contains(s.SubjectId) || s.SubjectId == "INF")

@@ -105,3 +105,10 @@ Nutzerhinweis „ganzes Halbjahr“ im Kontext GK HJ 1+4 entsprechend der besteh
 Automatisches Entfernen des entsprechenden BF bei LF-Umwahl ist durch die Nutzerentscheidung vom 28.10.2026 freigegeben und wird sichtbar erklärt. Die erneute Prüfungsplanung und Pflichtbelegung bleiben erforderlich. Bestehende fehlerhafte Entwürfe werden beim Laden erhalten und mit `AGVO-SEMESTERS` markiert; keine stille Dateimigration.
 
 Schülertexte am 28.10.2026 berichtigt: Die automatische Regelprüfung ist vorhanden. Die Schüler-Demo hat weiterhin keine verbindliche Abgabefunktion; jahrgangsbezogene fachliche Freigabe und offene persönliche Prüf-/Anrechnungsfragen liegen bei der Oberstufenberatung. Der veraltete Verweis auf spätere Ausbaustufen und technische Statusbegriffe in der Schüleranzeige sind durch konkrete Erläuterungen ersetzt. Interner Status `needs_review` und fachliche Sperren bleiben erhalten.
+
+### Rück-/Vorweg in der Schülerwahl (29.10.2026)
+
+- Fragen in „Pflichtbereiche“ zeigen alle bereits über HJ 1–4 belegten passenden Kurse als gewählt. Ersetzen per Optionsfeld nur, solange genau ein ersetzbarer Kurs belegt ist; sonst Kontrollkästchen ohne implizites Entfernen. Erneute Wahl eines belegten Kurses ändert nichts. Keine Regel- oder Schemaänderung.
+- Schritt 1 erlaubt höchstens drei LF; Tausch nur durch vorheriges Abwählen. Wird ein LF, das ein BF ersetzt hatte, wieder abgewählt, stellt die laufende Sitzung das vorherige BF (Halbjahre, ggf. mündliche Planung bei freiem Platz) mit sichtbarem Hinweis wieder her, sofern weiterhin wählbar und konfliktfrei. Diese Erinnerung wird nicht in der Wahldatei gespeichert und endet beim Laden/Neustart (bewusst kein Schemaeingriff).
+- Unbekannte Angebotskennungen aus geladenen Entwürfen bleiben erhalten und werden als `OFFER-SELECTION` gemeldet, beantworten aber keine Pflichtbereichsfrage.
+- Offen/nicht geändert: Bei bestätigter Sportbefreiung bietet Schritt 4 Einzelhalbjahre in allen Fächern an; die zulässige Anzahl wird weiterhin erst durch `AGVO-SEMESTERS` geprüft. Ob die Oberfläche das schon bei der Auswahl begrenzen soll, ist fachlich zu entscheiden.

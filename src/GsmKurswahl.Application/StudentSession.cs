@@ -16,6 +16,10 @@ public sealed class StudentSession
     private readonly IChoiceStore store;
     private readonly ChoiceValidator validator = new();
     private string? contentToken;
+    // Basic courses removed by choosing the subject as LF in this session, for restoring when the LF is given up.
+    private sealed record DisplacedBasic(CourseSelection Basic, bool WasOral);
+    private readonly Dictionary<string, DisplacedBasic> displacedBasics = [];
+    private string? lfChangeSubject;
     public OfferCatalog Catalog { get; }
     public ProfileContext Profile { get; }
     public CourseChoice Choice { get; private set; }
@@ -118,6 +122,19 @@ public sealed class StudentSession
     public ImmutableArray<CourseOffer> RestrictedOffers(bool lf) => [.. Catalog.Offers.Where(o => (o.Type == CourseType.Lf) == lf
         && !Availability(o).CanSelect && !Choice.Selections.Any(s => s.OfferId == o.Id))];
 
+    // All options of a task that are already selected for the whole task period, not only the one counted for it.
+    public ImmutableArray<string> SelectedTaskOptions(ChoiceTask task) =>
+        [.. task.OptionOfferIds.Union(task.ChosenOfferIds).Where(id => Choice.Selections.Any(s => s.OfferId == id && task.Semesters.All(s.Semesters.Contains)))];
+
+    // A single answer is only replaced while it is the one visible answer. With several matching or
+    // required courses nothing is removed implicitly; the student adds or removes courses explicitly.
+    public bool ReplacesTaskAnswer(ChoiceTask task)
+    {
+        var selected = SelectedTaskOptions(task);
+        return task.IsExclusive && selected.Length <= 1
+            && !selected.Any(id => IsRequiredSubject(Catalog.Offers.Single(o => o.Id == id).SubjectId));
+    }
+
     public void ChooseTaskOption(string taskId, string offerId, bool selected)
     {
         if (IsBusy) throw new InvalidOperationException("Dateivorgang läuft; bitte warten.");
@@ -130,16 +147,24 @@ public sealed class StudentSession
             return;
         }
         if (!task.OptionOfferIds.Contains(offerId)) throw new InvalidOperationException("Dieses Angebot passt nicht zu dieser Frage.");
-        // Single choice replaces the previous answer, but never a course that is required elsewhere.
-        if (task.IsExclusive)
-        {
-            foreach (var previous in task.ChosenOfferIds.Where(id => id != offerId))
-                if (!IsRequiredSubject(Catalog.Offers.Single(o => o.Id == previous).SubjectId)) SetSelection(previous, []);
-        }
-        else if (task.ChosenOfferIds.Length >= task.Choose && !task.ChosenOfferIds.Contains(offerId))
-            throw new InvalidOperationException("Zuerst eine gewählte Option abwählen oder weitere Kurse in Schritt 4 ergänzen.");
         var existing = Choice.Selections.FirstOrDefault(s => s.OfferId == offerId)?.Semesters ?? [];
-        SetSelection(offerId, existing.Union(task.Semesters));
+        // Already answers the task: choosing it again must not remove anything else.
+        if (task.Semesters.All(existing.Contains)) return;
+        var snapshot = Choice;
+        try
+        {
+            if (ReplacesTaskAnswer(task))
+                foreach (var previous in SelectedTaskOptions(task).Where(id => id != offerId)) SetSelection(previous, []);
+            else if (!task.IsExclusive && task.ChosenOfferIds.Length >= task.Choose)
+                throw new InvalidOperationException("Zuerst eine gewählte Option abwählen oder weitere Kurse in Schritt 4 ergänzen.");
+            SetSelection(offerId, existing.Union(task.Semesters));
+        }
+        catch (InvalidOperationException)
+        {
+            // Never leave a half-replaced answer behind.
+            if (Choice != snapshot) { Choice = snapshot; Changed?.Invoke(); }
+            throw;
+        }
     }
 
     public ImmutableArray<PlanRow> Plan
@@ -190,7 +215,7 @@ public sealed class StudentSession
                 IsDirty = true;
             }
         }
-        if (Step == 2) { ApplyRequired(); LfChangeMessage = ""; }
+        if (Step == 2) { ApplyRequired(); LfChangeMessage = ""; lfChangeSubject = null; }
         Step = Math.Min(LastStep, Step + 1);
         if (IsDirty) Message = "Ungespeicherte Änderungen – vorläufig, nicht eingereicht.";
         Changed?.Invoke();
@@ -271,6 +296,8 @@ public sealed class StudentSession
                 throw new InvalidOperationException("Halbjahr wird für dieses Angebot nicht angeboten.");
             if (offer.Type == CourseType.Lf && selected.Length != 4)
                 throw new InvalidOperationException("Leistungsfächer werden für alle vier Halbjahre gewählt.");
+            if (offer.Type == CourseType.Lf && Choice.Selections.Count(s => s.Type == CourseType.Lf && s.OfferId != offerId) >= 3)
+                throw new InvalidOperationException("Es sind bereits drei Leistungsfächer gewählt. Zum Tauschen zuerst ein Leistungsfach abwählen.");
             if (offer.Type == CourseType.Seminar && !selected.SequenceEqual(offer.Schedule.Select(h => h.Semester).Order()))
                 throw new InvalidOperationException("Seminarkurse werden über alle angebotenen Halbjahre gewählt.");
             if (Choice.Selections.Any(s => AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, offer.SubjectId)
@@ -280,17 +307,40 @@ public sealed class StudentSession
                 && !(offer.Type == CourseType.Lf && s.Type == CourseType.Bf)))
                 throw new InvalidOperationException("Dieses Fach ist bereits gewählt. Vor einem Wechsel die bisherige Kursart/Variante abwählen.");
         }
-        var replacesBasic = !selected.IsEmpty && offer.Type == CourseType.Lf
-            && Choice.Selections.Any(s => s.SubjectId == offer.SubjectId && s.Type == CourseType.Bf);
+        var replacedBasic = !selected.IsEmpty && offer.Type == CourseType.Lf
+            ? Choice.Selections.FirstOrDefault(s => s.SubjectId == offer.SubjectId && s.Type == CourseType.Bf) : null;
+        var replacesBasic = replacedBasic is not null;
+        // Giving up an LF again restores the basic course it had replaced, if that is still possible.
+        var removesLf = selected.IsEmpty && offer.Type == CourseType.Lf && Choice.Selections.Any(s => s.OfferId == offerId);
+        DisplacedBasic? restored = null;
+        if (removesLf && displacedBasics.Remove(offer.SubjectId, out var displaced)
+            && Catalog.Offers.FirstOrDefault(o => o.Id == displaced.Basic.OfferId) is { } basicOffer && Availability(basicOffer).CanSelect
+            && !Choice.Selections.Any(s => s.OfferId != offerId && (s.SubjectId == offer.SubjectId
+                || (AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, offer.SubjectId) && s.Semesters.Intersect(displaced.Basic.Semesters).Any()))))
+            restored = displaced;
         var selections = Choice.Selections.Where(s => s.OfferId != offerId
             && !(replacesBasic && s.SubjectId == offer.SubjectId && s.Type == CourseType.Bf)).ToImmutableArray();
         if (!selected.IsEmpty) selections = selections.Add(new(offer.Id, offer.SubjectId, offer.Type, offer.Variant, selected));
+        if (restored is not null) selections = selections.Add(restored.Basic);
         var oral = !selected.IsEmpty && offer.Type == CourseType.Lf
             ? Choice.PlannedOralSubjects.Remove(offer.SubjectId)
             : Choice.PlannedOralSubjects;
+        if (restored is { WasOral: true } && oral.Length < 2 && !oral.Contains(offer.SubjectId)) oral = oral.Add(offer.SubjectId);
+        if (replacedBasic is not null) displacedBasics[offer.SubjectId] = new(replacedBasic, Choice.PlannedOralSubjects.Contains(offer.SubjectId));
+        else if (!selected.IsEmpty && offer.Type != CourseType.Lf) displacedBasics.Remove(offer.SubjectId);
         Choice = Choice with { Selections = selections, PlannedOralSubjects = oral, UpdatedAt = DateTimeOffset.UtcNow };
         if (replacesBasic)
+        {
             LfChangeMessage = $"{SubjectName(offer.SubjectId)} ist jetzt Leistungsfach. Die bisherige Basisfachbelegung wurde automatisch entfernt. Bitte die Prüfungsfächer und die weiteren Schritte erneut durchgehen.";
+            lfChangeSubject = offer.SubjectId;
+        }
+        else if (restored is not null)
+        {
+            LfChangeMessage = $"{SubjectName(offer.SubjectId)} ist kein Leistungsfach mehr. Die vorherige Basisfachbelegung (HJ {string.Join(", ", restored.Basic.Semesters)}) wurde wiederhergestellt"
+                + (oral.Contains(offer.SubjectId) && restored.WasOral ? ", ebenso die mündliche Planung" : "") + ". Bitte die Prüfungsfächer und die weiteren Schritte erneut durchgehen.";
+            lfChangeSubject = offer.SubjectId;
+        }
+        else if (removesLf && lfChangeSubject == offer.SubjectId) { LfChangeMessage = ""; lfChangeSubject = null; }
         IsDirty = true;
         Message = "Ungespeicherte Änderungen – vorläufig, nicht eingereicht.";
         Changed?.Invoke();
@@ -328,6 +378,8 @@ public sealed class StudentSession
                 Step = 1;
                 AutomaticMessage = "";
                 LfChangeMessage = "";
+                lfChangeSubject = null;
+                displacedBasics.Clear();
                 contentToken = loaded.ContentToken;
                 IsDirty = false;
                 Message = $"Entwurf geladen (Revision {Choice.Revision}). Weiterhin fachlich zu klären.";
