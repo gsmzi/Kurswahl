@@ -15,7 +15,7 @@ public static class AcademicRules
         Rule("AGVO-REQUIRED", "Pflichtfächer und GSM-Halbjahresplan", "AGVO §13; Pflichtenheft §§4,6 Nr.3,8"),
         Rule("AGVO-LANGUAGE-SCIENCE", "Sprach- und Naturwissenschaftsbelegung", "AGVO §13; Pflichtenheft §6 Nr.4–6"),
         Rule("AGVO-LANGUAGE-REVIEW", "Sprachlaufbahn oder INF-Alternative ungeklärt", "AGVO §13; Pflichtenheft §6 Nr.4–6", ReviewStatus.NeedsReview),
-        Rule("AGVO-SEMESTERS", "Belegung je Jahrgangsstufe", "AGVO §10; Pflichtenheft §6 Nr.12"),
+        Rule("AGVO-SEMESTERS", "Belegung je Jahrgangsstufe", "AGVO §10; Pflichtenheft §6 Nr.12; Nutzerfestlegung 29.10.2026: kein Einzelhalbjahres-Sportersatz bei der Kurswahl"),
         Rule("AGVO-RELIGION", "Religion/Ethik: Zustimmung und Wechsel", "AGVO §§11,21; Pflichtenheft §6 Nr.9", ReviewStatus.NeedsReview),
         Rule("GSM-RELIGION-EXCLUSIVE", "Religion und Ethik nicht gleichzeitig", "Nutzerfestlegung 29.10.2026; Pflichtenheft §6 Nr.9"),
         Rule("AGVO-SPORT", "Befreiung, LF-Eignung und Ersatzbedarf", "AGVO §13 Abs.5; Pflichtenheft §6 Nr.10", ReviewStatus.NeedsReview),
@@ -46,14 +46,14 @@ public static class AcademicRules
     {
         if (offer.Type is CourseType.Lf or CourseType.Seminar)
             return [[.. offer.Schedule.Select(h => h.Semester).Order()]];
-        // Existing KOE sport replacement exception; the validator separately limits the total singles.
-        var sportException = profile.Status == ProfileStatus.Verified && profile.Prerequisites.SportExemptSemesters is { Length: > 0 };
+        // Nutzerfestlegung 29.10.2026: a sport exemption known at course selection is replaced by complete
+        // school years. The KOE single-semester replacement is meant for later absences in the Kursstufe.
         var units = ImmutableArray.CreateBuilder<ImmutableArray<int>>();
         foreach (var first in new[] { 1, 3 })
         {
             int[] pair = [first, first + 1];
             if (!pair.Any(h => offer.Schedule.Any(s => s.Semester == h))) continue;
-            if (sportException || !RequiresYearPair(choice, offer.SubjectId, first))
+            if (!RequiresYearPair(choice, offer.SubjectId, first))
                 units.AddRange(pair.Where(h => offer.Schedule.Any(s => s.Semester == h)).Select(h => ImmutableArray.Create(h)));
             else units.Add([.. pair]);
         }
@@ -99,16 +99,12 @@ public static class AcademicRules
                     || profile.Prerequisites.InformaticsImp == Knowledge.Unknown || profile.Prerequisites.InformaticsBridge == Knowledge.Unknown)));
             Add(unknownAlternative ? "AGVO-LANGUAGE-REVIEW" : "AGVO-LANGUAGE-SCIENCE", "Eine geeignete Sprache und BIO/CH/PH sind nötig; zusätzlich zweite geeignete Sprache oder zweite Naturwissenschaft (berechtigtes INF als Alternative). Italienisch-Profil allein ist keine Sprachlaufbahnbestätigung.");
         }
-        var allowedSingleSemesters = profile.Status == ProfileStatus.Verified && profile.Prerequisites.SportExemptSemesters is { } spExemptions ? spExemptions.Length : 0;
-        var usedSingleSemesters = 0;
         foreach (var s in choice.Selections.Where(s => s.Type != CourseType.Lf && s.SubjectId != "SP"))
         {
             var oddPairs = new[] { 1, 3 }.Count(first => RequiresYearPair(choice, s.SubjectId, first)
                 && s.Semesters.Contains(first) != s.Semesters.Contains(first + 1));
-            if (oddPairs == 0) continue;
-            usedSingleSemesters += oddPairs;
-            if (usedSingleSemesters > allowedSingleSemesters)
-                Add("AGVO-SEMESTERS", "Regulär HJ 1+2 bzw. HJ 3+4 zusammen wählen. Bei LF Wirtschaft sind GK HJ 1/2 und GEO HJ 3/4 einzeln möglich; zusätzliche GK-Kurse HJ 3+4 bleiben zusammen. Weitere Einzelhalbjahre benötigen bestätigten Sportersatz.", [s.SubjectId], [.. s.Semesters]);
+            if (oddPairs > 0)
+                Add("AGVO-SEMESTERS", "HJ 1+2 bzw. HJ 3+4 zusammen wählen. Bei LF Wirtschaft sind GK HJ 1/2 und GEO HJ 3/4 einzeln möglich; zusätzliche GK-Kurse HJ 3+4 bleiben zusammen. Auch bei Sportbefreiung werden Ersatzkurse bei der Kurswahl als ganze Schuljahre gewählt.", [s.SubjectId], [.. s.Semesters]);
         }
         var p = profile.Status == ProfileStatus.Verified ? profile.Prerequisites : PriorEducation.Unknown;
         var chosenRelEthics = choice.Selections.Where(s => s.SubjectId is "ETH" or "ER" or "KR").Select(s => s.SubjectId).Distinct().ToArray();
@@ -135,7 +131,7 @@ public static class AcademicRules
                 Add("AGVO-REQUIRED", "Sportbelegung in nicht befreiten Halbjahren fehlt.", ["SP"], requiredSport);
             if (exemptions.Length > 0)
             {
-                Add("AGVO-SPORT", $"{exemptions.Length} Ersatzkurse nötig. Umfang/Einzelhalbjahre administrativ bestätigen; SIA ist kein Ersatz.", ["SP"], [.. exemptions]);
+                Add("AGVO-SPORT", $"{exemptions.Length} Ersatzkurse nötig. Ersatzkurse als ganze Schuljahre (HJ 1+2 bzw. HJ 3+4) zusätzlich wählen; ein Kurs mehr als nötig schadet nicht. Umfang administrativ bestätigen; SIA ist kein Ersatz.", ["SP"], [.. exemptions]);
                 var totalWithoutSia = choice.Selections.Where(s => s.Type != CourseType.Seminar).Sum(s => s.Semesters.Length);
                 var extras = MaximumSportReplacementCourses(choice, profile);
                 if (totalWithoutSia < 42 || extras < exemptions.Length)

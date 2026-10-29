@@ -128,9 +128,8 @@ public class StudentMonkeyTests
         try { validation = session.Validation; } catch (Exception ex) { report("Validierung wirft", ex.ToString()); return; }
         foreach (var id in new[] { "SUBJECT-DUPLICATE", "GSM-RELIGION-EXCLUSIVE", "OFFER-SELECTION" })
             if (validation.Messages.Any(m => m.Rule.Id == id)) report("Regelverstoß über UI: " + id, Describe(session));
-        // With a confirmed sport exemption single half-years are offered on purpose; the validator limits their number.
-        if (session.Step >= 3 && validation.Messages.Any(m => m.Rule.Id == "AGVO-SEMESTERS")
-            && session.Profile.Prerequisites.SportExemptSemesters is not { Length: > 0 })
+        // Also with a sport exemption only complete school years are offered (Nutzerfestlegung 29.10.2026).
+        if (session.Step >= 3 && validation.Messages.Any(m => m.Rule.Id == "AGVO-SEMESTERS"))
             report("Einzelhalbjahr ab Schritt 3: AGVO-SEMESTERS", Describe(session));
         var lfCount = choice.Selections.Count(x => x.Type == CourseType.Lf);
         if (lfCount > 3) report("Mehr als drei LF wählbar", Describe(session));

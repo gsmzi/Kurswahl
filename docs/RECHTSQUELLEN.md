@@ -77,7 +77,7 @@ Geltungsbereich aller folgenden Regeln: GSM-Kurswahl, strukturelle Prüfung unte
 | `AGVO-COURSES` | 12 LF + mindestens 30 weitere Halbjahreskurse; §§12,13 / Pflichtenheft §6 Nr.2 | invalid |
 | `AGVO-REQUIRED` | Pflichtfächer, LF erfüllt BF-Pflicht, GK/GEO mit/ohne Wirtschaft; §13 / Pflichtenheft §§4,6 | invalid |
 | `AGVO-LANGUAGE-SCIENCE` | Eine Sprache und erste NW, dazu zweite Sprache/NW oder berechtigtes INF; §13 / Pflichtenheft §6 Nr.4–6 | invalid |
-| `AGVO-SEMESTERS` | Reguläre Jahrgangsbelegung; Ausnahme bei bestätigtem Sportersatz zur Prüfung; §10 / Pflichtenheft §6 Nr.12 | invalid |
+| `AGVO-SEMESTERS` | Jahrgangsbelegung HJ 1+2 bzw. HJ 3+4; einzige Ausnahme GK/GEO bei LF Wirtschaft; kein Einzelhalbjahres-Sportersatz bei der Kurswahl (Nutzerfestlegung 29.10.2026); §10 / Pflichtenheft §6 Nr.12 | invalid |
 | `AGVO-RELIGION` | Zustimmungen/Wechsel ungeklärt; BF Ethik nicht wegen fehlender Vorbildung sperren; §§11,21 / Pflichtenheft §6 Nr.9 | needs_review |
 | `AGVO-SPORT` | Befreiung/Umfang, LF-Sport und administrative Ersatzzuordnung; §13 Abs.5 / Pflichtenheft §6 Nr.10 | needs_review |
 | `AGVO-SPORT-REPLACEMENT` | Zusätzlich zu sonstiger Pflichtbelegung benötigte BF-/Wahlfachkurse; SIA ausgeschlossen; §13 Abs.5 / ZSL Ratgeber | invalid |
@@ -106,7 +106,7 @@ Die vollständige **AGVO** (`docs/Rechtsgrundlage AGVO BW GymAbiPrV_BW_2018.pdf`
 - **Sportersatzkurse (`AGVO-SPORT`, `AGVO-SPORT-REPLACEMENT`, `AGVO-SEMESTERS`):**
   - Rechtsquelle: **AGVO § 13 Abs. 5**, **KOE 2026 Kap. 2.1 (S. 2), Kap. 2.3 (S. 4) und Kap. 3.4 (S. 7)**.
   - Jeder zusätzliche Kurs in anderen Basisfächern aus dem **Pflicht- oder Wahlbereich** (`CourseType.Bf` und `CourseType.Elective`, z. B. auch Psychologie) kann befreite Sportkurse ersetzen; insgesamt müssen mindestens **42 Kurse ohne Seminarkurs (SIA)** erreicht werden. Der Seminarkurs ist kein Basiskurs im Sinne der AGVO und kann nicht als Sportersatz eingebracht werden (KOE Kap. 3.4 S. 7, Kap. 3.8.1 S. 8).
-  - Ersatzkurse müssen nicht in denselben Halbjahren besucht werden, in denen die Sportbefreiung vorliegt, und dürfen ausnahmsweise als **Einzelhalbjahreskurse** belegt werden (KOE Kap. 2.1 S. 2, Kap. 2.3 S. 4, Kap. 3.4 S. 7). `AGVO-SEMESTERS` erlaubt Einzelhalbjahre daher genau bis zur Anzahl der bestätigten Sportbefreiungs-Halbjahre.
+  - Ersatzkurse müssen nicht in denselben Halbjahren besucht werden, in denen die Sportbefreiung vorliegt, und dürfen ausnahmsweise als **Einzelhalbjahreskurse** belegt werden (KOE Kap. 2.1 S. 2, Kap. 2.3 S. 4, Kap. 3.4 S. 7). **Nutzerfestlegung 29.10.2026 (GSM):** Diese Einzelhalbjahresregelung ist für einen späteren Ausfall während der Kursstufe gedacht. Wer bei der Kurswahl in Klasse 10 bereits von der Sportbefreiung weiß, wählt Ersatzkurse ordnungsgemäß als ganze Schuljahre; ein Ersatzkurs mehr schadet nicht. `AGVO-SEMESTERS` lässt deshalb bei der Kurswahl keine Einzelhalbjahre als Sportersatz zu, und die Schülerwahl bietet sie nicht an. Ein nachträglicher Ausfall in der Kursstufe ist nicht modelliert und bleibt Einzelfall der Oberstufenberatung.
   - Bei auch nur teilweiser Sportbefreiung entfällt Sport sowohl als Leistungsfach (**AGVO § 12 Abs. 3 Satz 5**) als auch als mündliches Prüfungsfach (**AGVO § 21 Abs. 2 Nr. 6**; in `ChoiceWorkflow.OralCandidates` gesperrt).
 - **Religion und Ethik (`AGVO-RELIGION`, `PLAN-ORAL`):**
   - Rechtsquelle: **AGVO § 11 Abs. 2–3, § 12 Abs. 3 Satz 4, § 13 Abs. 1 Nr. 7 & Abs. 4, § 21 Abs. 2 Nr. 4–5**, **KOE 2026 Kap. 3.3 (S. 6) und Kap. 8.6.3 (S. 35)**.

@@ -183,16 +183,19 @@ public class AcademicRulesTests
         c = c with { Selections = c.Selections.Add(TestData.Select(psy)) };
         Assert.DoesNotContain(Check(c, p, catalog).Messages, m => m.Rule.Id == "AGVO-SPORT-REPLACEMENT");
     }
-    [Fact] public void SportExemptionBlocksSportAsOralCandidateAndLimitsSingleSemesters()
+    [Fact] public void SportExemptionBlocksSportAsOralCandidateAndAllowsNoSingleSemesterReplacement()
     {
+        // Nutzerfestlegung 29.10.2026: at course selection replacement courses are complete school years.
         var p = Profile with { Prerequisites = Profile.Prerequisites with { SportExemptSemesters = [1] } };
         Assert.DoesNotContain("SP", ChoiceWorkflow.OralCandidates(Complete, TestData.WorkflowCatalog, p));
-        // One single-semester course is permitted as sport replacement for 1 exempted semester, a second one triggers AGVO-SEMESTERS.
-        var oneSingle = Complete with { Selections = [.. Complete.Selections.Select(s => s.SubjectId == "SP" ? s with { Semesters = [2, 3, 4] } : s),
-            new("MU-BF", "MU", CourseType.Bf, CourseVariant.Normal, [1])] };
-        Assert.DoesNotContain(Check(oneSingle, p).Messages, m => m.Rule.Id == "AGVO-SEMESTERS");
-        var twoSingles = oneSingle with { Selections = [.. oneSingle.Selections.Select(s => s.SubjectId == "MU" ? s with { Semesters = [1, 3] } : s)] };
-        Assert.Contains(Check(twoSingles, p).Messages, m => m.Rule.Id == "AGVO-SEMESTERS");
+        var sportReduced = Complete with { Selections = [.. Complete.Selections.Select(s => s.SubjectId == "SP" ? s with { Semesters = [2, 3, 4] } : s)] };
+        Assert.DoesNotContain(Check(sportReduced, p).Messages, m => m.Rule.Id == "AGVO-SEMESTERS");
+        var oneSingle = sportReduced with { Selections = sportReduced.Selections.Add(new("MU-BF", "MU", CourseType.Bf, CourseVariant.Normal, [1])) };
+        Assert.Contains(Check(oneSingle, p).Messages, m => m.Rule.Id == "AGVO-SEMESTERS" && m.SubjectIds.Contains("MU"));
+        var fullYear = sportReduced with { Selections = sportReduced.Selections.Add(new("MU-BF", "MU", CourseType.Bf, CourseVariant.Normal, [1, 2])) };
+        Assert.DoesNotContain(Check(fullYear, p).Messages, m => m.Rule.Id == "AGVO-SEMESTERS");
+        var mu = TestData.WorkflowCatalog.Offers.Single(o => o.Id == "MU-BF");
+        Assert.Equal(new[] { "1,2", "3,4" }, AcademicRules.SemesterSelectionUnits(sportReduced, mu, p).Select(u => string.Join(",", u)));
     }
     [Fact] public void ReligionEthicsSwitchBlocksOralChoiceAndReportsFeststellungspruefungHint()
     {

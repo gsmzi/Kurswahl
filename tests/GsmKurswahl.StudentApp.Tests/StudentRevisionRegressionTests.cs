@@ -139,6 +139,34 @@ public class StudentRevisionRegressionTests
     }
 
     [AvaloniaFact]
+    public void SportExemptionOffersOnlyCompleteSchoolYearsInStepFour()
+    {
+        // Nutzerfestlegung 29.10.2026: no single-semester sport replacement at course selection.
+        var profile = new ProfileContext(ProfileStatus.Verified, PriorEducation.Unknown with { SportExemptSemesters = [2], PermanentSportExemption = Knowledge.No });
+        var session = new StudentSession(Shipped, "demo-001", new NullStore(), profile);
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            ToggleButton Box(string name) { window.UpdateLayout(); return window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == name); }
+            bool Has(string name) { window.UpdateLayout(); return window.GetVisualDescendants().OfType<Control>().Any(b => b.Name == name); }
+            void Next() { window.UpdateLayout(); window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "NextStep").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); }
+            foreach (var s in new[] { "D", "M", "BIO" }) Box($"Offer_{s}_LF").IsChecked = true;
+            Next();
+            Box("Oral_E").IsChecked = true; Box("Oral_G").IsChecked = true;
+            Next(); Next();
+            Assert.Equal(new[] { 1, 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "SP").Semesters);
+            // Before 29.10.2026 single half-years HJ 3 / HJ 4 were offered here because of the sport exemption.
+            Assert.True(Has("Sem_GK_BF_3_4"));
+            Assert.False(Has("Sem_GK_BF_3") || Has("Sem_GK_BF_4"));
+            Box("Sem_GK_BF_3_4").IsChecked = true;
+            Assert.Equal(new[] { 1, 2, 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Assert.DoesNotContain(session.Validation.Messages, m => m.Rule.Id == "AGVO-SEMESTERS");
+        }
+        finally { session.SaveAsync().GetAwaiter().GetResult(); window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task LoadedDraftWithUnknownOfferDoesNotBreakTasksOrWindow()
     {
         var store = new FixedStore();
