@@ -38,6 +38,7 @@ public sealed class StudentSession
     public int CountedCourses => ChoiceWorkflow.CountedCourses(Choice);
     public ImmutableArray<ExamOption> ExamOptions => AcademicRules.ExamOptions(Choice, Catalog, Profile);
     public string AutomaticMessage { get; private set; } = "";
+    public string LfChangeMessage { get; private set; } = "";
 
     public string ProfileStatusText => Profile.Status switch
     {
@@ -106,10 +107,13 @@ public sealed class StudentSession
 
     public bool IsRequiredSubject(string subjectId) => ChoiceWorkflow.Required(Choice, Profile).Any(r => r.SubjectId == subjectId);
 
+    public ImmutableArray<ImmutableArray<int>> SemesterSelectionUnits(string offerId) =>
+        AcademicRules.SemesterSelectionUnits(Choice, Catalog.Offers.Single(o => o.Id == offerId), Profile);
+
     public ImmutableArray<CourseOffer> LfOffers => [.. Catalog.Offers.Where(o => o.Type == CourseType.Lf && Availability(o).CanSelect)];
 
     public ImmutableArray<CourseOffer> ExtraOffers => [.. Catalog.Offers.Where(o => o.Type != CourseType.Lf && Availability(o).CanSelect
-        && !Choice.Selections.Any(s => s.SubjectId == o.SubjectId))];
+        && !Choice.Selections.Any(s => s.SubjectId == o.SubjectId || AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, o.SubjectId)))];
 
     public ImmutableArray<CourseOffer> RestrictedOffers(bool lf) => [.. Catalog.Offers.Where(o => (o.Type == CourseType.Lf) == lf
         && !Availability(o).CanSelect && !Choice.Selections.Any(s => s.OfferId == o.Id))];
@@ -186,7 +190,7 @@ public sealed class StudentSession
                 IsDirty = true;
             }
         }
-        if (Step == 2) ApplyRequired();
+        if (Step == 2) { ApplyRequired(); LfChangeMessage = ""; }
         Step = Math.Min(LastStep, Step + 1);
         if (IsDirty) Message = "Ungespeicherte Änderungen – vorläufig, nicht eingereicht.";
         Changed?.Invoke();
@@ -221,6 +225,11 @@ public sealed class StudentSession
             var offer = existing is null ? (offers.Length == 1 ? offers[0] : null) : offers.FirstOrDefault(o => o.Id == existing.OfferId);
             if (offer is null) { notes.Add($"{SubjectName(required.SubjectId)} ({required.SubjectId}): needs_review – kein eindeutiges verfügbares BF; vorhandene Wahl bleibt erhalten."); continue; }
             var semesters = (existing?.Semesters ?? []).Union(required.Semesters).Order().ToImmutableArray();
+            var replaced = selections.Where(s => AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, required.SubjectId)
+                && s.Semesters.Intersect(semesters).Any()).ToArray();
+            foreach (var previous in replaced)
+                notes.Add($"{SubjectName(previous.SubjectId)} wurde durch {SubjectName(required.SubjectId)} ersetzt, weil du es mündlich planst. Religion und Ethik können nicht gleichzeitig belegt werden.");
+            selections = selections.Except(replaced).ToImmutableArray();
             if (existing is not null && existing.Semesters.SequenceEqual(semesters)) continue;
             selections = selections.Where(s => s.OfferId != offer.Id).ToImmutableArray()
                 .Add(new(offer.Id, offer.SubjectId, offer.Type, offer.Variant, semesters));
@@ -264,15 +273,24 @@ public sealed class StudentSession
                 throw new InvalidOperationException("Leistungsfächer werden für alle vier Halbjahre gewählt.");
             if (offer.Type == CourseType.Seminar && !selected.SequenceEqual(offer.Schedule.Select(h => h.Semester).Order()))
                 throw new InvalidOperationException("Seminarkurse werden über alle angebotenen Halbjahre gewählt.");
-            if (Choice.Selections.Any(s => s.OfferId != offerId && s.SubjectId == offer.SubjectId))
+            if (Choice.Selections.Any(s => AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, offer.SubjectId)
+                && s.Semesters.Intersect(selected).Any()))
+                throw new InvalidOperationException("Religion und Ethik sowie verschiedene Religionsfächer können nicht gleichzeitig belegt werden. Wechsle das Fach im Schritt Pflichtbereiche; ein mündlich geplantes Fach zuerst in Prüfungsfächer ändern.");
+            if (Choice.Selections.Any(s => s.OfferId != offerId && s.SubjectId == offer.SubjectId
+                && !(offer.Type == CourseType.Lf && s.Type == CourseType.Bf)))
                 throw new InvalidOperationException("Dieses Fach ist bereits gewählt. Vor einem Wechsel die bisherige Kursart/Variante abwählen.");
         }
-        var selections = Choice.Selections.Where(s => s.OfferId != offerId).ToImmutableArray();
+        var replacesBasic = !selected.IsEmpty && offer.Type == CourseType.Lf
+            && Choice.Selections.Any(s => s.SubjectId == offer.SubjectId && s.Type == CourseType.Bf);
+        var selections = Choice.Selections.Where(s => s.OfferId != offerId
+            && !(replacesBasic && s.SubjectId == offer.SubjectId && s.Type == CourseType.Bf)).ToImmutableArray();
         if (!selected.IsEmpty) selections = selections.Add(new(offer.Id, offer.SubjectId, offer.Type, offer.Variant, selected));
         var oral = !selected.IsEmpty && offer.Type == CourseType.Lf
             ? Choice.PlannedOralSubjects.Remove(offer.SubjectId)
             : Choice.PlannedOralSubjects;
         Choice = Choice with { Selections = selections, PlannedOralSubjects = oral, UpdatedAt = DateTimeOffset.UtcNow };
+        if (replacesBasic)
+            LfChangeMessage = $"{SubjectName(offer.SubjectId)} ist jetzt Leistungsfach. Die bisherige Basisfachbelegung wurde automatisch entfernt. Bitte die Prüfungsfächer und die weiteren Schritte erneut durchgehen.";
         IsDirty = true;
         Message = "Ungespeicherte Änderungen – vorläufig, nicht eingereicht.";
         Changed?.Invoke();
@@ -309,6 +327,7 @@ public sealed class StudentSession
                 Choice = candidate;
                 Step = 1;
                 AutomaticMessage = "";
+                LfChangeMessage = "";
                 contentToken = loaded.ContentToken;
                 IsDirty = false;
                 Message = $"Entwurf geladen (Revision {Choice.Revision}). Weiterhin fachlich zu klären.";

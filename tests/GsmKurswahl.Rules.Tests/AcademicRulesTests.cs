@@ -7,6 +7,65 @@ namespace GsmKurswahl.Rules.Tests;
 // Pflichtenheft §6; AGVO §§12/13/17/21. These are structural checks, not legal release.
 public class AcademicRulesTests
 {
+    [Theory]
+    [InlineData(36, false)]
+    [InlineData(37, false)]
+    [InlineData(38, true)]
+    public void UpperHoursWarningUsesStrictSemesterThreshold(int hours, bool warning)
+    {
+        // Nutzerfestlegung 29.10.2026: Hinweis, keine automatische Ablehnung.
+        var offers = new[] { "D", "M", "E", "G" }.Select(s => TestData.Offer(s + "-BF", s)
+            with { Schedule = [new(1, 9), new(2, 9), new(3, 9), new(4, 9)] }).ToList();
+        if (hours > 36) offers.Add(TestData.Offer("BIO-BF", "BIO") with { Schedule = [new(1, hours - 36), new(3, hours - 36)] });
+        var catalog = TestData.WorkflowCatalog with { Offers = [.. offers] };
+        var choice = TestData.Choice with { Selections = [.. offers.Select(TestData.Select)] };
+        var messages = Check(choice, catalog: catalog).Messages.Where(m => m.Rule.Id == "GSM-HOURS-UPPER").ToArray();
+        Assert.Equal(warning, messages.Length > 0);
+        if (warning)
+        {
+            Assert.Equal(new[] { 1, 3 }, messages[0].Semesters);
+            Assert.Equal(ReviewStatus.NeedsReview, messages[0].Rule.Severity);
+            Assert.Contains("38 Wochenstunden", messages[0].Explanation);
+        }
+    }
+
+    [Theory]
+    [InlineData("ETH", "KR", true)]
+    [InlineData("ETH", "ER", true)]
+    [InlineData("KR", "ER", true)]
+    [InlineData("ETH", "KR", false)]
+    [InlineData("ETH", "ER", false)]
+    [InlineData("KR", "ER", false)]
+    public void ReligionSubjectsCannotOverlapButSequentialChangeIsNotParallel(string first, string second, bool overlap)
+    {
+        // Nutzerfestlegung 29.10.2026; Pflichtenheft §6 Nr.9.
+        var c = Complete with { Selections = [.. Complete.Selections.Where(s => s.SubjectId != "ETH"),
+            new(first + "-BF", first, CourseType.Bf, CourseVariant.Normal, [1, 2]),
+            new(second + "-BF", second, CourseType.Bf, CourseVariant.Normal, overlap ? [1, 2] : [3, 4])] };
+        var before = c.Selections;
+        var messages = AcademicRules.Check(c, TestData.WorkflowCatalog, Profile);
+        Assert.Equal(overlap, messages.Any(m => m.Rule.Id == "GSM-RELIGION-EXCLUSIVE"));
+        if (overlap)
+        {
+            var message = Assert.Single(messages.Where(m => m.Rule.Id == "GSM-RELIGION-EXCLUSIVE"));
+            Assert.Equal(new[] { 1, 2 }, message.Semesters);
+            Assert.Equal(ReviewStatus.Invalid, message.Rule.Severity);
+            Assert.Contains(first, message.SubjectIds); Assert.Contains(second, message.SubjectIds);
+        }
+        Assert.Equal(before, c.Selections);
+    }
+
+    [Fact]
+    public void MutuallyExclusiveReligionSubjectsAreNeverAnOralPair()
+    {
+        var catalog = TestData.WorkflowCatalog with { Subjects = TestData.WorkflowCatalog.Subjects.Add(new("KR", "KR")),
+            Offers = TestData.WorkflowCatalog.Offers.Add(TestData.Offer("KR-BF", "KR")) };
+        var c = Choice("D-LF", "M-LF", "W-LF", "ETH-BF") with { PlannedOralSubjects = ["ETH", "KR"] };
+        c = c with { Selections = c.Selections.Add(TestData.Select(catalog.Offers.Single(o => o.Id == "KR-BF"))) };
+        Assert.Contains("GSM-RELIGION-EXCLUSIVE", ChoiceWorkflow.OralError(c, catalog, Profile));
+        Assert.DoesNotContain(AcademicRules.ExamOptions(c, catalog, Profile), o => AcademicRules.MutuallyExclusiveSubjects(o.First, o.Second));
+    }
+
     private static ProfileContext Profile => new(ProfileStatus.Verified, PriorEducation.Unknown with
     {
         InformaticsImp = Knowledge.Yes, SportExemptSemesters = [], PermanentSportExemption = Knowledge.No,
@@ -50,6 +109,45 @@ public class AcademicRulesTests
         Assert.Equal(economics ? new[] { 1 } : [1, 2], required.Single(r => r.SubjectId == "GK").Semesters);
         Assert.Equal(economics ? new[] { 3 } : [3, 4], required.Single(r => r.SubjectId == "GEO").Semesters);
         Assert.Equal(economics ? new[] { 1, 3, 4 } : [1, 2, 3, 4], ChoiceWorkflow.OralSemesters(c, "GK"));
+    }
+
+    [Theory]
+    [InlineData(false, "GK")]
+    [InlineData(true, "GK")]
+    [InlineData(false, "GEO")]
+    [InlineData(true, "GEO")]
+    [InlineData(false, "BK")]
+    [InlineData(true, "BK")]
+    public void AllSemesterSubsetsRespectSchoolYearsAndExactEconomicsException(bool economics, string subject)
+    {
+        // Pflichtenheft §§4,6 Nr.12; AGVO §10; Nutzerpräzisierung 28.10.2026.
+        for (var mask = 1; mask < 16; mask++)
+        {
+            var semesters = Enumerable.Range(1, 4).Where(h => (mask & (1 << (h - 1))) != 0).ToImmutableArray();
+            var c = economics ? Choice("D-LF", "M-LF", "W-LF") : Choice("D-LF", "M-LF", "E-LF");
+            c = c with { Selections = c.Selections.Add(new(subject + "-BF", subject, CourseType.Bf, CourseVariant.Normal, semesters)) };
+            var requiresFirstPair = !(economics && subject == "GK");
+            var requiresSecondPair = !(economics && subject == "GEO");
+            var invalid = (requiresFirstPair && semesters.Contains(1) != semesters.Contains(2))
+                || (requiresSecondPair && semesters.Contains(3) != semesters.Contains(4));
+            var issues = Check(c).Messages.Where(m => m.Rule.Id == "AGVO-SEMESTERS" && m.SubjectIds.Contains(subject)).ToArray();
+            Assert.Equal(invalid, issues.Length > 0);
+            if (invalid)
+            {
+                Assert.Equal(ReviewStatus.Invalid, issues[0].Rule.Severity);
+                Assert.Equal(semesters.ToArray(), issues[0].Semesters.ToArray());
+            }
+        }
+    }
+
+    [Fact]
+    public void InvalidGkSelectionIsReportedWithoutChangingImportedChoice()
+    {
+        var c = Choice("D-LF", "M-LF", "W-LF", "GK-BF");
+        c = c with { Selections = [.. c.Selections.Select(s => s.SubjectId == "GK" ? s with { Semesters = [1, 4] } : s)] };
+        var before = System.Text.Json.JsonSerializer.Serialize(c, DocumentJson.Options);
+        Assert.Contains(Check(c).Messages, m => m.Rule.Id == "AGVO-SEMESTERS" && m.SubjectIds.Contains("GK"));
+        Assert.Equal(before, System.Text.Json.JsonSerializer.Serialize(c, DocumentJson.Options));
     }
     [Fact] public void InformaticsReplacesOnlySecondScience()
     {
@@ -113,10 +211,34 @@ public class AcademicRulesTests
         var result = Check(Complete, p, catalog);
         var relMsg = Assert.Single(result.Messages.Where(m => m.Rule.Id == "AGVO-RELIGION"));
         Assert.Contains("Feststellungsprüfung", relMsg.Explanation);
+        Assert.Contains("Austritt aus Religionsunterricht muss beantragt werden.", relMsg.Explanation);
+        Assert.Contains("Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig.", relMsg.Explanation);
         // Planning ETH as oral subject without exam permission triggers PLAN-ORAL with Feststellungsprüfung explanation.
         var withEthOral = Complete with { PlannedOralSubjects = ["ETH", "BIO"] };
         var oralMsg = Assert.Single(Check(withEthOral, p, catalog).Messages.Where(m => m.Rule.Id == "PLAN-ORAL"));
         Assert.Contains("Feststellungsprüfung", oralMsg.Explanation);
+    }
+
+    [Theory]
+    [InlineData("KR")]
+    [InlineData("ER")]
+    [InlineData("ETH")]
+    public void ContinuedGradeTenSubjectNeedsNoAdditionalBlanketPermission(string subject)
+    {
+        // Pflichtenheft §6 Nr.9; Nutzerpräzisierung 28.10.2026: Fortführung ist kein Wechsel.
+        var offer = TestData.Offer(subject + "-BF", subject);
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = [.. TestData.WorkflowCatalog.Subjects.Where(s => s.Id != subject), new(subject, subject)],
+            Offers = [.. TestData.WorkflowCatalog.Offers.Where(o => o.Id != offer.Id), offer]
+        };
+        var c = Complete with { Selections = [.. Complete.Selections.Where(s => s.SubjectId != "ETH"), TestData.Select(offer)] };
+        var p = Profile with { Prerequisites = Profile.Prerequisites with
+        { ReligionEthicsGrade10 = subject, ReligionEthicsPermission = Knowledge.Unknown, ReligionEthicsExamPermission = Knowledge.Unknown } };
+        Assert.DoesNotContain(Check(c, p, catalog).Messages, m => m.Rule.Id == "AGVO-RELIGION");
+        Assert.Contains(Check(c, p with { Prerequisites = p.Prerequisites with { ReligionEthicsPermission = Knowledge.No } }, catalog).Messages,
+            m => m.Rule.Id == "AGVO-RELIGION");
+        Assert.Contains(Check(c, ProfileContext.Missing, catalog).Messages, m => m.Rule.Id == "AGVO-RELIGION");
     }
     [Fact] public void IncompleteBreadthSelectionDoesNotUnderstateMinimumCredits()
     {

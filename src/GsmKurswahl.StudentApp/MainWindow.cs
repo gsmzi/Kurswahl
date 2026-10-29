@@ -30,6 +30,7 @@ public sealed class MainWindow : Window
     private readonly StackPanel plan = new() { Spacing = 10 };
     private readonly TextBlock fileStatus = Text("", 13);
     private readonly TextBlock error = Text("", 14);
+    private readonly Border hoursWarning = Notice("", WarnSoft, Warn);
     private readonly Button previous = new() { Content = "_Zurück", Name = "PreviousStep" };
     private readonly Button next = new() { Content = "_Weiter", Name = "NextStep", Background = Accent, Foreground = Brushes.White };
     private readonly Button save = new() { Content = "Entwurf _speichern", Name = "SaveButton" };
@@ -43,7 +44,7 @@ public sealed class MainWindow : Window
     public MainWindow(StudentSession session, string filePath, string account)
     {
         this.session = session;
-        Title = "GSM-Kurswahl | Schülerprogramm · M2 Demo";
+        Title = "GSM-Kurswahl | Schülerprogramm · Demo";
         Width = 1440; Height = 900; MinWidth = 900; MinHeight = 600;
         WindowState = WindowState.Maximized;
         Background = Page;
@@ -53,11 +54,10 @@ public sealed class MainWindow : Window
         var title = new StackPanel { Spacing = 2 };
         var titleLine = new WrapPanel();
         titleLine.Children.Add(Text("GSM-Kurswahl", 26, FontWeight.Bold));
-        var badge = Pill("Vorläufig · needs_review · nicht eingereicht", WarnSoft, Warn);
+        var badge = Pill("Vorläufig · nicht eingereicht", WarnSoft, Warn);
         badge.VerticalAlignment = VerticalAlignment.Center;
         badge.Margin = new Thickness(12, 4, 0, 4);
-        ToolTip.SetTip(badge, "Keine verbindliche Abgabe; Profilstatus siehe Fußzeile. Demoangebot: Schulische Freigabe und "
-            + "vollständige Rechtsprüfung stehen aus. Eingeschränkte Fächer erfordern ein geprüftes Profil.");
+        ToolTip.SetTip(badge, "Die automatische Prüfung unterstützt deine Planung. Die Oberstufenberatung muss den Regelstand für deinen Abiturjahrgang fachlich freigeben und offene Einzelfragen klären. In dieser Demo ist keine verbindliche Abgabe möglich.");
         titleLine.Children.Add(badge);
         title.Children.Add(titleLine);
         title.Children.Add(Text($"Synthetische Person {session.Choice.StudentId} · Abitur {session.Catalog.GraduationYear} · Demoangebot ohne schulische Freigabe", 13, color: Muted));
@@ -95,6 +95,8 @@ public sealed class MainWindow : Window
         Grid.SetRow(body, 2); root.Children.Add(body);
 
         var footer = new StackPanel { Spacing = 3, Margin = new Thickness(0, 10, 0, 0) };
+        hoursWarning.Name = "HoursWarning";
+        footer.Children.Add(hoursWarning);
         error.Foreground = Danger;
         footer.Children.Add(error); footer.Children.Add(fileStatus);
         footer.Children.Add(PrerequisitePanel());
@@ -165,6 +167,9 @@ public sealed class MainWindow : Window
         content.Children.Clear();
         content.Children.Add(session.Step switch { 1 => LfStep(), 2 => OralStep(), 3 => AreaStep(), 4 => ExtraStep(), _ => ReviewStep() });
         BuildPlan();
+        var hoursMessage = session.Validation.Messages.FirstOrDefault(m => m.Rule.Id == "GSM-HOURS-UPPER");
+        hoursWarning.IsVisible = hoursMessage is not null;
+        ((TextBlock)hoursWarning.Child!).Text = hoursMessage?.Explanation ?? "";
         previous.IsEnabled = !session.IsBusy && session.Step > 1;
         next.IsVisible = session.Step < StudentSession.LastStep;
         next.IsEnabled = !session.IsBusy && session.StepError is null;
@@ -210,6 +215,8 @@ public sealed class MainWindow : Window
     private Control LfStep()
     {
         var panel = Step("Wähle drei Leistungsfächer", "Mindestens zwei davon aus Deutsch, Mathematik, einer fortgeführten Fremdsprache oder einer Naturwissenschaft. Leistungsfächer laufen immer über HJ 1–4.");
+        panel.Children.Add(Text("Wenn du ein bisheriges Basisfach als Leistungsfach wählst, wird seine Basisfachbelegung automatisch entfernt. Gehe anschließend die weiteren Schritte erneut durch.", 13, color: Muted));
+        if (session.LfChangeMessage.Length > 0) panel.Children.Add(Notice(session.LfChangeMessage, WarnSoft, Warn));
         var chosen = session.Choice.Selections.Where(s => s.Type == CourseType.Lf).ToArray();
         panel.Children.Add(Text(chosen.Length < 3 ? $"{chosen.Length} von 3 gewählt – noch {3 - chosen.Length}" : $"{chosen.Length} von 3 gewählt", 15, FontWeight.SemiBold));
         if (chosen.Length >= 3 && session.StepError is { } stepError) panel.Children.Add(Notice(stepError, WarnSoft, Warn));
@@ -220,19 +227,6 @@ public sealed class MainWindow : Window
             box.IsCheckedChanged += (_, _) => Edit(() => session.SetSelection(offer.Id, box.IsChecked == true ? offer.Schedule.Select(h => h.Semester) : []));
             panel.Children.Add(Option(box, box.IsChecked == true));
         }
-        // After going back: a subject already taken as BF must be deselected before it can become an LF.
-        var asBasic = session.Choice.Selections.Where(s => s.Type != CourseType.Lf && session.LfOffers.Any(o => o.SubjectId == s.SubjectId)).ToArray();
-        if (asBasic.Length > 0)
-        {
-            panel.Children.Add(Text("Schon als Basisfach gewählt – zum Wechsel ins LF zuerst abwählen", 13, color: Muted));
-            foreach (var selection in asBasic)
-            {
-                var offer = session.Catalog.Offers.Single(o => o.Id == selection.OfferId);
-                var box = new CheckBox { Name = ControlName("Offer", offer.Id), Content = OfferLabel(offer), IsChecked = true, IsEnabled = !session.IsBusy };
-                box.IsCheckedChanged += (_, _) => Edit(() => session.SetSelection(offer.Id, []));
-                panel.Children.Add(Option(box, true));
-            }
-        }
         AddRestricted(panel, session.RestrictedOffers(lf: true), "Leistungsfach-Angebote derzeit nicht wählbar");
         return panel;
     }
@@ -240,6 +234,7 @@ public sealed class MainWindow : Window
     private Control OralStep()
     {
         var panel = Step("Plane zwei mündliche Prüfungsfächer", "Zusammen mit deinen Leistungsfächern müssen Deutsch, Mathematik und alle drei Aufgabenfelder abgedeckt sein. Die Planung ist unverbindlich.");
+        if (session.LfChangeMessage.Length > 0) panel.Children.Add(Notice(session.LfChangeMessage, WarnSoft, Warn));
         foreach (var subject in session.ForcedOral)
             panel.Children.Add(Notice($"✓ {session.SubjectName(subject)} ist gesetzt, weil du es nicht als Leistungsfach hast.", DoneSoft, Done));
         var planned = session.Choice.PlannedOralSubjects;
@@ -264,6 +259,8 @@ public sealed class MainWindow : Window
         var automatic = session.Plan.Where(r => r.IsAutomatic && !r.IsOpen).Select(r => $"{r.Label} (HJ {Semesters(r.Semesters)})").ToArray();
         if (automatic.Length > 0) panel.Children.Add(Notice("✓ Eingetragen: " + string.Join(", ", automatic), DoneSoft, Done));
         if (session.AutomaticMessage.Length > 0) panel.Children.Add(Notice(session.AutomaticMessage, WarnSoft, Warn));
+        foreach (var message in session.Validation.Messages.Where(m => m.Rule.Id == "AGVO-RELIGION"))
+            panel.Children.Add(Notice(message.Explanation, WarnSoft, Warn));
         var tasks = session.Tasks;
         var expanded = expandedTask ?? tasks.FirstOrDefault(t => !t.IsSatisfied && t.Choose > 0)?.Id;
         foreach (var task in tasks)
@@ -321,7 +318,7 @@ public sealed class MainWindow : Window
 
     private Control ExtraStep()
     {
-        var panel = Step("Weitere Kurse", "Ergänze Kurse, bis du das Planungsziel erreichst. Halbjahre kannst du bei deinen Kursen anpassen.");
+        var panel = Step("Weitere Kurse", "Ergänze Kurse, bis du das Planungsziel erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten.");
         panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold));
         var adjustable = session.Choice.Selections.Where(s => s.Type != CourseType.Lf).Select(s => (Selection: s, Offer: session.Catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId)))
             .Where(x => x.Offer is not null && (!session.LockedSemesters(x.Selection.OfferId).Any() || x.Offer.Schedule.Length > session.LockedSemesters(x.Selection.OfferId).Length)).ToArray();
@@ -358,16 +355,17 @@ public sealed class MainWindow : Window
         }
         else row.Children.Add(Text(OfferLabel(offer) + " · Pflicht in HJ " + Semesters(locked), 14));
         var semesters = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(28, 0, 0, 0) };
-        foreach (var hours in offer.Schedule)
+        foreach (var unit in session.SemesterSelectionUnits(offer.Id))
         {
-            var semester = hours.Semester;
             var box = new CheckBox
             {
-                Name = ControlName("Sem", offer.Id) + "_" + semester, Content = $"HJ {semester}", FontSize = 12,
-                IsChecked = selection.Semesters.Contains(semester), IsEnabled = !session.IsBusy && offer.Type != CourseType.Seminar && !locked.Contains(semester)
+                Name = ControlName("Sem", offer.Id) + "_" + string.Join("_", unit), Content = "HJ " + string.Join("+", unit), FontSize = 12,
+                IsChecked = unit.All(selection.Semesters.Contains),
+                IsEnabled = !session.IsBusy && offer.Type != CourseType.Seminar && !unit.Any(locked.Contains)
+                    && unit.All(h => offer.Schedule.Any(s => s.Semester == h))
             };
             box.IsCheckedChanged += (_, _) => Edit(() =>
-                session.SetSelection(offer.Id, box.IsChecked == true ? selection.Semesters.Add(semester) : selection.Semesters.Remove(semester)));
+                session.SetSelection(offer.Id, box.IsChecked == true ? selection.Semesters.Union(unit) : selection.Semesters.Except(unit)));
             semesters.Children.Add(box);
         }
         row.Children.Add(semesters);
@@ -376,7 +374,10 @@ public sealed class MainWindow : Window
 
     private Control ReviewStep()
     {
-        var panel = Step("Überblick und offene Punkte", "Dein Entwurf ist vorläufig und nicht eingereicht. Eine verbindliche Abgabe und die vollständige Prüfung folgen in späteren Ausbaustufen.");
+        var panel = Step("Überblick und offene Punkte", "Deine Wahl wird automatisch geprüft. Du kannst den Entwurf speichern und den Kontrollbogen exportieren. In dieser Demo ist keine verbindliche Abgabe möglich; die fachliche Freigabe für deinen Abiturjahrgang steht noch aus.");
+        panel.Children.Add(Text("Wer klärt offene Punkte? Die Oberstufenberatung prüft unklare persönliche Voraussetzungen und Sonderfälle sowie die Anrechnung. Du ergänzt fehlende Kurse und besprichst die hier aufgeführten Rückfragen mit ihr. Ein Prüfhinweis bedeutet noch nicht, dass deine Wahl falsch ist.", 14, color: Muted));
+        foreach (var message in session.Validation.Messages.Where(m => m.Rule.Id == "AGVO-RELIGION"))
+            panel.Children.Add(Notice(message.Explanation, WarnSoft, Warn));
         panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold));
         var table = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto"), Margin = new Thickness(0, 4) };
         var summary = session.Summary;
@@ -407,14 +408,15 @@ public sealed class MainWindow : Window
         panel.Children.Add(Text("PDF-Export mit dem aktuellen Entwurf und allen Prüfhinweisen.", 12, color: Muted));
         panel.Children.Add(Text("Mögliche mündliche Kombinationen aus deiner Belegung", 15, FontWeight.SemiBold));
         foreach (var exam in session.ExamOptions)
-            panel.Children.Add(Text($"{session.SubjectName(exam.First)} + {session.SubjectName(exam.Second)} · Mindestanrechnung {exam.MinimumCredits} · needs_review", 13));
+            panel.Children.Add(Text($"{session.SubjectName(exam.First)} + {session.SubjectName(exam.Second)} · vorläufige Mindestanrechnung {exam.MinimumCredits}", 13));
+        panel.Children.Add(Text("Die Oberstufenberatung bestätigt die persönlichen Prüfungsvoraussetzungen und die endgültige Anrechnung. Diese Kombinationen sind Planungsvorschläge.", 12, color: Muted));
         if (session.ExamOptions.IsEmpty) panel.Children.Add(Text("Noch keine passende Kombination aus den belegten Kursen. Pflichtbelegung und offene Punkte prüfen.", 13));
         panel.Children.Add(Text("Noch zu erledigen oder zu klären", 15, FontWeight.SemiBold));
         foreach (var note in session.PlanningNotes) panel.Children.Add(Text("• " + note, 13));
         var messages = session.Validation.Messages;
         var details = new StackPanel { Spacing = 6 };
         foreach (var m in messages) details.Children.Add(Text($"{m.Rule.Id}: {m.Explanation}\n{m.Remedy}", 12, color: m.Rule.Severity == ReviewStatus.Invalid ? Danger : Muted));
-        panel.Children.Add(new Expander { Header = $"Prüfhinweise ({messages.Length}) – Status {(session.Validation.Status == ReviewStatus.Invalid ? "invalid" : "needs_review")}", Content = details, HorizontalAlignment = HorizontalAlignment.Stretch });
+        panel.Children.Add(new Expander { Header = $"Prüfhinweise ({messages.Length}) – {(session.Validation.Status == ReviewStatus.Invalid ? "Wahl bitte korrigieren" : "Klärung durch die Oberstufenberatung erforderlich")}", Content = details, HorizontalAlignment = HorizontalAlignment.Stretch });
         return panel;
     }
 
@@ -610,7 +612,7 @@ public sealed class MainWindow : Window
 
     private static TextBlock Text(string value, double size, FontWeight? weight = null, IBrush? color = null)
     {
-        var block = new TextBlock { Text = value, FontSize = size, FontWeight = weight ?? FontWeight.Normal, TextWrapping = TextWrapping.Wrap };
+        var block = new TextBlock { Text = value.Replace("needs_review", "durch die Oberstufenberatung zu klären").Replace("profile_invalid", "Profil ungültig"), FontSize = size, FontWeight = weight ?? FontWeight.Normal, TextWrapping = TextWrapping.Wrap };
         if (color is not null) block.Foreground = color;
         return block;
     }

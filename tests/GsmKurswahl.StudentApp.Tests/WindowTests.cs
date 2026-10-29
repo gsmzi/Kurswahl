@@ -34,6 +34,69 @@ public sealed class TestApp : Avalonia.Application
 public class WindowTests
 {
     [AvaloniaFact]
+    public async Task HoursWarningPersistsAcrossStepsAndReloadAndDisappearsAfterReduction()
+    {
+        var catalog = TestData.WorkflowCatalog;
+        catalog = catalog with { Offers = [.. catalog.Offers.Select(o => o.Type == CourseType.Lf
+            ? o with { Schedule = [.. o.Schedule.Select(h => h with { WeeklyHours = 5 })] } : o)] };
+        var session = new StudentSession(catalog, "demo-001", new UiMemoryStore());
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            Border Warning() => window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "HoursWarning");
+            Assert.False(Warning().IsVisible);
+            foreach (var subject in new[] { "D", "M", "E" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
+            session.NextStep(); session.SetOral("BIO", true); session.SetOral("G", true); session.NextStep();
+            foreach (var subject in new[] { "BK", "ETH", "CH" }) session.SetSelection(subject + "-BF", [1, 2, 3, 4]);
+            session.SetSelection("GK-BF", [1, 2, 3, 4]);
+            Assert.True(Warning().IsVisible);
+            Assert.Contains("HJ 3: 38 Wochenstunden", ((TextBlock)Warning().Child!).Text);
+            session.NextStep(); Assert.True(Warning().IsVisible);
+            session.NextStep(); Assert.True(Warning().IsVisible);
+            window.UpdateLayout();
+            var origin = Warning().TranslatePoint(default, window);
+            Assert.NotNull(origin);
+            Assert.True(origin.Value.Y >= 0 && origin.Value.Y + Warning().Bounds.Height <= window.ClientSize.Height);
+            await session.SaveAsync(); await session.LoadAsync();
+            Assert.True(Warning().IsVisible);
+            session.SetSelection("CH-BF", []);
+            Assert.False(Warning().IsVisible);
+        }
+        finally { await session.SaveAsync(); window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ContinuingReligionHasNoBlanketBadgeAndSwitchToEthicsShowsAction()
+    {
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = TestData.WorkflowCatalog.Subjects.Add(new("KR", "Katholische Religion")),
+            Offers = TestData.WorkflowCatalog.Offers.Add(TestData.Offer("KR-BF", "KR"))
+        };
+        var profile = new ProfileContext(ProfileStatus.Verified, PriorEducation.Unknown with { ReligionEthicsGrade10 = "KR" });
+        var session = new StudentSession(catalog, "demo-001", new UiMemoryStore(), profile);
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            foreach (var subject in new[] { "E", "BIO", "W" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
+            session.NextStep(); session.NextStep();
+            session.ChooseTaskOption("PLAN-AREA-RELIGION", "KR-BF", true);
+            Assert.Null(session.Plan.Single(r => r.OfferId == "KR-BF").Issue);
+            session.NextStep();
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<ToggleButton>(), b => b.Name == "Offer_ETH_BF");
+            session.GoToStep(3);
+            session.ChooseTaskOption("PLAN-AREA-RELIGION", "ETH-BF", true);
+            Assert.DoesNotContain(session.Choice.Selections, s => s.SubjectId == "KR");
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Austritt aus Religionsunterricht muss beantragt werden.") == true);
+            session.NextStep(); session.NextStep();
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig.") == true);
+        }
+        finally { session.SaveAsync().GetAwaiter().GetResult(); window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task ShippedCatalogShowsFrenchLatinAndScienceAsAlternatives()
     {
         var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json")));
@@ -79,6 +142,10 @@ public class WindowTests
             Assert.Contains("PDF", window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ControlSheetButton").Content?.ToString());
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Content?.ToString()?.Contains("Drucken") == true);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), b => b.Text?.Contains("Mögliche mündliche Kombinationen") == true);
+            var visibleTexts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text ?? "").ToArray();
+            Assert.DoesNotContain(visibleTexts, t => t.Contains("Ausbaustufen") || t.Contains("needs_review"));
+            Assert.Contains(visibleTexts, t => t.Contains("Wer klärt offene Punkte? Die Oberstufenberatung"));
+            Assert.Contains(visibleTexts, t => t.Contains("Deine Wahl wird automatisch geprüft."));
             var sportRow = session.Plan.Single(r => r.OfferId == "SP-BF");
             Assert.Equal(ReviewStatus.NeedsReview, sportRow.Issue);
             Assert.Contains("AGVO-SPORT", sportRow.IssueText);
@@ -163,9 +230,25 @@ public class WindowTests
             Assert.False(Box("Sem_GK_BF_1").IsEnabled);
             Box("Sem_GK_BF_2").IsChecked = true;
             Assert.Equal(new[] { 1, 2 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Assert.False(Has("Sem_GK_BF_3"));
+            Assert.False(Has("Sem_GK_BF_4"));
+            Box("Sem_GK_BF_3_4").IsChecked = true;
+            Assert.Equal(new[] { 1, 2, 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Box("Sem_GK_BF_2").IsChecked = false;
+            Assert.Equal(new[] { 1, 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Box("Sem_GK_BF_3_4").IsChecked = false;
+            Assert.Equal(new[] { 1 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Box("Sem_GEO_BF_4").IsChecked = true;
+            Assert.Equal(new[] { 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GEO").Semesters);
+            Box("Sem_GEO_BF_4").IsChecked = false;
             Box("Offer_BK_BF").IsChecked = true;
             Assert.Contains(session.Choice.Selections, s => s.SubjectId == "BK");
             Assert.True(Has("Offer_BK_BF"));
+            Assert.False(Has("Sem_BK_BF_1"));
+            Capture(window, "student-year-pairs");
+            Box("Sem_BK_BF_1_2").IsChecked = false;
+            Assert.Equal(new[] { 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "BK").Semesters);
+            Box("Sem_BK_BF_1_2").IsChecked = true;
             var save = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "SaveButton");
             save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             for (var i = 0; i < 200 && session.IsBusy; i++) await Task.Delay(10);
@@ -180,6 +263,56 @@ public class WindowTests
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("nicht eingereicht") == true);
         }
         finally { window.Close(); if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [AvaloniaFact]
+    public async Task CompletedChoicePromotesBasicToLfThroughVisibleControls()
+    {
+        var session = new StudentSession(TestData.WorkflowCatalog, "demo-001", new UiMemoryStore());
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            ToggleButton Box(string name) => window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == name);
+            Button Button(string name) => window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == name);
+            void Click(string name) => Button(name).RaiseEvent(new RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+            foreach (var subject in new[] { "D", "M", "W" }) Box("Offer_" + subject + "_LF").IsChecked = true;
+            Click("NextStep");
+            Box("Oral_E").IsChecked = true; Box("Oral_BIO").IsChecked = true;
+            Click("NextStep");
+            Box("Option_BK_BF").IsChecked = true;
+            Box("Option_ETH_BF").IsChecked = true;
+            Box("Option_CH_BF").IsChecked = true;
+            Click("NextStep"); Click("NextStep");
+            Assert.Equal(5, session.Step);
+            Click("Step_1");
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<ToggleButton>(), b => b.Name == "Offer_E_BF");
+            Box("Offer_W_LF").IsChecked = false;
+            Box("Offer_E_LF").IsChecked = true;
+            Assert.True(Button("NextStep").IsEnabled);
+            Assert.Equal("E-LF", Assert.Single(session.Choice.Selections.Where(s => s.SubjectId == "E")).OfferId);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Basisfachbelegung wurde automatisch entfernt") == true);
+            Capture(window, "student-lf-change");
+            Click("NextStep");
+            Assert.False(Button("NextStep").IsEnabled);
+            Box("Oral_G").IsChecked = true;
+            Click("NextStep");
+            Assert.Equal(new[] { 1, 2 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Assert.Equal(new[] { 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GEO").Semesters);
+            Click("NextStep"); Click("NextStep");
+            Assert.Equal(5, session.Step);
+            Assert.DoesNotContain(session.Validation.Messages, m => m.Rule.Id is "SUBJECT-DUPLICATE" or "AGVO-SEMESTERS");
+        }
+        finally { await session.SaveAsync(); window.Close(); }
+    }
+
+    private static void Capture(MainWindow window, string name)
+    {
+        if (Environment.GetEnvironmentVariable("GSM_UI_SCREENSHOTS") is not { Length: > 0 } directory) return;
+        Directory.CreateDirectory(directory);
+        window.UpdateLayout(); AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        using var bitmap = window.CaptureRenderedFrame();
+        Assert.NotNull(bitmap); bitmap.Save(Path.Combine(directory, name + ".png"));
     }
 
     [AvaloniaFact]

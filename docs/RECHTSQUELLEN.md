@@ -1,5 +1,13 @@
 # Quellenstand M1
 
+### Stundenwarnung (29.10.2026)
+
+`GSM-HOURS-UPPER`: Nutzerfestlegung 29.10.2026; Version m2-2, Geltungsbereich GSM-Wahlplanung je Halbjahr, Schweregrad needs_review. Bei strikt mehr als 37 gewählten Wochenstunden in mindestens einem Halbjahr: „Mehr als 37 Unterrichtsstunden pro Woche werden in der Regel nicht genehmigt.“ Betroffene Halbjahre und tatsächliche Wochenstunden werden aufgeführt. Keine automatische Ablehnung und keine erfundene gesetzliche Obergrenze. Gemeinsamer Regelkern für beide Programme; Schüler-App zeigt die Warnung außerhalb der Scrollbereiche dauerhaft in allen Schritten, bis die Überschreitung entfällt. Speichern/Laden ändert die Warnbedingung nicht.
+
+### Gegenseitiger Ausschluss Religion/Ethik (29.10.2026)
+
+`GSM-RELIGION-EXCLUSIVE`: Nutzerfestlegung vom 29.10.2026 und Pflichtenheft §6 Nr.9; Regelversion m2-2, Geltungsbereich GSM-Kurswahlen, Schweregrad invalid. ETH/KR/ER dürfen in keinem Halbjahr gleichzeitig belegt werden. Zeitlich getrennte Wechsel werden dadurch nicht pauschal verboten; bestehende Pflicht-/Wechsel- und Prüfungsregeln gelten weiter. Der gemeinsame Regelkern beanstandet auch geladene/importierte Doppelbelegungen mit betroffenen Fächern und Halbjahren, ohne den Bestand zu ändern. Mündliche Zweierkombinationen dieser Fächer werden ausgeschlossen. Zusatzangebote verstecken konkurrierende Fächer; bewusste Wechsel erfolgen im Pflichtbereich oder über geänderte mündliche Planung mit ersetzter bisheriger Belegung und sichtbarem Hinweis.
+
 Grundlage ist ausschließlich `GSM_Kurswahl_Anforderungen_Codex.md`, Stand 25.10.2026, ausdrücklich noch nicht rechtsverbindlich freigegeben.
 
 Die dort genannten AGVO, KOE 2026, Leitfaden Abitur 2028 und Prozessbeschreibung wurden nicht mitgeliefert. Die spätere Geltung für Abitur 2029 ist offen. Es wird keine Rechtsfreigabe behauptet.
@@ -112,3 +120,13 @@ Die vollständige **AGVO** (`docs/Rechtsgrundlage AGVO BW GymAbiPrV_BW_2018.pdf`
   - Bestätigt: Das 3-stündige Basisfach Informatik im Schulversuch ersetzt die 2. Naturwissenschaft auch dann, wenn die 1. Naturwissenschaft nur als Basisfach belegt ist; für die mündliche Prüfung in Informatik genügt Brückenkurs Kl. 10 oder IMP Kl. 8–10 in Verbindung mit 4 Halbjahren BF Informatik.
 - **Vorbehalt für Abitur 2029 (`M2-RELEASE`):**
   - Da KOE 2026 formell für das Abitur 2026 gilt, bleibt der jahrgangsbezogene Freigabevorbehalt (`M2-RELEASE`, `needs_review`) für den ersten Einsatzjahrgang 2029 bestehen.
+
+### Fehlerkorrektur Halbjahresbelegung (28.10.2026)
+
+Religion/Ethik, Nutzerpräzisierung 28.10.2026: `AGVO-RELIGION` (m2-2, needs_review, GSM-Jahrgangsvorbehalt; Pflichtenheft §6 Nr.9) verlangt bei bestätigter Fortführung desselben Fachs aus Klasse 10 keine zusätzliche pauschale Zustimmung. Explizites Nein und fehlende vertrauenswürdige Vorbildung bleiben Klärfälle. Beim Wechsel KR/ER -> ETH erscheint der gewünschte Hinweis auf beantragten Austritt und notwendige Feststellungsprüfung direkt. Dies ändert keine mündliche Zulassung: Der dokumentierte Widerspruch zur KOE-Regel bei Religionsabmeldung bleibt fachlich zu klären; Feststellungsprüfung allein wird nicht als hinreichende Freigabe behandelt.
+
+`AGVO-SEMESTERS`, Regelstand `m2-2`, Geltungsbereich GSM-Kurswahl unter unverändertem Jahrgangsvorbehalt, Schweregrad `invalid`: Umsetzung der bereits geltenden Jahresbelegung aus AGVO §10 / Pflichtenheft §6 Nr.12 berichtigt. Nutzerhinweis vom 28.10.2026 konkretisiert den Fehlerfall GK HJ 1+4 bei LF Wirtschaft. Regulär gehören HJ 1+2 und HJ 3+4 zusammen. Die Wirtschaftsausnahme aus Pflichtenheft §4 betrifft nur GK HJ 1/2 und GEO HJ 3/4; zusätzliche GK-Kurse HJ 3+4 bleiben ein vollständiges Schuljahr. Die früher pauschale Ausnahme sämtlicher GK-/GEO-Belegungen ist entfernt. Bestätigte Sportersatz-Einzelkurse bleiben nach den oben dokumentierten KOE-Regeln auf die Zahl bestätigter Befreiungshalbjahre begrenzt; keine neue Ausnahme oder Rechtsfreigabe.
+
+Die Schüleroberfläche bezieht ihre Belegungseinheiten aus dem gemeinsamen Regelkern und schaltet reguläre Jahrespaare zusammen. Die Validierung prüft ebenso gespeicherte/importierte Einzelbelegungen, ohne sie zu verändern. Keine Schema- oder normative Regeländerung; Wahlformat v2 und Regelstand m2-2 bleiben lesbar. `AcademicRulesTests` prüft sämtliche nichtleeren Halbjahresteilmengen für GK, GEO und ein reguläres BF mit/ohne LF Wirtschaft sowie unveränderte fehlerhafte Bestandswahlen; die vorhandenen Sportersatztests bleiben bestehen.
+
+Beim Wechsel BF -> LF gilt die ausdrücklich gewünschte Bedienänderung vom 28.10.2026 zu Pflichtenheft §7: Die BF-Belegung desselben Fachs wird unabhängig von der Variante automatisch durch das gewählte LF ersetzt und mit sichtbarem Hinweis erklärt. Andere Fächer bleiben erhalten. Prüfungsplanung und Pflichtbelegung werden beim erneuten Durchlaufen überprüft/ergänzt; keine automatische Ersatzwahl für ein abgewähltes LF.

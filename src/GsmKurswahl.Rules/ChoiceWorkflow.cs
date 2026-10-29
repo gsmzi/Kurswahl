@@ -62,7 +62,8 @@ public static class ChoiceWorkflow
     private static bool Combination(CourseChoice choice, IEnumerable<string> oral, ProfileContext? profile = null)
     {
         var all = Lf(choice).Concat(oral).ToArray();
-        return all.Contains("D") && all.Contains("M") && new[] { 1, 2, 3 }.All(f => all.Any(s => AcademicRules.Field(s, profile ?? ProfileContext.Missing) == f));
+        return !all.Any(a => all.Any(b => AcademicRules.MutuallyExclusiveSubjects(a, b)))
+            && all.Contains("D") && all.Contains("M") && new[] { 1, 2, 3 }.All(f => all.Any(s => AcademicRules.Field(s, profile ?? ProfileContext.Missing) == f));
     }
 
     public static string? LfError(CourseChoice choice, OfferCatalog catalog, ProfileContext? profile = null)
@@ -85,6 +86,8 @@ public static class ChoiceWorkflow
     public static string? OralError(CourseChoice choice, OfferCatalog catalog, ProfileContext? profile = null)
     {
         var oral = choice.PlannedOralSubjects;
+        if (oral.Any(a => oral.Any(b => AcademicRules.MutuallyExclusiveSubjects(a, b))))
+            return "GSM-RELIGION-EXCLUSIVE: Nur eines der Fächer Ethik, evangelische oder katholische Religion als mündliches Prüfungsfach planen.";
         if (oral.Length != 2 || oral.Distinct().Count() != 2) return "PLAN-ORAL: Zwei verschiedene mündliche Prüfungsfächer planen.";
         if (oral.Any(s => !OralCandidates(choice, catalog, profile).Contains(s))) return "PLAN-ORAL: Prüfungsplanung passt nicht mehr zu LF oder Angebot. Bitte neu wählen.";
         if (!Combination(choice, oral, profile)) return "PLAN-ORAL: Deutsch, Mathematik und alle drei Aufgabenfelder müssen abgedeckt sein.";
@@ -197,7 +200,7 @@ public static class ChoiceWorkflow
         var count = CountedCourses(choice);
         if (count < MinimumCourses)
             notes.Add($"PLAN-MIN-COURSES: {count} von mindestens {MinimumCourses} Halbjahreskursen (12 LF + 30 weitere) geplant.");
-        notes.Add("needs_review: Sportersatz, Religion/Ethik, persönliche Prüfungsvoraussetzungen und Anrechnung (höchstens 40) benötigen die angezeigten Bestätigungen.");
+        notes.Add("Die Oberstufenberatung klärt die in den Prüfhinweisen genannten offenen Fragen. Der Regelstand für deinen Abiturjahrgang und die endgültige Anrechnung müssen fachlich bestätigt werden.");
         return notes.ToImmutable();
     }
 }

@@ -2,6 +2,8 @@ param([switch]$Reset)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $exe = Join-Path $projectRoot 'src/GsmKurswahl.StudentApp/bin/Release/net10.0/GsmKurswahl.StudentApp.exe'
+$verifiedExe = Join-Path $projectRoot 'artifacts/hours-warning-build/bin/GsmKurswahl.StudentApp/release/GsmKurswahl.StudentApp.exe'
+if (Test-Path -LiteralPath $verifiedExe) { $exe = $verifiedExe }
 $demoDir = Join-Path $projectRoot 'artifacts/demo-schueler-blank'
 
 if (-not (Test-Path -LiteralPath $exe)) {

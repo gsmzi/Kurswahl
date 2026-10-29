@@ -37,13 +37,42 @@ public class StudentSessionTests
         Assert.Equal(ReviewStatus.Invalid, second.Validation.Status);
         Assert.Equal(SubmissionStatus.Draft, second.Choice.SubmissionStatus);
     }
-    [Fact] public void DuplicateSubjectIsNotSilentlyReplaced()
+    [Fact] public void PromotingBasicToLfReplacesItWithVisibleNoticeAndRejectsReverseDuplicate()
     {
         var catalog = TestData.Catalog with { Offers = [TestData.Offer(), TestData.Offer("D-LF", type: CourseType.Lf)] };
         var session = new StudentSession(catalog, "demo-001", new MemoryStore());
         session.SetSelection("D-BF", [1, 2]);
-        Assert.Throws<InvalidOperationException>(() => session.SetSelection("D-LF", [1, 2, 3, 4]));
-        Assert.Equal("D-BF", Assert.Single(session.Choice.Selections).OfferId);
+        session.SetSelection("D-LF", [1, 2, 3, 4]);
+        Assert.Equal("D-LF", Assert.Single(session.Choice.Selections).OfferId);
+        Assert.Contains("Basisfachbelegung wurde automatisch entfernt", session.LfChangeMessage);
+        Assert.True(session.IsDirty);
+        var choice = session.Choice;
+        Assert.Throws<InvalidOperationException>(() => session.SetSelection("D-BF", [1, 2, 3, 4]));
+        Assert.Equal(choice, session.Choice);
+    }
+
+    [Fact] public void UnavailableLfDoesNotRemoveBasicSelection()
+    {
+        var lf = TestData.Offer("D-LF", type: CourseType.Lf) with { Requirements = [Requirement.ContinuousBilingual] };
+        var session = new StudentSession(TestData.Catalog with { Offers = [TestData.Offer(), lf] }, "demo-001", new MemoryStore());
+        session.SetSelection("D-BF", [1, 2, 3, 4]);
+        var before = session.Choice;
+        Assert.Throws<InvalidOperationException>(() => session.SetSelection(lf.Id, [1, 2, 3, 4]));
+        Assert.Equal(before, session.Choice);
+        Assert.Empty(session.LfChangeMessage);
+    }
+
+    [Fact] public void PromotingBilingualBasicToNormalLfReplacesSubjectAcrossVariants()
+    {
+        var basic = TestData.Offer("BIO-BF-BILI", "BIO") with { Variant = CourseVariant.Bilingual, Requirements = [Requirement.ContinuousBilingual] };
+        var lf = TestData.Offer("BIO-LF", "BIO", CourseType.Lf);
+        var catalog = TestData.Catalog with { Subjects = [new("BIO", "Biologie")], Offers = [basic, lf] };
+        var session = new StudentSession(catalog, "demo-001", new MemoryStore(),
+            new(ProfileStatus.Verified, PriorEducation.Unknown with { ContinuousBilingual = Knowledge.Yes }));
+        session.SetSelection(basic.Id, [1, 2, 3, 4]);
+        session.SetSelection(lf.Id, [1, 2, 3, 4]);
+        Assert.Equal(lf.Id, Assert.Single(session.Choice.Selections).OfferId);
+        Assert.Contains("Biologie", session.LfChangeMessage);
     }
     [Fact] public async Task FailedSaveRetainsDirtyChoiceAndRevision()
     {

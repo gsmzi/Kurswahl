@@ -17,12 +17,14 @@ public static class AcademicRules
         Rule("AGVO-LANGUAGE-REVIEW", "Sprachlaufbahn oder INF-Alternative ungeklärt", "AGVO §13; Pflichtenheft §6 Nr.4–6", ReviewStatus.NeedsReview),
         Rule("AGVO-SEMESTERS", "Belegung je Jahrgangsstufe", "AGVO §10; Pflichtenheft §6 Nr.12"),
         Rule("AGVO-RELIGION", "Religion/Ethik: Zustimmung und Wechsel", "AGVO §§11,21; Pflichtenheft §6 Nr.9", ReviewStatus.NeedsReview),
+        Rule("GSM-RELIGION-EXCLUSIVE", "Religion und Ethik nicht gleichzeitig", "Nutzerfestlegung 29.10.2026; Pflichtenheft §6 Nr.9"),
         Rule("AGVO-SPORT", "Befreiung, LF-Eignung und Ersatzbedarf", "AGVO §13 Abs.5; Pflichtenheft §6 Nr.10", ReviewStatus.NeedsReview),
         Rule("AGVO-SPORT-REPLACEMENT", "Zusätzliche Kurse statt Sport; kein Seminarkurs", "AGVO §13 Abs.5; ZSL Ratgeber Schulsport"),
         Rule("AGVO-EXAM", "Mindestens eine mögliche Prüfungskombination", "AGVO §21; Pflichtenheft §6 Nr.11"),
         Rule("AGVO-CREDIT", "Pflichtanrechnung höchstens 40", "AGVO §§17,21; Pflichtenheft §6 Nr.11", ReviewStatus.NeedsReview),
         Rule("AGVO-ELECTION", "Vorwahl, Endwahl und Wahltermin", "AGVO §14; Pflichtenheft §6 Nr.13", ReviewStatus.NeedsReview),
-        Rule("PLAN-HOURS", "32 Wochenstunden als Planungshinweis", "Pflichtenheft §6 letzter Absatz", ReviewStatus.NeedsReview)
+        Rule("PLAN-HOURS", "32 Wochenstunden als Planungshinweis", "Pflichtenheft §6 letzter Absatz", ReviewStatus.NeedsReview),
+        Rule("GSM-HOURS-UPPER", "Mehr als 37 Wochenstunden je Halbjahr", "Nutzerfestlegung 29.10.2026", ReviewStatus.NeedsReview)
     ];
     private static RuleDefinition Rule(string id, string description, string source, ReviewStatus severity = ReviewStatus.Invalid) =>
         new(id, description, source, "GSM-Kurswahl; Rechtsstand für Abiturjahrgang vor Freigabe bestätigen", ChoiceValidator.Version, severity);
@@ -31,6 +33,32 @@ public static class AcademicRules
         ["E", "F", "L", .. (profile.Status == ProfileStatus.Verified ? profile.Prerequisites.ContinuedLanguages : [])
             .Where(s => s is "GR" or "I" or "SPA" or "RU" or "POR")];
     public static bool Four(CourseSelection s) => Enumerable.Range(1, 4).All(s.Semesters.Contains);
+    public static bool MutuallyExclusiveSubjects(string first, string second) => first != second
+        && first is "ETH" or "ER" or "KR" && second is "ETH" or "ER" or "KR";
+
+    // Pflichtenheft §§4,6 Nr.12: only the compulsory GK/GEO year is split by LF economics.
+    // Additional GK in HJ 3+4 remains a complete school year.
+    private static bool RequiresYearPair(CourseChoice choice, string subject, int firstSemester) =>
+        !choice.Selections.Any(s => s.Type == CourseType.Lf && s.SubjectId == "W")
+        || !((subject == "GK" && firstSemester == 1) || (subject == "GEO" && firstSemester == 3));
+
+    public static ImmutableArray<ImmutableArray<int>> SemesterSelectionUnits(CourseChoice choice, CourseOffer offer, ProfileContext profile)
+    {
+        if (offer.Type is CourseType.Lf or CourseType.Seminar)
+            return [[.. offer.Schedule.Select(h => h.Semester).Order()]];
+        // Existing KOE sport replacement exception; the validator separately limits the total singles.
+        var sportException = profile.Status == ProfileStatus.Verified && profile.Prerequisites.SportExemptSemesters is { Length: > 0 };
+        var units = ImmutableArray.CreateBuilder<ImmutableArray<int>>();
+        foreach (var first in new[] { 1, 3 })
+        {
+            int[] pair = [first, first + 1];
+            if (!pair.Any(h => offer.Schedule.Any(s => s.Semester == h))) continue;
+            if (sportException || !RequiresYearPair(choice, offer.SubjectId, first))
+                units.AddRange(pair.Where(h => offer.Schedule.Any(s => s.Semester == h)).Select(h => ImmutableArray.Create(h)));
+            else units.Add([.. pair]);
+        }
+        return units.ToImmutable();
+    }
     public static int Field(string subject, ProfileContext profile) => Languages(profile).Contains(subject) ? 1 : subject switch
     {
         "D" or "BK" or "MU" => 1,
@@ -73,20 +101,30 @@ public static class AcademicRules
         }
         var allowedSingleSemesters = profile.Status == ProfileStatus.Verified && profile.Prerequisites.SportExemptSemesters is { } spExemptions ? spExemptions.Length : 0;
         var usedSingleSemesters = 0;
-        foreach (var s in choice.Selections.Where(s => s.Type != CourseType.Lf && s.SubjectId is not ("GK" or "GEO" or "SP")))
+        foreach (var s in choice.Selections.Where(s => s.Type != CourseType.Lf && s.SubjectId != "SP"))
         {
-            var oddPairs = (s.Semesters.Contains(1) != s.Semesters.Contains(2) ? 1 : 0) + (s.Semesters.Contains(3) != s.Semesters.Contains(4) ? 1 : 0);
+            var oddPairs = new[] { 1, 3 }.Count(first => RequiresYearPair(choice, s.SubjectId, first)
+                && s.Semesters.Contains(first) != s.Semesters.Contains(first + 1));
             if (oddPairs == 0) continue;
             usedSingleSemesters += oddPairs;
             if (usedSingleSemesters > allowedSingleSemesters)
-                Add("AGVO-SEMESTERS", "Einzelhalbjahr benötigt eine belegte Ausnahme; regulär jahrgangsweise wählen.", [s.SubjectId], [.. s.Semesters]);
+                Add("AGVO-SEMESTERS", "Regulär HJ 1+2 bzw. HJ 3+4 zusammen wählen. Bei LF Wirtschaft sind GK HJ 1/2 und GEO HJ 3/4 einzeln möglich; zusätzliche GK-Kurse HJ 3+4 bleiben zusammen. Weitere Einzelhalbjahre benötigen bestätigten Sportersatz.", [s.SubjectId], [.. s.Semesters]);
         }
         var p = profile.Status == ProfileStatus.Verified ? profile.Prerequisites : PriorEducation.Unknown;
         var chosenRelEthics = choice.Selections.Where(s => s.SubjectId is "ETH" or "ER" or "KR").Select(s => s.SubjectId).Distinct().ToArray();
+        var conflictingSemesters = Enumerable.Range(1, 4).Where(h => choice.Selections
+            .Where(s => s.Semesters.Contains(h) && s.SubjectId is "ETH" or "ER" or "KR")
+            .Select(s => s.SubjectId).Distinct().Count() > 1).ToArray();
+        if (conflictingSemesters.Length > 0)
+            Add("GSM-RELIGION-EXCLUSIVE", "Ethik und Religion sowie verschiedene Religionsfächer dürfen nicht gleichzeitig belegt werden. Im Pflichtbereich genau ein Fach wählen.", chosenRelEthics, conflictingSemesters);
         var switchedRelEthics = p.ReligionEthicsGrade10 is { } grade10 && chosenRelEthics.Any(s => s != grade10);
-        if (switchedRelEthics)
+        if (p.ReligionEthicsGrade10 is "KR" or "ER" && chosenRelEthics.Contains("ETH"))
+            Add("AGVO-RELIGION", "Austritt aus Religionsunterricht muss beantragt werden. Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig. Bitte mit der Oberstufenberatung klären; daraus folgt noch keine Zulassung zur mündlichen Prüfung (jahrgangsbezogene Vorgaben und Sonderfall Religionsabmeldung prüfen).", ["ETH"]);
+        else if (switchedRelEthics)
             Add("AGVO-RELIGION", $"Wechsel der Belegung gegenüber Klasse 10 ({p.ReligionEthicsGrade10} -> {string.Join("/", chosenRelEthics)}): Für eine mögliche spätere mündliche Prüfung im gewechselten Fach ist eine Überprüfung/Feststellungsprüfung zu Beginn des 1. Schulhalbjahres erforderlich (AGVO § 21 Abs. 2 Nr. 4/5; bei Abmeldung Rel -> Ethik nach KOE Kap. 3.3 i. d. R. keine mündliche Prüfung möglich).", chosenRelEthics);
-        else if (p.ReligionEthicsPermission != Knowledge.Yes)
+        else if (chosenRelEthics.Length > 0 && (p.ReligionEthicsPermission == Knowledge.No
+            || (p.ReligionEthicsPermission == Knowledge.Unknown
+                && !(p.ReligionEthicsGrade10 is "KR" or "ER" or "ETH" && chosenRelEthics.All(s => s == p.ReligionEthicsGrade10)))))
             Add("AGVO-RELIGION", "Konfession, Zustimmung oder Wechsel ist offen (für eine mündliche Prüfung ohne Vorbildung in Klasse 10 ist eine Überprüfung/Feststellungsprüfung erforderlich). BF Ethik bleibt grundsätzlich wählbar.", ["ER", "KR", "ETH"]);
         if (p.SportExemptSemesters is not { } exemptions)
             Add("AGVO-SPORT", "Sportbefreiung und Ersatzbedarf sind unbekannt.", ["SP"]);
@@ -111,6 +149,11 @@ public static class AcademicRules
         Add("AGVO-CREDIT", "Belegungszahl und Pflichtanrechnung sind getrennt. Angezeigte Mindestanrechnung ist vorläufig; Sonderfälle/Schulversuch und BLL sind zu bestätigen.");
         Add("AGVO-ELECTION", "Vorwahl: keine verbindliche Abgabe. Endwahltermin und Unterrichtsende der Einführungsphase sind noch nicht konfiguriert.");
         var summaries = ChoiceValidator.Summarize(choice, catalog);
+        var overloaded = summaries.Where(s => s.WeeklyHours > 37).ToArray();
+        if (overloaded.Length > 0)
+            Add("GSM-HOURS-UPPER", "Mehr als 37 Unterrichtsstunden pro Woche werden in der Regel nicht genehmigt. "
+                + string.Join("; ", overloaded.Select(s => $"HJ {s.Semester}: {s.WeeklyHours} Wochenstunden"))
+                + ". Bitte reduziere deine Wahl oder besprich sie mit der Oberstufenberatung.", semesters: overloaded.Select(s => s.Semester).ToArray());
         if (summaries.Average(s => s.WeeklyHours) < 32)
             Add("PLAN-HOURS", $"Durchschnitt {summaries.Average(s => s.WeeklyHours):0.##} Wochenstunden; Planungsrichtwert 32, kein automatischer Rechtsverstoß.");
         return messages.ToImmutable();
@@ -158,6 +201,7 @@ public static class AcademicRules
         for (var i = 0; i < candidates.Length; i++)
         for (var j = i + 1; j < candidates.Length; j++)
         {
+            if (MutuallyExclusiveSubjects(candidates[i], candidates[j])) continue;
             var all = lf.Concat([candidates[i], candidates[j]]).ToArray();
             if (!all.Contains("D") || !all.Contains("M") || !new[] { 1, 2, 3 }.All(f => all.Any(s => Field(s, profile) == f))) continue;
             var floor = MinimumCredits(choice, [candidates[i], candidates[j]], profile);

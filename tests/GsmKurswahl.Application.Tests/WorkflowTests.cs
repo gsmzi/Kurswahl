@@ -5,6 +5,27 @@ namespace GsmKurswahl.Application.Tests;
 
 public class WorkflowTests
 {
+    [Fact]
+    public void ReligionSelectionCannotBeAddedAsExtraAndOralChangeReplacesPreviousCourse()
+    {
+        var catalog = TestData.WorkflowCatalog with { Subjects = TestData.WorkflowCatalog.Subjects.Add(new("KR", "KR")),
+            Offers = TestData.WorkflowCatalog.Offers.Add(TestData.Offer("KR-BF", "KR")) };
+        var profile = new ProfileContext(ProfileStatus.Verified, PriorEducation.Unknown with
+            { ReligionEthicsGrade10 = "KR", ReligionEthicsExamPermission = Knowledge.Yes });
+        var session = new StudentSession(catalog, "demo-001", new MemoryStore(), profile);
+        foreach (var subject in new[] { "D", "M", "W" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
+        session.NextStep(); session.SetOral("G", true); session.SetOral("KR", true); session.NextStep();
+        Assert.DoesNotContain(session.ExtraOffers, o => o.SubjectId == "ETH");
+        var before = session.Choice;
+        Assert.Throws<InvalidOperationException>(() => session.SetSelection("ETH-BF", [1, 2, 3, 4]));
+        Assert.Equal(before, session.Choice);
+        session.GoToStep(2); session.SetOral("KR", false); session.SetOral("ETH", true); session.NextStep();
+        Assert.DoesNotContain(session.Choice.Selections, s => s.SubjectId == "KR");
+        Assert.Contains(session.Choice.Selections, s => s.SubjectId == "ETH");
+        Assert.Contains("wurde durch", session.AutomaticMessage);
+        Assert.DoesNotContain(session.Validation.Messages, m => m.Rule.Id == "GSM-RELIGION-EXCLUSIVE");
+    }
+
     private static StudentSession Create(params string[] subjects)
     {
         var session = new StudentSession(TestData.WorkflowCatalog, "demo-001", new MemoryStore());
@@ -242,11 +263,51 @@ public class WorkflowTests
         session.SetOral("BIO", true); session.SetOral("G", true);
         session.NextStep();
         session.GoToStep(1);
-        session.SetSelection("BIO-BF", []);
         session.SetSelection("E-LF", []);
         session.SetSelection("BIO-LF", [1, 2, 3, 4]);
         Assert.DoesNotContain("BIO", session.Choice.PlannedOralSubjects);
         Assert.False(session.Plan.Single(r => r.OfferId == "BIO-LF").IsOral);
+        Assert.DoesNotContain(session.Choice.Selections, s => s.OfferId == "BIO-BF");
+    }
+
+    [Fact]
+    public async Task CompletedChoiceCanChangeEnglishBasicToLfAndRevisitAllSteps()
+    {
+        // Pflichtenheft §7; Nutzerentscheidung 28.10.2026: automatic BF removal on LF changes.
+        var store = new MemoryStore();
+        var session = new StudentSession(TestData.WorkflowCatalog, "demo-001", store);
+        foreach (var subject in new[] { "D", "M", "W" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
+        session.NextStep();
+        session.SetOral("E", true); session.SetOral("BIO", true);
+        session.NextStep();
+        session.ChooseTaskOption("PLAN-AREA-ART", "BK-BF", true);
+        session.ChooseTaskOption("PLAN-AREA-RELIGION", "ETH-BF", true);
+        session.ChooseTaskOption("PLAN-AREA-BREADTH", "CH-BF", true);
+        session.NextStep(); session.NextStep();
+        Assert.Equal(5, session.Step);
+        var preserved = session.Choice.Selections.Where(s => s.SubjectId is "BIO" or "CH" or "BK" or "ETH").ToArray();
+        session.GoToStep(1);
+        session.SetSelection("W-LF", []);
+        session.SetSelection("E-LF", [1, 2, 3, 4]);
+        Assert.Null(session.StepError);
+        Assert.DoesNotContain(session.Choice.Selections, s => s.OfferId == "E-BF");
+        Assert.DoesNotContain("E", session.Choice.PlannedOralSubjects);
+        session.NextStep();
+        Assert.NotNull(session.StepError);
+        Assert.Throws<InvalidOperationException>(session.NextStep);
+        session.SetOral("G", true);
+        session.NextStep();
+        Assert.Empty(session.LfChangeMessage);
+        Assert.Equal(new[] { 1, 2 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+        Assert.Equal(new[] { 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GEO").Semesters);
+        Assert.All(preserved, s => Assert.Contains(s, session.Choice.Selections));
+        session.NextStep(); session.NextStep();
+        await session.SaveAsync();
+        var loaded = new StudentSession(TestData.WorkflowCatalog, "demo-001", store);
+        await loaded.LoadAsync();
+        Assert.Equal(session.Choice, loaded.Choice);
+        Assert.DoesNotContain(loaded.Validation.Messages, m => m.Rule.Id is "SUBJECT-DUPLICATE" or "AGVO-SEMESTERS");
+        Assert.Contains(loaded.Validation.Messages, m => m.Rule.Id == "M2-RELEASE");
     }
 
     private sealed class MemoryStore : IChoiceStore
