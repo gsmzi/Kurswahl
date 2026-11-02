@@ -10,14 +10,22 @@ public sealed record CollectionPreview(StudentRecord Student, CourseChoice Choic
 public sealed class TeacherSession(IAdministrationStore store, OfferCatalog catalog, string actor)
 {
     public OfferCatalog Catalog { get; } = catalog;
-    public ImmutableArray<TeacherState> Overview() => [.. store.Students().Select(record =>
+    public ImmutableArray<TeacherState> Overview() => [.. store.Students()
+        .OrderBy(r => r.Student.ClassName, StringComparer.CurrentCulture)
+        .ThenBy(r => r.Student.SortName().Last, StringComparer.CurrentCulture)
+        .ThenBy(r => r.Student.SortName().First, StringComparer.CurrentCulture)
+        .ThenBy(r => r.Student.ExternalStudentId, StringComparer.Ordinal)
+        .Select(record =>
     {
         var active = store.History(record.Student.ExternalStudentId).LastOrDefault();
         var review = active is null ? null : Validate(active.Snapshot, record);
         var followup = store.Reselection(record.Student.ExternalStudentId);
         return new TeacherState(record, active, review, followup.Required || review?.Status == ReviewStatus.Invalid, followup.Deadline, followup.Note);
     })];
-    private ValidationResult Validate(CourseChoice choice, StudentRecord record) => new ChoiceValidator().Validate(choice, Catalog,
+    // The protected stock is always judged by the current offer and rules. The versions stored with a revision
+    // document its origin; an older label alone is no defect (otherwise every update would invalidate all choices).
+    private ValidationResult Validate(CourseChoice choice, StudentRecord record) => new ChoiceValidator().Validate(
+        choice with { OfferVersion = Catalog.Version, RuleVersion = ChoiceValidator.Version }, Catalog,
         new ProfileContext(ProfileStatus.Verified, record.Student.Prerequisites));
     public CollectionPreview Preview(CourseChoice choice, string studentId, ImportOrigin origin)
     {

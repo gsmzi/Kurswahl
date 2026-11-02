@@ -16,7 +16,7 @@ public sealed class WorkspaceTransferTests : IDisposable
         var workspace = new TeacherWorkspace(Path.Combine(root, "source")); workspace.Create(TestData.WorkflowCatalog, "demo-transfer");
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
         using var store = workspace.OpenActive();
-        store.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Transfer", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-transfer", DateTimeOffset.UtcNow, null), null);
+        store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Transfer", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-transfer", DateTimeOffset.UtcNow, null), null);
         var session = new TeacherSession(store, TestData.WorkflowCatalog, "demo-transfer");
         session.Save(TestData.Choice, null, RevisionSource.TeacherEdit, "Demo Ursprung");
         store.EnablePlanning(); store.SavePlanningDocument(CoursePlanning.Capture(store, TestData.WorkflowCatalog, "demo-transfer", "Demo Stand", true));

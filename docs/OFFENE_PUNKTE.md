@@ -113,3 +113,17 @@ Schülertexte am 28.10.2026 berichtigt: Die automatische Regelprüfung ist vorha
 - Unbekannte Angebotskennungen aus geladenen Entwürfen bleiben erhalten und werden als `OFFER-SELECTION` gemeldet, beantworten aber keine Pflichtbereichsfrage.
 - Nutzerfestlegung 29.10.2026: Bei einer zum Zeitpunkt der Kurswahl bekannten Sportbefreiung keine Einzelhalbjahre als Sportersatz. Ersatzkurse werden als ganze Schuljahre gewählt; ein Ersatzkurs mehr schadet nicht. Die KOE-Einzelhalbjahresregelung ist für einen späteren Ausfall während der Kursstufe gedacht. Schülerwahl bietet nur noch Schuljahrespaare an (Ausnahme unverändert GK/GEO bei LF Wirtschaft); `AGVO-SEMESTERS` beanstandet jedes andere Einzelhalbjahr in beiden Programmen. Regelversion bleibt `m2-2` wie bei den übrigen Festlegungen vom 29.10.2026, damit bestehende Entwürfe ladbar bleiben; solche Entwürfe mit Einzelhalbjahren werden beim Laden erhalten und beanstandet, nicht still korrigiert.
 - Offen: Ein nachträglicher Sportausfall während der Kursstufe (dort zulässiger Einzelhalbjahres-Ersatz) ist nicht modelliert und bleibt Einzelfall der Oberstufenberatung.
+
+- Geklärt am 29.10.2026: Bei LF Wirtschaft genehmigt das GSM GK HJ 1/3/4 ohne HJ 2 nicht. GK HJ 3/4 setzt HJ 2 voraus; GK mündlich benötigt damit HJ 1-4. Schulische Vorgabe, keine offene Rechtsauslegung. Ältere gegenteilige Angaben sind durch diese Nutzerentscheidung ersetzt.
+
+## Produktivvorbereitung: Datenstrukturen (Nutzerentscheidungen 02.11.2026)
+
+- Kompatibilitätsvertrag umgesetzt (siehe DATEIFORMAT.md): ältere Versionen bleiben lesbar und werden nur im Speicher umgewandelt; frühere Einträge „v1 wird ohne Migration abgewiesen“ sind damit ersetzt.
+- Abgabetermin nur als Hinweis; danach sammelt die Beratung abschließend ein und räumt die Wahlordner einschließlich des verteilten Schülerprogramms, nach byte-genauer Archivierung.
+- Genehmigte Ausnahmen werden nicht in der Wahl abgebildet, sondern nachgelagert behandelt. Kein Datenmodell dafür.
+- G8/G9 und Sportausfall während der Kursstufe werden nicht abgebildet.
+- Löschfunktion je Person eingebaut (statt nur Löschung ganzer Jahrgänge). Offen: verbindliche Lösch- und Aufbewahrungsfristen sowie Umgang mit bereits erstellten `.gsm-transfer`-Sicherungen.
+- Name und Klasse bleiben im Profil (bestätigt).
+- Fachkennungen der AGVO-Fächer sind fest und werden nie umbenannt (bestätigt).
+- Altlasten der Signatur entfernt, soweit risikoarm: Profil v2 ohne `keyId`/`accountId`, Arbeitsstand/Transport v2 ohne Zertifikatsfelder, `profile-trust.json` und Signaturschema gelöscht. Bewusst belassen: leeres `signatureBytes` in unveränderlichen Profilzeilen der Lehrerdatenbank sowie das optionale Konto-Feld `accountId` der Stammdaten (wird für die Eindeutigkeitsprüfung verwendet).
+- Weiterhin offen und für den Produktivbetrieb Voraussetzung: Entfernen der `demo-`/`isDemo`-Sperren, fachliche Freigabe 2029, Schulnetz-Pilot (Dateirechte, AppLocker für das verteilte Schülerprogramm), Test auf Zielgerät ohne SDK, Backup-/Aufbewahrungskonzept.

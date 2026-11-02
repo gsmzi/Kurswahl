@@ -8,6 +8,15 @@ namespace GsmKurswahl.AdministrationStorage;
 /// <summary>One local writer. SQLite transactions and immutable rows protect administrative history.</summary>
 public sealed partial class SqliteAdministrationStore : IAdministrationStore, IPlanningStore
 {
+    // 4 (02.11.2026): archive of collected pupil files, program deliveries and the person-free deletion log.
+    public const int CurrentSchema = 4;
+    internal static readonly string[] Tables = ["students", "revisions", "reselections", "profiles", "distributions", "planning_snapshots",
+        "planning_decisions", "transfer_receipts", "collected_files", "program_deliveries", "deletions"];
+    private const string Schema4Tables = """
+        CREATE TABLE IF NOT EXISTS collected_files (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS program_deliveries (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS deletions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+        """;
     private readonly FileStream lease;
     private readonly SqliteConnection db;
     public SqliteAdministrationStore(string path)
@@ -22,7 +31,7 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
         {
             db.Open();
             var version = Convert.ToInt32(Scalar("PRAGMA user_version"));
-            if (version is not (0 or 1 or 2 or 3)) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion; keine Migration.");
+            if (version is < 0 or > CurrentSchema) throw new InvalidDataException("Verwaltungsschemaversion " + version + " stammt von einer neueren Programmversion; keine Migration.");
             if (version == 0)
             {
                 if (Convert.ToInt32(Scalar("SELECT count(*) FROM sqlite_master WHERE type='table'")) != 0)
@@ -37,7 +46,8 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
                     CREATE TABLE planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
                     CREATE TABLE planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
                     CREATE TABLE transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    PRAGMA user_version=3;
+                    """ + Schema4Tables + """
+                    PRAGMA user_version=4;
                     COMMIT;
                     """);
             }
@@ -48,23 +58,30 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
                     CREATE TABLE IF NOT EXISTS planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
                     CREATE TABLE IF NOT EXISTS planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
                     CREATE TABLE IF NOT EXISTS transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    PRAGMA user_version=3;
+                    """ + Schema4Tables + """
+                    PRAGMA user_version=4;
                     COMMIT;
                     """);
             }
-            else if (version == 2)
+            else if (version is 2 or 3)
             {
+                // Existing rows stay untouched; only missing empty tables are added.
                 Execute("""
                     BEGIN IMMEDIATE;
                     CREATE TABLE IF NOT EXISTS transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    PRAGMA user_version=3;
+                    """ + Schema4Tables + """
+                    PRAGMA user_version=4;
                     COMMIT;
                     """);
             }
-            foreach (var table in new[] { "students", "revisions", "reselections", "profiles", "distributions", "planning_snapshots", "planning_decisions", "transfer_receipts" })
-                Execute($"CREATE TRIGGER IF NOT EXISTS {table}_no_update BEFORE UPDATE ON {table} BEGIN SELECT RAISE(ABORT,'append-only'); END; CREATE TRIGGER IF NOT EXISTS {table}_no_delete BEFORE DELETE ON {table} BEGIN SELECT RAISE(ABORT,'append-only'); END;");
+            CreateAppendOnlyTriggers();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
+    }
+    private void CreateAppendOnlyTriggers()
+    {
+        foreach (var table in Tables)
+            Execute($"CREATE TRIGGER IF NOT EXISTS {table}_no_update BEFORE UPDATE ON {table} BEGIN SELECT RAISE(ABORT,'append-only'); END; CREATE TRIGGER IF NOT EXISTS {table}_no_delete BEFORE DELETE ON {table} BEGIN SELECT RAISE(ABORT,'append-only'); END;");
     }
     private SqliteCommand Command(string sql, params object?[] args)
     {
@@ -85,12 +102,12 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
     public ImmutableArray<StudentRecord> Students()
     {
         var records = Read<StudentRecord>("SELECT body FROM students s WHERE version=(SELECT MAX(version) FROM students WHERE id=s.id) ORDER BY id");
-        if (records.Any(r => r.SchemaVersion != 1)) throw new InvalidDataException("Unbekannte Stammdaten-Schemaversion.");
+        if (records.Any(r => r.SchemaVersion != SchemaVersions.StudentRecord)) throw new InvalidDataException("Unbekannte Stammdaten-Schemaversion.");
         return records;
     }
     public void SaveStudent(StudentRecord record, int? expectedVersion)
     {
-        if (record.SchemaVersion != 1 || record.Version != (expectedVersion ?? 0) + 1 || string.IsNullOrWhiteSpace(record.Actor)
+        if (record.SchemaVersion != SchemaVersions.StudentRecord || record.Version != (expectedVersion ?? 0) + 1 || string.IsNullOrWhiteSpace(record.Actor)
             || !record.Student.ExternalStudentId.StartsWith("demo-", StringComparison.Ordinal) || record.Student.Id == Guid.Empty
             || record.Student.GraduationYear is < 2000 or > 2200 || string.IsNullOrWhiteSpace(record.Student.SyntheticDisplayName))
             throw new ArgumentException("Ungültige Stammdaten; dieser Entwicklungsstand erlaubt nur synthetische demo-IDs.");

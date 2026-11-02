@@ -22,7 +22,7 @@ public sealed class ReconciliationWindowTests
         using (var store = workspace.OpenActive())
         {
             store.EnablePlanning();
-            store.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Abschluss", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Abschluss", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
             new TeacherSession(store, TestData.WorkflowCatalog, "demo-test").Save(TestData.Choice, null, RevisionSource.TeacherEdit, "Demo Ursprung");
         }
         var window = new TeacherWindow(root);

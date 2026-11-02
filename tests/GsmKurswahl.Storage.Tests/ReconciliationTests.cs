@@ -15,7 +15,7 @@ public sealed class ReconciliationTests : IDisposable
         var workspace = new TeacherWorkspace(root); workspace.Create(catalog, "demo-test");
         var store = workspace.OpenActive();
         foreach (var id in new[] { "demo-001", "demo-002" })
-            store.SaveStudent(new(1, new(Guid.NewGuid(), id, "Demo Test", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), id, "Demo Test", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
         new TeacherSession(store, catalog, "demo-test").Save(TestData.Choice, null, RevisionSource.TeacherEdit, "Ursprung");
         return store;
     }

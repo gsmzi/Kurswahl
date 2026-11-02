@@ -238,6 +238,65 @@ public sealed partial class TeacherWindow
             };
             subjects.Children.Add(card);
         }
+        var optional = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8) };
+        foreach (var offer in active.Catalog.Offers.Where(o => o.Type != CourseType.Lf && PlanningPresentation.CanCancel(o)))
+        {
+            var subject = active.Catalog.Subjects.Single(s => s.Id == offer.SubjectId);
+            var box = new CheckBox
+            {
+                Name = "SetupOffer_" + offer.Id.Replace('-', '_'),
+                Content = subject.Name + " · " + FormatCourseType(offer.Type) + (offer.Variant == CourseVariant.Bilingual ? " bilingual" : ""),
+                IsChecked = offer.Status is OfferStatus.Offered or OfferStatus.Established
+            };
+            box.HorizontalAlignment = HorizontalAlignment.Stretch;
+            var card = Surface(box, 12); card.Width = 260; card.Margin = new Thickness(0, 0, 12, 12);
+            void PaintCard() { card.Background = box.IsChecked == true ? SoftAccent : Brushes.White; card.BorderBrush = box.IsChecked == true ? Accent : Line; }
+            PaintCard();
+            box.IsCheckedChanged += (_, _) =>
+            {
+                try
+                {
+                    var current = workspace.Active!;
+                    if (session!.Overview().Any(s => s.Record.Student.GraduationYear == current.Catalog.GraduationYear && s.Active is not null))
+                        throw new InvalidOperationException("Inzwischen liegen Kurswahlen vor. Änderungen nur über die Kursplanung mit Vorschau vornehmen.");
+                    var enabledLf = current.Catalog.Offers.Where(o => o.Type == CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established).Select(o => o.Id).ToHashSet();
+                    var enabledOptional = current.Catalog.Offers.Where(o => o.Type != CourseType.Lf && PlanningPresentation.CanCancel(o) && o.Status is OfferStatus.Offered or OfferStatus.Established).Select(o => o.Id).ToHashSet();
+                    if (box.IsChecked == true) enabledOptional.Add(offer.Id); else enabledOptional.Remove(offer.Id);
+                    var prepared = CatalogConfiguration.Prepare(current.Catalog, current.Catalog.GraduationYear, "demo-" + current.Catalog.GraduationYear + "-" + Guid.NewGuid().ToString("N")[..8], enabledLf, enabledOptional);
+                    workspace.Update(current with { Catalog = prepared });
+                    session = new TeacherSession(store!, prepared, current.Actor);
+                    PaintCard(); status.Text = "Fachauswahl gespeichert.";
+                }
+                catch (Exception ex) { status.Text = "Fachauswahl nicht gespeichert: " + ex.Message; ShowOfferSetup(); }
+            };
+            optional.Children.Add(card);
+        }
+        panel.Children.Add(new Expander { Header = "Optionale Basis-, Wahl- und Seminarkurse anpassen (z. B. Italienisch, Psychologie, SIA)", Content = optional });
+        var deadline = new CalendarDatePicker { Name = "SetupDeadline", Width = 220, SelectedDate = active.SubmissionDeadline?.ToDateTime(TimeOnly.MinValue) };
+        deadline.SelectedDateChanged += (_, _) =>
+        {
+            try
+            {
+                var value = deadline.SelectedDate is { } date ? DateOnly.FromDateTime(date) : (DateOnly?)null;
+                if (value == workspace.Active!.SubmissionDeadline) return;
+                workspace.Update(workspace.Active! with { SubmissionDeadline = value });
+                status.Text = value is null ? "Abgabetermin entfernt." : $"Abgabetermin {value:dd.MM.yyyy} gespeichert; er erscheint nach der nächsten Verteilung im Schülerprogramm.";
+            }
+            catch (Exception ex) { status.Text = "Abgabetermin nicht gespeichert: " + ex.Message; }
+        };
+        panel.Children.Add(Labeled("Abgabetermin (nur Hinweis)", deadline, "Wird den Schülern im Programm angezeigt. Das Programm sperrt danach nichts; Sie sammeln nach dem Termin unter „Kurswahlen einsammeln“ abschließend ein."));
+        var program = new TextBox { Name = "SetupStudentProgram", Text = active.StudentProgramDirectory, Watermark = "Ordner mit dem veröffentlichten Schülerprogramm (optional)", Width = 520 };
+        var saveProgram = Button("Programmordner übernehmen", () =>
+        {
+            var value = (program.Text ?? "").Trim();
+            if (value.Length > 0 && (!Path.IsPathFullyQualified(value) || !Directory.Exists(value)
+                || (!File.Exists(Path.Combine(value, "GsmKurswahl.StudentApp.exe")) && !File.Exists(Path.Combine(value, "GsmKurswahl.StudentApp.dll")))))
+                throw new ArgumentException("Bitte den vollständigen Pfad des Ordners mit GsmKurswahl.StudentApp.exe angeben.");
+            workspace.Update(workspace.Active! with { StudentProgramDirectory = value.Length == 0 ? "" : Path.GetFullPath(value) });
+            status.Text = value.Length == 0 ? "Schülerprogramm wird nicht mitverteilt." : "Schülerprogramm wird bei der Verteilung in jeden Wahlordner kopiert.";
+        }, "Leer lassen, wenn das Schülerprogramm anders bereitgestellt wird.");
+        var programRow = new WrapPanel { Orientation = Orientation.Horizontal }; programRow.Children.Add(program); programRow.Children.Add(saveProgram);
+        panel.Children.Add(Labeled("Schülerprogramm mitverteilen", programRow, "Optional. Das Programm wird nach „" + StudentFolderCleanup.ProgramFolder + "“ im Wahlordner kopiert und beim abschließenden Einsammeln wieder entfernt. Die appsettings.json im Programmordner muss auf den Wahlordner aus Sicht des Schülerrechners zeigen."));
         var next = Button("Fachangebot bestätigen · weiter zur Schülerliste", () =>
         {
             if (workspace.Active!.Catalog.Offers.Count(o => o.Type == CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established) < 3)

@@ -52,7 +52,8 @@ public class ChoiceValidatorTests
     [Fact] public void EveryRuleHasStableMetadata()
     {
         Assert.Equal(ChoiceValidator.Definitions.Length, ChoiceValidator.Definitions.Select(d => d.Id).Distinct().Count());
-        Assert.All(ChoiceValidator.Definitions, d => { Assert.NotEmpty(d.Source); Assert.NotEmpty(d.Scope); Assert.Equal(ChoiceValidator.Version, d.Version); });
+        Assert.All(ChoiceValidator.Definitions, d => { Assert.NotEmpty(d.Source); Assert.NotEmpty(d.Scope);
+            Assert.Equal(d.Id == "GSM-GK-CONTINUITY" ? "gsm-2026-10-29.1" : ChoiceValidator.Version, d.Version); });
         Assert.All(CatalogRules.Definitions, d => Assert.Contains(d, ChoiceValidator.Definitions));
     }
     [Fact] public void EveryRuleIsDocumented()

@@ -5,7 +5,7 @@ public static class ModelGuard
     public static void Choice(CourseChoice value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        Require(value.SchemaVersion == 2, "Nicht unterstützte Wahl-Schemaversion. Version 2 erforderlich; keine automatische Migration.");
+        Require(value.SchemaVersion == SchemaVersions.Choice, "Nicht unterstützte Wahl-Schemaversion; ältere Versionen werden beim Einlesen umgewandelt.");
         Require(!value.PlannedOralSubjects.IsDefault && value.PlannedOralSubjects.Length <= 2
             && value.PlannedOralSubjects.All(s => !string.IsNullOrWhiteSpace(s))
             && value.PlannedOralSubjects.Distinct().Count() == value.PlannedOralSubjects.Length, "Ungültige mündliche Prüfungsplanung.");
@@ -29,10 +29,11 @@ public static class ModelGuard
     public static void Catalog(OfferCatalog value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        Require(value.SchemaVersion == 1, "Nicht unterstützte Katalog-Schemaversion.");
+        Require(value.SchemaVersion == SchemaVersions.Catalog, "Nicht unterstützte Katalog-Schemaversion.");
         Require(!string.IsNullOrWhiteSpace(value.Version) && value.GraduationYear is >= 2000 and <= 2200, "Katalogversion/Jahrgang ungültig.");
         Require(!value.Subjects.IsDefaultOrEmpty && !value.Offers.IsDefaultOrEmpty, "Leerer Katalog.");
-        Require(value.Subjects.All(s => s is not null && !string.IsNullOrWhiteSpace(s.Id) && !string.IsNullOrWhiteSpace(s.Name)), "Ungültiges Fach.");
+        Require(value.Subjects.All(s => s is not null && !string.IsNullOrWhiteSpace(s.Id) && !string.IsNullOrWhiteSpace(s.Name)
+            && s.TaskField is null or (>= 0 and <= 3)), "Ungültiges Fach.");
         Require(value.Subjects.Select(s => s.Id).Distinct().Count() == value.Subjects.Length, "Doppelte Fachkennung.");
         Require(value.Offers.All(o => o is not null && !string.IsNullOrWhiteSpace(o.Id)), "Ungültiges Angebot.");
         Require(value.Offers.Select(o => o.Id).Distinct().Count() == value.Offers.Length, "Doppelte Angebotskennung.");

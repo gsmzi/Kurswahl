@@ -19,7 +19,7 @@
             "additionalProperties": false,
             "required": ["schemaVersion", "version", "graduationYear", "isDemo", "subjects", "offers"],
             "properties": {
-              "schemaVersion": { "const": 1 },
+              "schemaVersion": { "enum": [1, 2] },
               "version": { "type": "string", "minLength": 1 },
               "graduationYear": { "type": "integer", "minimum": 2000, "maximum": 2200 },
               "isDemo": { "type": "boolean" },
@@ -30,7 +30,7 @@
                   "type": "object",
                   "additionalProperties": false,
                   "required": ["id", "name"],
-                  "properties": { "id": { "type": "string", "minLength": 1 }, "name": { "type": "string", "minLength": 1 } }
+                  "properties": { "id": { "type": "string", "minLength": 1 }, "name": { "type": "string", "minLength": 1 }, "taskField": { "type": ["integer", "null"], "minimum": 0, "maximum": 3 }, "isForeignLanguage": { "type": "boolean" }, "isScience": { "type": "boolean" } }
                 }
               },
               "offers": {

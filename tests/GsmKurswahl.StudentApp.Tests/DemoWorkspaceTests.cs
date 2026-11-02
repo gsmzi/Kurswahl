@@ -34,7 +34,7 @@ public sealed class DemoWorkspaceTests
                     Assert.True(File.Exists(Path.Combine(s.Record.HomeDirectory, "profil.json"))); });
                 Assert.Equal(4, states.Select(s => s.Record.Student.ClassName).Distinct().Count());
                 var selections = states.SelectMany(s => s.Active!.Snapshot.Selections).ToArray();
-                foreach (var semesters in new[] { new[] { 1 }, new[] { 1, 2 }, new[] { 1, 3, 4 }, new[] { 1, 2, 3, 4 } })
+                foreach (var semesters in new[] { new[] { 1 }, new[] { 1, 2 }, new[] { 1, 2, 3, 4 } })
                     Assert.Contains(selections, s => s.OfferId == "GK-BF" && s.Semesters.SequenceEqual(semesters));
                 Assert.Contains(selections, s => s.OfferId == "GEO-BF" && s.Semesters.SequenceEqual(new[] { 3 }));
                 var snapshot = store.PlanningDocuments().First(); var analysis = CoursePlanning.Analyze(snapshot);

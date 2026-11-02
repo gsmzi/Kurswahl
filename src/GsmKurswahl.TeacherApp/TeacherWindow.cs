@@ -150,7 +150,12 @@ public sealed partial class TeacherWindow : Window
         }
         if (!preserveEditor)
         {
-            profileTargets.ItemsSource = store.Students().Where(s => s.Student.GraduationYear == session.Catalog.GraduationYear).Select(s => new Target(s)).ToArray();
+            profileTargets.ItemsSource = store.Students().Where(s => s.Student.GraduationYear == session.Catalog.GraduationYear)
+                .OrderBy(s => s.Student.ClassName, StringComparer.CurrentCulture)
+                .ThenBy(s => s.Student.SortName().Last, StringComparer.CurrentCulture)
+                .ThenBy(s => s.Student.SortName().First, StringComparer.CurrentCulture)
+                .ThenBy(s => s.Student.ExternalStudentId, StringComparer.Ordinal)
+                .Select(s => new Target(s)).ToArray();
             profileTargets.SelectAll();
         }
         if (!preserveEditor && personEditor.IsExpanded && selectedStudentId is not null && states.SingleOrDefault(s => s.Record.Student.ExternalStudentId == selectedStudentId) is { } current)
@@ -346,6 +351,24 @@ public sealed partial class TeacherWindow : Window
                     "Übernimmt diesen früheren Stand als neue, aktuelle Wahl. Begründung im Reiter „Kurswahl und Nachwahl“ eintragen."));
             historyTab.Children.Add(Surface(card, 10));
         }
+
+        // ---- Deletion: deliberate and irreversible, never part of an import or collection.
+        var deletion = new StackPanel { Spacing = 8 };
+        deletion.Children.Add(Heading("Person löschen"));
+        deletion.Children.Add(Text("Entfernt diese Person vollständig aus dem Lehrerbestand dieses Jahrgangs: Stammdaten, Vorbildung, alle Kurswahlstände, Nachwahl- und Übertragungsvermerke, Profile, Zustellberichte, archivierte Schülerdateien und die Person in gespeicherten Planungsständen. Zurück bleibt nur ein Protokolleintrag ohne Name und Schüler-ID. Dateien im Wahlordner werden nicht verändert. Vorher ggf. „Jahrgang sichern“."));
+        var deleteReason = new TextBox { Name = "DeleteStudentReason", Watermark = "Löschgrund (z. B. Schulwechsel, Löschfrist erreicht)" };
+        var deleteConfirm = new CheckBox { Name = "DeleteStudentConfirm", Content = $"Ich möchte {record.Student.SyntheticDisplayName} ({id}) endgültig löschen" };
+        deletion.Children.Add(deleteReason); deletion.Children.Add(deleteConfirm);
+        var deleteButton = Button("Person endgültig löschen", () =>
+        {
+            if (deleteConfirm.IsChecked != true) throw new InvalidOperationException("Bitte die Löschung ausdrücklich bestätigen.");
+            if (store is not SqliteAdministrationStore sql) throw new InvalidOperationException("Löschen ist nur im lokalen Lehrerbestand möglich.");
+            var log = sql.DeleteStudent(id, record.Student.Id, Actor, deleteReason.Text ?? "");
+            detail.Children.Clear(); Refresh();
+            status.Text = $"Person gelöscht ({log.RemovedRows} Datensätze, {log.UpdatedPlanningSnapshots} Planungsstände bereinigt).";
+        }, "Nicht umkehrbar. Eine zuvor erstellte Jahrgangssicherung enthält die Person weiterhin.");
+        deleteButton.Name = "DeleteStudent"; deletion.Children.Add(deleteButton);
+        detail.Children.Add(Surface(deletion, 14));
     }
     private void BuildImport()
     {
@@ -415,7 +438,7 @@ public sealed partial class TeacherWindow : Window
             {
                 var issued = store!.LatestProfile(target.Record.Student.ExternalStudentId);
                 if (issued is null) { reports.Add(target.Record.Student.SyntheticDisplayName + ": noch kein Profil erstellt"); continue; }
-                var entry = distribution.Distribute(target.Record, issued, session!.Catalog); reports.Add(target.Record.Student.SyntheticDisplayName + ": " + DistributionText(entry.Status));
+                var entry = distribution.Distribute(target.Record, issued, DistributedCatalog()); reports.Add(target.Record.Student.SyntheticDisplayName + ": " + DistributionText(entry.Status) + DeliverProgramIfConfigured(distribution, target.Record));
             }
             status.Text = string.Join(" · ", reports);
         }, "Kopiert das zuletzt erstellte Profil und das aktuelle Fachangebot in die bestätigten Wahlordner. Vorhandene Kurswahlen werden nicht verändert.");
@@ -437,6 +460,7 @@ public sealed partial class TeacherWindow : Window
         "Zugriff_verweigert" => "kein Schreibzugriff",
         "Profil_abweichend" => "vorhandene Datei weicht ab (nicht überschrieben)",
         "veraltet" => "Profil veraltet – neu erstellen",
+        "Programm_abweichend" => "vorhandene Programmdateien weichen ab (nicht überschrieben)",
         _ => status
     };
     private void BuildCollection()
@@ -446,6 +470,29 @@ public sealed partial class TeacherWindow : Window
         collectionPanel.Children.Add(Help("Was ist ein Konflikt?", "Ein Konflikt entsteht, wenn die Beratung die Wahl einer Person bereits geändert hat und danach eine andere Schülerdatei im Wahlordner auftaucht. Das Programm übernimmt die Schülerdatei dann nicht automatisch.\n\n• „Übernehmen“: Die Schülerwahl wird neuer aktueller Stand (Begründung nötig, Häkchen oben setzen).\n• „Verwerfen“: Der Stand der Beratung bleibt; dieselbe Schülerdatei wird nicht erneut gemeldet.\n\nIn beiden Fällen bleibt die Historie vollständig erhalten."));
         collectionPanel.Children.Add(Help("Welche Datei muss ich auswählen?", "Keine. Für jede Person muss lediglich der persönliche Wahlordner hinterlegt und bestätigt sein – das geschieht bei der gemeinsamen Verteilung automatisch. In diesem Ordner wird aktuell.json gesucht.\n\nprofil.json enthält Voraussetzungen, keine gewählten Kurse. Excel-/CSV-Schülerlisten gehören in den Schülerlisten-Import. Ein PDF-Kontrollbogen lässt sich nicht als Kurswahl einlesen."));
         collectionPanel.Children.Add(Button("Jetzt auf neue Kurswahlen prüfen", CollectAutomatically, "Sofort einlesen, ohne auf die automatische Prüfung zu warten."));
+        var finalConfirm = new CheckBox { Name = "FinalCollectionConfirm", Content = "Abgabetermin ist vorbei: Wahlordner jetzt räumen" };
+        var finalCollection = Button("Abschließend einsammeln und Schülerordner räumen", async () =>
+        {
+            if (finalConfirm.IsChecked != true) throw new InvalidOperationException("Bitte das abschließende Einsammeln ausdrücklich bestätigen.");
+            if (store is not SqliteAdministrationStore sql) throw new InvalidOperationException("Nur im lokalen Lehrerbestand möglich.");
+            await CollectAutomatically();
+            var results = new List<CleanupResult>();
+            foreach (var record in CurrentStudents().Where(r => r.MappingConfirmed))
+            {
+                var accepted = dismissedConflicts.Where(k => k.StartsWith(record.Student.ExternalStudentId + ":", StringComparison.Ordinal))
+                    .Select(k => k[(record.Student.ExternalStudentId.Length + 1)..]).ToHashSet();
+                results.Add(await Task.Run(() => StudentFolderCleanup.Clean(sql, record, Actor, accepted)));
+            }
+            finalConfirm.IsChecked = false;
+            var names = CurrentStudents().ToDictionary(s => s.Student.ExternalStudentId, s => s.Student.SyntheticDisplayName);
+            collectionResults.Children.Clear();
+            foreach (var r in results.OrderBy(r => r.Status == "geräumt"))
+                collectionResults.Children.Add(TableLine(names.GetValueOrDefault(r.StudentId, r.StudentId), r.StudentId, r.Status, r.Detail));
+            status.Text = $"Abschließendes Einsammeln: {results.Count(r => r.Status == "geräumt")} von {results.Count} Wahlordnern geräumt; übrige siehe Liste.";
+        }, "Liest zuerst alle neuen Wahlen ein. Danach werden je Person aktuell.json, Sicherung, Profil, Fachangebot und das verteilte Schülerprogramm entfernt – erst nachdem alle Dateien byte-genau im Lehrerbestand archiviert sind. Ordner mit offenem Konflikt oder nicht eingesammelter Wahl bleiben unverändert.");
+        finalCollection.Name = "FinalCollection";
+        collectionPanel.Children.Add(Help("Was passiert beim abschließenden Einsammeln?", "Nach dem Abgabetermin räumt das Programm die Wahlordner: Jede Datei wird vorher vollständig mit Prüfsumme im Lehrerbestand archiviert, erst dann gelöscht. Entfernt wird nur, was nachweislich eingesammelt ist; bei offenem Konflikt zuerst übernehmen oder verwerfen. Programmdateien werden nur gelöscht, wenn sie unverändert aus der eigenen Verteilung stammen. Startet eine Person das Programm danach erneut, entsteht eine neue Datei, die wie gewohnt eingesammelt wird."));
+        collectionPanel.Children.Add(finalConfirm); collectionPanel.Children.Add(finalCollection);
         collectionPanel.Children.Add(collectionResults); collectionPanel.Children.Add(conflict); collectionPanel.Children.Add(reason);
         var conflictActions = new WrapPanel { Orientation = Orientation.Horizontal };
         var acceptConflicts = Button("Ausgewählte Konflikte übernehmen (Schülerwahl gilt)", () =>

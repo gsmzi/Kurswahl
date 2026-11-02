@@ -52,7 +52,7 @@ Das Angebot ist ein **eigens gepflegter Fächerkatalog pro Abiturjahrgang**, nic
 
 **Nicht als LF anbieten:** Informatik, Italienisch, Ethik, evangelische und katholische Religion. Alle anderen LF-Optionen nur, wenn die Schule sie im jeweiligen Jahrgang freigibt.
 
-**GSM-Festlegung für GK/GEO bei LF Wirtschaft:** Pflichtkurs GK ausschließlich HJ 1, Pflichtkurs GEO ausschließlich HJ 3. GK HJ 2 und GEO HJ 4 sind bei bestehendem Angebot möglich, aber nicht pflichtig. GK-Wahlkurse HJ 3+4 bleiben möglich; für GK als mündliches Prüfungsfach bei LF Wirtschaft genügen der verpflichtende GK-Kurs HJ 1 und die beiden Wahlkurse HJ 3+4. Ohne LF Wirtschaft: GK HJ 1+2 und GEO HJ 3+4 pflichtig; GK mündlich verlangt zusätzlich HJ 3+4. GEO mündlich nicht anbieten, da die zwei zusätzlichen GEO-Wahlkurse fehlen.
+**GSM-Festlegung für GK/GEO bei LF Wirtschaft:** Pflichtkurs GK ausschließlich HJ 1, Pflichtkurs GEO ausschließlich HJ 3. GK HJ 2 und GEO HJ 4 sind bei bestehendem Angebot möglich, aber nicht pflichtig. GK-Wahlkurse HJ 3+4 bleiben möglich; GSM-Ergänzung vom 29.10.2026: GK HJ 3+4 wird bei LF Wirtschaft nur mit durchgehender Belegung HJ 1-4 genehmigt; HJ 2 darf nicht ausgelassen werden. Für GK als mündliches Prüfungsfach sind daher auch bei LF Wirtschaft alle vier Kurse erforderlich. Ohne LF Wirtschaft: GK HJ 1+2 und GEO HJ 3+4 pflichtig; GK mündlich verlangt zusätzlich HJ 3+4. GEO mündlich nicht anbieten, da die zwei zusätzlichen GEO-Wahlkurse fehlen.
 
 **Unbedingt getrennt halten:** Fach und Kursart bzw. bilinguale Variante, Halbjahresbelegung, schulisches Angebot, Kursgruppe in Untis und spätere Kurszuweisung. Die Schüler wählen keine Lehrer oder konkreten Parallelgruppen.
 
@@ -212,7 +212,7 @@ Mindestens xUnit-Tests für Domäne, Dateischicht, Import und Analyse; UI-Smoke-
 3. INF BF ohne Brückenkurs/IMP -> blockiert; mit Voraussetzung und vier Kursen -> zweite Naturwissenschaft ersetzbar, erste nicht.
 4. Italienisch BF nur bei Profilberechtigung. Bili-BIO nur bei bestätigtem durchgängigem Bili-Bildungsgang.
 5. Ohne LF W GK HJ 1+2 und GEO HJ 3+4 Pflicht; mit LF W nur GK HJ 1 und GEO HJ 3 Pflicht.
-6. GK mündlich ohne W nur mit HJ 1-4, mit W mit HJ 1,3,4; GEO mündlich am GSM nicht möglich.
+6. GK mündlich ohne W nur mit HJ 1-4, mit W ebenfalls mit HJ 1-4 (GSM-Festlegung 29.10.2026); GEO mündlich am GSM nicht möglich.
 7. Psychologie nur HJ 1+2, SIA 3-stündig in HJ 1+2, SIA zählt als zwei Basiskurse, nie als Sportersatz.
 8. Sportbefreiung mit fehlenden Kursen -> erforderliche Ersatzkurszahl; bei bereits 42 Kursen darf Ersatzpflicht nicht stillschweigend entfallen.
 9. Religion/Ethik: fehlende Vorbildung in der Einführungsphase beeinflusst mündliche Prüfungsoption, nicht pauschal die BF-Wahl; Wechsel und zustimmungspflichtige Sonderfälle ergeben die richtigen Prüfhinweise.

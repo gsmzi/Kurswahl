@@ -68,7 +68,10 @@ public static class ControlSheet
         Paragraph("Kurswahl - Kontrollbogen", heading, 9);
         heading.TextSize = 14;
         Paragraph("Vorläufig / nicht eingereicht", heading);
-        Paragraph($"Schüler-ID: {choice.StudentId}   |   Wahlrevision: {choice.Revision}");
+        var identity = string.IsNullOrWhiteSpace(profile.DisplayName)
+            ? $"Schüler-ID: {choice.StudentId}"
+            : $"Name: {profile.DisplayName}   |   " + (string.IsNullOrWhiteSpace(profile.ClassName) ? "" : $"Klasse: {profile.ClassName}   |   ") + $"Schüler-ID: {choice.StudentId}";
+        Paragraph($"{identity}   |   Wahlrevision: {choice.Revision}");
         Paragraph($"Angebot: {choice.OfferVersion}   |   Regeln: {choice.RuleVersion}", muted);
         Paragraph($"Wahlstand: {choice.UpdatedAt:dd.MM.yyyy HH:mm zzz}", muted);
         Paragraph($"Profil: {profile.Status}   |   Revision: {profile.Revision?.ToString() ?? "ungeprüft"}   |   Stand: {profile.IssuedAt?.ToString("dd.MM.yyyy HH:mm zzz") ?? "unbekannt"}", muted);

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "profileRevision": 1,
+  "studentId": "demo-001",
+  "windowsUsername": "",
+  "graduationYear": 2029,
+  "issuedAt": "2026-10-27T10:00:00+00:00",
+  "keyId": "local-profile",
+  "prerequisites": {
+    "italianProfile": "yes",
+    "informaticsBridge": "no",
+    "informaticsImp": "yes",
+    "continuousBilingual": "yes",
+    "religionEthicsGrade10": "KR",
+    "sportExemptSemesters": [
+      1
+    ],
+    "continuedLanguages": [
+      "E",
+      "F"
+    ],
+    "religionEthicsPermission": "yes",
+    "religionEthicsExamPermission": "no",
+    "permanentSportExemption": "no"
+  },
+  "accountId": ""
+}

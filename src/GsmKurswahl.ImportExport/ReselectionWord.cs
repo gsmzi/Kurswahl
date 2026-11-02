@@ -34,7 +34,10 @@ public static class ReselectionWord
     }
     public static byte[] Render(IEnumerable<ReselectionPrintItem> items, OfferCatalog catalog)
     {
-        var ordered = items.OrderBy(x => x.Student.Student.ClassName).ThenBy(x => x.Student.Student.SyntheticDisplayName).ThenBy(x => x.Remaining.StudentId).ToArray();
+        var ordered = items.OrderBy(x => x.Student.Student.ClassName, StringComparer.CurrentCulture)
+            .ThenBy(x => x.Student.Student.SortName().Last, StringComparer.CurrentCulture)
+            .ThenBy(x => x.Student.Student.SortName().First, StringComparer.CurrentCulture)
+            .ThenBy(x => x.Remaining.StudentId, StringComparer.Ordinal).ToArray();
         if (ordered.Length == 0) throw new ArgumentException("Keine Nachwahlbögen vorhanden.");
         var body = E("body");
         foreach (var item in ordered)

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GsmKurswahl.Domain;
 
 namespace GsmKurswahl.AdministrationStorage;
@@ -20,13 +21,36 @@ public sealed class TeacherWorkspace
             throw new ArgumentException("Verwaltungsverzeichnis muss lokal liegen.");
         path = Path.Combine(Root, "workspace.json");
         var bytes = Read(path);
-        Document = bytes is null ? new(1, null, []) : Parse(bytes);
+        Document = bytes is null ? new(CurrentSchema, null, []) : Parse(bytes);
         token = Token(bytes);
+    }
+    public const int CurrentSchema = 2;
+    // v1 carried the former certificate fields of each year. They never had an effect and are dropped in memory;
+    // the file itself is only rewritten (as v2) by the next deliberate change.
+    internal static byte[] UpgradeYears(byte[] bytes, string container)
+    {
+        var root = JsonNode.Parse(bytes, documentOptions: new() { MaxDepth = 32 }) as JsonObject ?? throw new InvalidDataException($"{container}: ungültiges JSON.");
+        var version = root["schemaVersion"]?.GetValueKind() == JsonValueKind.Number ? root["schemaVersion"]!.GetValue<int>() : 0;
+        if (version is not (1 or CurrentSchema)) throw new InvalidDataException($"{container}: Schemaversion {version} wird nicht unterstützt; keine Migration.");
+        if (version == CurrentSchema) return bytes;
+        static void Strip(JsonNode? year)
+        {
+            if (year is not JsonObject value) return;
+            foreach (var legacy in new[] { "certificateThumbprint", "keyId" })
+            {
+                if (!value.ContainsKey(legacy) || value[legacy]?.GetValueKind() != JsonValueKind.String) throw new InvalidDataException("Jahrgangseintrag v1 unvollständig.");
+                value.Remove(legacy);
+            }
+        }
+        if (root["years"] is JsonArray years) foreach (var year in years) Strip(year);
+        if (root["year"] is { } single) Strip(single);
+        root["schemaVersion"] = CurrentSchema;
+        return JsonSerializer.SerializeToUtf8Bytes(root);
     }
     private static TeacherWorkspaceDocument Parse(byte[] bytes)
     {
-        var value = JsonSerializer.Deserialize<TeacherWorkspaceDocument>(bytes, DocumentJson.Options) ?? throw new InvalidDataException("Leere Jahrgangsverwaltung.");
-        if (value.SchemaVersion != 1 || value.Years.IsDefault || (value.Years.Length > 0 && value.ActiveYear is null) || value.Years.Select(y => y.Catalog.GraduationYear).Distinct().Count() != value.Years.Length
+        var value = JsonSerializer.Deserialize<TeacherWorkspaceDocument>(UpgradeYears(bytes, "Jahrgangsverwaltung"), DocumentJson.Options) ?? throw new InvalidDataException("Leere Jahrgangsverwaltung.");
+        if (value.SchemaVersion != CurrentSchema || value.Years.IsDefault || (value.Years.Length > 0 && value.ActiveYear is null) || value.Years.Select(y => y.Catalog.GraduationYear).Distinct().Count() != value.Years.Length
             || (value.ActiveYear is not null && !value.Years.Any(y => y.Catalog.GraduationYear == value.ActiveYear)))
             throw new InvalidDataException("Unbekannte oder ungültige Jahrgangsverwaltung; keine automatische Migration.");
         foreach (var year in value.Years)
@@ -69,7 +93,7 @@ public sealed class TeacherWorkspace
         if (Document.Years.Any(y => y.Catalog.GraduationYear == catalog.GraduationYear)) throw new InvalidOperationException("Dieser Jahrgang ist bereits eingerichtet. Bitte auswählen.");
         var database = Path.Combine(Root, "Abitur-" + catalog.GraduationYear, "verwaltung.db");
         if (File.Exists(database)) throw new IOException("Vorhandene Verwaltungsdatei ohne Zuordnung. Über Einstellungen ausdrücklich einbinden.");
-        var year = new TeacherYear(catalog, database, YearSetupStep.Offer, actor, "", "");
+        var year = new TeacherYear(catalog, database, YearSetupStep.Offer, actor);
         // Validate all values before creating any database.
         var next = Document with { ActiveYear = catalog.GraduationYear, Years = Document.Years.Add(year) };
         _ = Parse(JsonSerializer.SerializeToUtf8Bytes(next, DocumentJson.Options));
@@ -101,7 +125,7 @@ public sealed class TeacherWorkspace
         var students = existing.Students();
         if (students.Any(s => s.Student.GraduationYear != catalog.GraduationYear))
             throw new InvalidDataException("Die ausgewählte Verwaltungsdatei enthält Schüler eines anderen Abiturjahrgangs.");
-        var year = new TeacherYear(catalog, Path.GetFullPath(databasePath), YearSetupStep.Import, actor, "", "");
+        var year = new TeacherYear(catalog, Path.GetFullPath(databasePath), YearSetupStep.Import, actor);
         Save(Document with { ActiveYear = catalog.GraduationYear, Years = Document.Years.Add(year) });
     }
 }

@@ -135,8 +135,8 @@ public sealed partial class TeacherWindow
                     var latest = store.LatestProfile(current.Student.ExternalStudentId);
                     if (latest is null || latest.Profile.GraduationYear != current.Student.GraduationYear || System.Text.Json.JsonSerializer.Serialize(latest.Profile.Prerequisites, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(current.Student.Prerequisites, DocumentJson.Options))
                         latest = service.Issue(current);
-                    var result = service.Distribute(current, latest, session!.Catalog); if (result.Status == "verteilt") count++;
-                    reports.Add(current.Student.SyntheticDisplayName + ": " + result.Status);
+                    var result = service.Distribute(current, latest, DistributedCatalog()); if (result.Status == "verteilt") count++;
+                    reports.Add(current.Student.SyntheticDisplayName + ": " + result.Status + DeliverProgramIfConfigured(service, current));
                 }
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException) { reports.Add(record.Student.SyntheticDisplayName + ": " + ex.Message); }
             }
@@ -160,6 +160,16 @@ public sealed partial class TeacherWindow
             collectionResults.Children.Add(TableLine(preview.Student.Student.SyntheticDisplayName + " (" + preview.Choice.StudentId + ")", preview.Student.Student.ClassName, "Konflikt", preview.Conflict, box));
         }
         foreach (var message in messages) collectionResults.Children.Add(Text(message));
+    }
+    // The deadline is a hint in the pupils' copy of the offer; the protected catalog itself stays unchanged.
+    private OfferCatalog DistributedCatalog() => session!.Catalog with { SubmissionDeadline = workspace?.Active?.SubmissionDeadline };
+    private string DeliverProgramIfConfigured(ProfileDistribution service, StudentRecord record)
+    {
+        var directory = workspace?.Active?.StudentProgramDirectory;
+        if (string.IsNullOrWhiteSpace(directory)) return "";
+        var current = store!.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId);
+        var result = service.DeliverProgram(current, directory);
+        return result.Status == "verteilt" ? " · Programm bereitgestellt" : " · Programm: " + DistributionText(result.Status);
     }
     private async Task CollectAutomatically()
     {

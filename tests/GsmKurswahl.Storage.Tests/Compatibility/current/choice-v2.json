@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "documentId": "11111111-1111-1111-1111-111111111111",
+  "studentId": "demo-001",
+  "graduationYear": 2029,
+  "offerVersion": "demo-2029-compat",
+  "ruleVersion": "m2-2",
+  "revision": 3,
+  "createdAt": "2026-11-02T08:00:00+00:00",
+  "updatedAt": "2026-11-02T09:00:00+00:00",
+  "submissionStatus": "draft",
+  "phase": "preliminary",
+  "selections": [
+    {
+      "offerId": "D-LF",
+      "subjectId": "D",
+      "type": "lf",
+      "variant": "normal",
+      "semesters": [
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "plannedOralSubjects": [
+    "D",
+    "NEU"
+  ]
+}

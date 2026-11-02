@@ -111,12 +111,14 @@ public static class StudentTableImport
                 var id = Value("studentId");
                 if (!id.StartsWith("demo-", StringComparison.Ordinal)) throw new ArgumentException("Nur synthetische demo-IDs erlaubt.");
                 var name = Value("name");
-                if (name.Length == 0 && Value("firstName").Length > 0 && Value("lastName").Length > 0) name = Value("firstName") + " " + Value("lastName");
+                var firstName = Value("firstName");
+                var lastName = Value("lastName");
+                if (name.Length == 0 && firstName.Length > 0 && lastName.Length > 0) name = firstName + " " + lastName;
                 var home = Value("home");
                 if (home.Length == 0)
                 {
                     var folder = Value("folder");
-                    if (folder.Length == 0 && Value("firstName").Length > 0 && Value("lastName").Length > 0) folder = Value("lastName") + "." + Value("firstName");
+                    if (folder.Length == 0 && firstName.Length > 0 && lastName.Length > 0) folder = lastName + "." + firstName;
                     if (folder.Length > 0)
                     {
                         bool InvalidPart(string part) => string.IsNullOrWhiteSpace(part) || part is "." or ".." || part.IndexOfAny(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) >= 0 || part.EndsWith('.') || part.EndsWith(' ');
@@ -134,8 +136,9 @@ public static class StudentTableImport
                 var prior = new PriorEducation(Known("italian"), Known("bridge"), Known("imp"), Known("bilingual"), religion.Length == 0 ? null : religion, semesters)
                 { ContinuedLanguages = [.. Value("languages").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct()], ReligionEthicsPermission = Known("religionPermission"), ReligionEthicsExamPermission = Known("religionExamPermission"), PermanentSportExemption = Known("permanentSport") };
                 var departure = Value("departure").ToLowerInvariant() switch { "" or "aktiv" => DepartureStatus.Active, "voraussichtlich" => DepartureStatus.ExpectedDeparture, "bestaetigt" or "bestätigt" => DepartureStatus.ConfirmedDeparture, _ => throw new ArgumentException("Abgängerstatus ungültig.") };
-                var student = new AdministrativeStudent(Guid.NewGuid(), id, name, Value("class"), year, departure, prior);
-                result.Add(new(i + 2, new(1, student, Value("username"), Value("accountId"), home, false, 1, actor, DateTimeOffset.UtcNow, origin), ""));
+                var student = new AdministrativeStudent(Guid.NewGuid(), id, name, Value("class"), year, departure, prior)
+                { FirstName = firstName, LastName = lastName };
+                result.Add(new(i + 2, new(SchemaVersions.StudentRecord, student, Value("username"), Value("accountId"), home, false, 1, actor, DateTimeOffset.UtcNow, origin), ""));
             }
             catch (Exception ex) when (ex is ArgumentException or FormatException or OverflowException) { result.Add(new(i + 2, null, ex.Message)); }
         }

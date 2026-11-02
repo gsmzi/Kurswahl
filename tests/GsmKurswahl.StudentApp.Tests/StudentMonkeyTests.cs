@@ -41,8 +41,9 @@ public class StudentMonkeyTests
         var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json")));
         var runs = int.TryParse(Environment.GetEnvironmentVariable("GSM_MONKEY_RUNS"), out var r) ? r : 4;
         var steps = int.TryParse(Environment.GetEnvironmentVariable("GSM_MONKEY_STEPS"), out var s) ? s : 120;
+        var firstSeed = int.TryParse(Environment.GetEnvironmentVariable("GSM_MONKEY_SEED"), out var start) ? start : 0;
         var findings = new Dictionary<string, string>();
-        for (var seed = 0; seed < runs; seed++)
+        for (var seed = firstSeed; seed < firstSeed + runs; seed++)
             await Run(catalog, Profile(profileName), seed, steps, findings);
         var report = Environment.GetEnvironmentVariable("GSM_MONKEY_REPORT");
         if (report is { Length: > 0 })
@@ -126,7 +127,7 @@ public class StudentMonkeyTests
         if (Technical.Any(error.Contains)) report("Technische Fehlermeldung", error);
         ValidationResult validation;
         try { validation = session.Validation; } catch (Exception ex) { report("Validierung wirft", ex.ToString()); return; }
-        foreach (var id in new[] { "SUBJECT-DUPLICATE", "GSM-RELIGION-EXCLUSIVE", "OFFER-SELECTION" })
+        foreach (var id in new[] { "SUBJECT-DUPLICATE", "GSM-RELIGION-EXCLUSIVE", "GSM-GK-CONTINUITY", "OFFER-SELECTION" })
             if (validation.Messages.Any(m => m.Rule.Id == id)) report("Regelverstoß über UI: " + id, Describe(session));
         // Also with a sport exemption only complete school years are offered (Nutzerfestlegung 29.10.2026).
         if (session.Step >= 3 && validation.Messages.Any(m => m.Rule.Id == "AGVO-SEMESTERS"))
@@ -211,8 +212,9 @@ public class StudentMonkeyTests
     {
         var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json")));
         var runs = int.TryParse(Environment.GetEnvironmentVariable("GSM_MONKEY_RUNS"), out var r) ? r : 6;
+        var firstSeed = int.TryParse(Environment.GetEnvironmentVariable("GSM_MONKEY_SEED"), out var start) ? start : 0;
         var findings = new Dictionary<string, string>();
-        for (var seed = 0; seed < runs; seed++)
+        for (var seed = firstSeed; seed < firstSeed + runs; seed++)
         {
             var random = new Random(1000 + seed);
             var session = new StudentSession(catalog, "demo-001", new MemoryStore(), Profile(profileName));
@@ -315,7 +317,7 @@ public class StudentMonkeyTests
                     if (lost.Length > 0) Report("Kurse nach Rück-/Vorweg verloren", string.Join(",", lost) + $"\nVorher: {Selections(completed)}\nNachher: {Selections(session.Choice)}");
                 }
             }
-            catch (Exception) { }
+            catch (Exception ex) { Report("Ausnahme " + ex.GetType().Name, ex.ToString()); }
             finally { if (session.IsDirty && !session.LoadFailed) await session.SaveAsync(); window.Close(); }
         }
         var report = Environment.GetEnvironmentVariable("GSM_MONKEY_REPORT");

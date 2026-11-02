@@ -18,6 +18,7 @@ public static class AcademicRules
         Rule("AGVO-SEMESTERS", "Belegung je Jahrgangsstufe", "AGVO §10; Pflichtenheft §6 Nr.12; Nutzerfestlegung 29.10.2026: kein Einzelhalbjahres-Sportersatz bei der Kurswahl"),
         Rule("AGVO-RELIGION", "Religion/Ethik: Zustimmung und Wechsel", "AGVO §§11,21; Pflichtenheft §6 Nr.9", ReviewStatus.NeedsReview),
         Rule("GSM-RELIGION-EXCLUSIVE", "Religion und Ethik nicht gleichzeitig", "Nutzerfestlegung 29.10.2026; Pflichtenheft §6 Nr.9"),
+        new("GSM-GK-CONTINUITY", "GK ohne Unterbrechung bei LF Wirtschaft", "GSM-Nutzerfestlegung 29.10.2026", "GSM; GK-BF bei LF Wirtschaft", "gsm-2026-10-29.1", ReviewStatus.Invalid),
         Rule("AGVO-SPORT", "Befreiung, LF-Eignung und Ersatzbedarf", "AGVO §13 Abs.5; Pflichtenheft §6 Nr.10", ReviewStatus.NeedsReview),
         Rule("AGVO-SPORT-REPLACEMENT", "Zusätzliche Kurse statt Sport; kein Seminarkurs", "AGVO §13 Abs.5; ZSL Ratgeber Schulsport"),
         Rule("AGVO-EXAM", "Mindestens eine mögliche Prüfungskombination", "AGVO §21; Pflichtenheft §6 Nr.11"),
@@ -29,10 +30,18 @@ public static class AcademicRules
     private static RuleDefinition Rule(string id, string description, string source, ReviewStatus severity = ReviewStatus.Invalid) =>
         new(id, description, source, "GSM-Kurswahl; Rechtsstand für Abiturjahrgang vor Freigabe bestätigen", ChoiceValidator.Version, severity);
 
-    public static string[] Languages(ProfileContext profile) =>
+    public static string[] Languages(ProfileContext profile, OfferCatalog? catalog = null) =>
         ["E", "F", "L", .. (profile.Status == ProfileStatus.Verified ? profile.Prerequisites.ContinuedLanguages : [])
-            .Where(s => s is "GR" or "I" or "SPA" or "RU" or "POR")];
+            .Where(s => s is "GR" or "I" or "SPA" or "RU" or "POR"
+                || catalog?.Subjects.FirstOrDefault(x => x.Id == s)?.IsForeignLanguage == true)];
+    public static string[] ScienceSubjects(OfferCatalog? catalog = null) =>
+        catalog is null ? Sciences : [.. Sciences.Union(catalog.Subjects.Where(s => s.IsScience).Select(s => s.Id))];
     public static bool Four(CourseSelection s) => Enumerable.Range(1, 4).All(s.Semesters.Contains);
+    public const string GkContinuityExplanation = "Am GSM darf Gemeinschaftskunde bei LF Wirtschaft nicht nach einer Pause in HJ 2 wieder in HJ 3/4 belegt werden. Für GK in HJ 3/4 auch HJ 2 wählen.";
+    public static bool HasGkContinuityGap(CourseChoice choice) =>
+        choice.Selections.Any(s => s.Type == CourseType.Lf && s.SubjectId == "W")
+        && choice.Selections.Any(s => s.SubjectId == "GK" && s.Type == CourseType.Bf
+            && s.Semesters.Any(h => h is 3 or 4) && !s.Semesters.Contains(2));
     public static bool MutuallyExclusiveSubjects(string first, string second) => first != second
         && first is "ETH" or "ER" or "KR" && second is "ETH" or "ER" or "KR";
 
@@ -59,13 +68,15 @@ public static class AcademicRules
         }
         return units.ToImmutable();
     }
-    public static int Field(string subject, ProfileContext profile) => Languages(profile).Contains(subject) ? 1 : subject switch
-    {
-        "D" or "BK" or "MU" => 1,
-        "G" or "GK" or "GEO" or "W" or "ETH" or "ER" or "KR" => 2,
-        "M" or "BIO" or "CH" or "PH" or "INF" => 3,
-        _ => 0
-    };
+    public static int Field(string subject, ProfileContext profile, OfferCatalog? catalog = null) =>
+        catalog?.Subjects.FirstOrDefault(s => s.Id == subject)?.TaskField is { } configured ? configured
+        : Languages(profile, catalog).Contains(subject) ? 1 : subject switch
+        {
+            "D" or "BK" or "MU" => 1,
+            "G" or "GK" or "GEO" or "W" or "ETH" or "ER" or "KR" => 2,
+            "M" or "BIO" or "CH" or "PH" or "INF" => 3,
+            _ => 0
+        };
 
     public static ImmutableArray<RuleMessage> Check(CourseChoice choice, OfferCatalog catalog, ProfileContext profile)
     {
@@ -75,9 +86,12 @@ public static class AcademicRules
                 "Belegung prüfen; offene Voraussetzungen und Sonderfälle mit der Oberstufenberatung klären."));
         Add("M2-RELEASE", "needs_review: Rechtsstand für diesen Jahrgang und interne KOE-Auslegung sind noch nicht freigegeben. Keine verbindliche Abgabe.");
         var lf = choice.Selections.Where(s => s.Type == CourseType.Lf).ToArray();
-        var languages = Languages(profile);
+        if (HasGkContinuityGap(choice))
+            Add("GSM-GK-CONTINUITY", GkContinuityExplanation, ["GK"], [2, 3, 4]);
+        var languages = Languages(profile, catalog);
+        var sciences = ScienceSubjects(catalog);
         if (lf.Length != 3 || lf.Select(s => s.SubjectId).Distinct().Count() != 3
-            || lf.Count(s => s.SubjectId is "D" or "M" || Sciences.Contains(s.SubjectId) || languages.Contains(s.SubjectId)) < 2)
+            || lf.Count(s => s.SubjectId is "D" or "M" || sciences.Contains(s.SubjectId) || languages.Contains(s.SubjectId)) < 2)
             Add("AGVO-LF", "Genau drei verschiedene LF, darunter mindestens zwei aus Deutsch, Mathematik, geeigneten fortgeführten Sprachen oder BIO/CH/PH wählen.");
         if (lf.Sum(s => s.Semesters.Length) != 12 || choice.Selections.Where(s => s.Type != CourseType.Lf).Sum(s => s.Semesters.Length) < 30)
             Add("AGVO-COURSES", "Benötigt werden 12 LF-Halbjahreskurse und mindestens 30 weitere Kurse. SIA zählt nur seine zwei Halbjahre.");
@@ -88,13 +102,13 @@ public static class AcademicRules
             if (!choice.Selections.Any(s => group.Contains(s.SubjectId) && Four(s)))
                 Add("AGVO-REQUIRED", $"Vier Kurse in einem der Fächer {string.Join(" / ", group)} fehlen.", group, [1, 2, 3, 4]);
         var full = choice.Selections.Where(Four).Select(s => s.SubjectId).Distinct().ToArray();
-        var scienceCount = full.Count(Sciences.Contains);
+        var scienceCount = full.Count(sciences.Contains);
         var languageCount = full.Count(languages.Contains);
         var inf = full.Contains("INF") && catalog.Offers.Any(o => o.SubjectId == "INF"
             && choice.Selections.Any(s => s.OfferId == o.Id) && new ChoiceValidator().GetAvailability(o, profile).CanSelect);
         if (scienceCount < 1 || languageCount < 1 || !(languageCount >= 2 || scienceCount + (inf ? 1 : 0) >= 2))
         {
-            var unknownAlternative = scienceCount > 0 && (full.Any(s => s is "I" or "F" or "L" or "GR" or "SPA" or "RU" or "POR" && !languages.Contains(s))
+            var unknownAlternative = scienceCount > 0 && (full.Any(s => (s is "I" or "F" or "L" or "GR" or "SPA" or "RU" or "POR" || catalog.Subjects.FirstOrDefault(x => x.Id == s)?.IsForeignLanguage == true) && !languages.Contains(s))
                 || (full.Contains("INF") && (profile.Status != ProfileStatus.Verified
                     || profile.Prerequisites.InformaticsImp == Knowledge.Unknown || profile.Prerequisites.InformaticsBridge == Knowledge.Unknown)));
             Add(unknownAlternative ? "AGVO-LANGUAGE-REVIEW" : "AGVO-LANGUAGE-SCIENCE", "Eine geeignete Sprache und BIO/CH/PH sind nötig; zusätzlich zweite geeignete Sprache oder zweite Naturwissenschaft (berechtigtes INF als Alternative). Italienisch-Profil allein ist keine Sprachlaufbahnbestätigung.");
@@ -199,8 +213,8 @@ public static class AcademicRules
         {
             if (MutuallyExclusiveSubjects(candidates[i], candidates[j])) continue;
             var all = lf.Concat([candidates[i], candidates[j]]).ToArray();
-            if (!all.Contains("D") || !all.Contains("M") || !new[] { 1, 2, 3 }.All(f => all.Any(s => Field(s, profile) == f))) continue;
-            var floor = MinimumCredits(choice, [candidates[i], candidates[j]], profile);
+            if (!all.Contains("D") || !all.Contains("M") || !new[] { 1, 2, 3 }.All(f => all.Any(s => Field(s, profile, catalog) == f))) continue;
+            var floor = MinimumCredits(choice, [candidates[i], candidates[j]], profile, catalog);
             if (floor > 40) continue;
             var note = "Vorläufig; Rechtsstand, persönliche Prüfungsvoraussetzungen und Anrechnung bestätigen. BLL/SIA ersetzt kein Fach automatisch.";
             options.Add(new(candidates[i], candidates[j], floor, ReviewStatus.NeedsReview, note));
@@ -209,7 +223,7 @@ public static class AcademicRules
     }
 
     // Distinct subject/semester sets avoid counting LF twice. Missing required courses are not hidden.
-    public static int MinimumCredits(CourseChoice choice, string[] oral, ProfileContext profile)
+    public static int MinimumCredits(CourseChoice choice, string[] oral, ProfileContext profile, OfferCatalog? catalog = null)
     {
         var required = new HashSet<(string, int)>();
         void Add(string s, IEnumerable<int> h) { foreach (var semester in h) required.Add((s, semester)); }
@@ -219,8 +233,10 @@ public static class AcademicRules
         foreach (var s in oral) Add(s, ChoiceWorkflow.OralSemesters(choice, s));
         var art = choice.Selections.Where(s => s.SubjectId is "BK" or "MU").OrderByDescending(s => s.Type == CourseType.Lf || oral.Contains(s.SubjectId)).FirstOrDefault();
         if (art is not null) Add(art.SubjectId, art.Semesters.Take(2));
-        var languages = choice.Selections.Where(s => Four(s) && Languages(profile).Contains(s.SubjectId)).Select(s => s.SubjectId).Distinct().DefaultIfEmpty("__LANG1").ToArray();
-        var sciences = choice.Selections.Where(s => Four(s) && Sciences.Contains(s.SubjectId)).Select(s => s.SubjectId).Distinct().DefaultIfEmpty("__SCI1").ToArray();
+        var allowedLanguages = Languages(profile, catalog);
+        var allowedSciences = ScienceSubjects(catalog);
+        var languages = choice.Selections.Where(s => Four(s) && allowedLanguages.Contains(s.SubjectId)).Select(s => s.SubjectId).Distinct().DefaultIfEmpty("__LANG1").ToArray();
+        var sciences = choice.Selections.Where(s => Four(s) && allowedSciences.Contains(s.SubjectId)).Select(s => s.SubjectId).Distinct().DefaultIfEmpty("__SCI1").ToArray();
         var minima = new List<int>();
         foreach (var language in languages)
         foreach (var science in sciences)

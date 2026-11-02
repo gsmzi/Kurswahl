@@ -21,7 +21,7 @@ public sealed class PlanningTests : IDisposable
         for (var i = 1; i <= 3; i++)
         {
             var id = $"demo-{i:000}";
-            var record = new StudentRecord(1, new(Guid.NewGuid(), id, "Demo " + i, "10a", 2029,
+            var record = new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), id, "Demo " + i, "10a", 2029,
                 i == 1 ? DepartureStatus.Active : i == 2 ? DepartureStatus.ExpectedDeparture : DepartureStatus.ConfirmedDeparture,
                 PriorEducation.Unknown with { ContinuousBilingual = Knowledge.Yes }), "", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
             store.SaveStudent(record, null);

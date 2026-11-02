@@ -15,12 +15,25 @@ public enum RevisionSource { StudentSubmission, TeacherEdit, OfferCancellation, 
 public enum ProfileStatus { Missing, Unverified, Verified, ProfileInvalid }
 public enum Requirement { Informatics, ItalianProfile, ContinuousBilingual }
 
-public sealed record Subject(string Id, string Name);
+public sealed record Subject(string Id, string Name)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? TaskField { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsForeignLanguage { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsScience { get; init; }
+}
 public sealed record SemesterHours(int Semester, int WeeklyHours);
 public sealed record CourseOffer(string Id, string SubjectId, CourseType Type, CourseVariant Variant,
     OfferStatus Status, ImmutableArray<SemesterHours> Schedule, ImmutableArray<Requirement> Requirements);
 public sealed record OfferCatalog(int SchemaVersion, string Version, int GraduationYear, bool IsDemo,
-    ImmutableArray<Subject> Subjects, ImmutableArray<CourseOffer> Offers);
+    ImmutableArray<Subject> Subjects, ImmutableArray<CourseOffer> Offers)
+{
+    // Catalog v2: only a hint for pupils, set in the distributed copy; collection is a separate teacher action.
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public DateOnly? SubmissionDeadline { get; init; }
+}
 public sealed record CourseSelection(string OfferId, string SubjectId, CourseType Type,
     CourseVariant Variant, ImmutableArray<int> Semesters);
 
@@ -43,22 +56,22 @@ public sealed record PriorEducation(Knowledge ItalianProfile, Knowledge Informat
         Knowledge.Unknown, Knowledge.Unknown, null, null);
 }
 
-// Model for M2; signature verification and account binding must precede use as trusted evidence.
+// Advisory copy of protected prerequisites for the pupil app; binding checks always use the teacher stock.
 public sealed record StudentProfile(int SchemaVersion, int ProfileRevision, string StudentId,
-    string WindowsUsername, int GraduationYear, DateTimeOffset IssuedAt, string KeyId, PriorEducation Prerequisites,
-    string AccountId);
+    string WindowsUsername, int GraduationYear, DateTimeOffset IssuedAt, PriorEducation Prerequisites)
+{
+    public string DisplayName { get; init; } = "";
+    public string ClassName { get; init; } = "";
+}
 public sealed record ProfileContext(ProfileStatus Status, PriorEducation Prerequisites)
 {
     public int? Revision { get; init; }
     public DateTimeOffset? IssuedAt { get; init; }
     public string Detail { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public string ClassName { get; init; } = "";
     public static ProfileContext Missing { get; } = new(ProfileStatus.Missing, PriorEducation.Unknown);
 }
-public sealed record ProfileSignature(int SchemaVersion, string KeyId, string Algorithm, string Signature);
-// Installed by school administration in the protected application directory, never in a pupil home.
-public sealed record TrustedProfileKey(string KeyId, string SubjectPublicKeyInfo);
-public sealed record ProfileTrust(int SchemaVersion, ImmutableArray<TrustedProfileKey> Keys,
-    ImmutableArray<string> AllowedAccountDomains);
 public sealed record CurrentIdentity(string Username, string? AccountId);
 public interface ICurrentIdentityProvider { CurrentIdentity GetCurrent(); }
 
@@ -74,7 +87,23 @@ public sealed record ExamOption(string First, string Second, int MinimumCredits,
 public sealed record ImportOrigin(string SourceId, string ContentHash, string MappingVersion,
     DateTimeOffset ImportedAt, string AuthenticatedAccount);
 public sealed record AdministrativeStudent(Guid Id, string ExternalStudentId, string SyntheticDisplayName,
-    string ClassName, int GraduationYear, DepartureStatus Departure, PriorEducation Prerequisites);
+    string ClassName, int GraduationYear, DepartureStatus Departure, PriorEducation Prerequisites)
+{
+    public string FirstName { get; init; } = "";
+    public string LastName { get; init; } = "";
+    public (string Last, string First) SortName()
+    {
+        if (!string.IsNullOrWhiteSpace(LastName) || !string.IsNullOrWhiteSpace(FirstName))
+            return (LastName, FirstName);
+        var comma = SyntheticDisplayName.IndexOf(',');
+        if (comma >= 0)
+            return (SyntheticDisplayName[..comma].Trim(), SyntheticDisplayName[(comma + 1)..].Trim());
+        var space = SyntheticDisplayName.LastIndexOf(' ');
+        return space > 0
+            ? (SyntheticDisplayName[(space + 1)..].Trim(), SyntheticDisplayName[..space].Trim())
+            : (SyntheticDisplayName, "");
+    }
+}
 public sealed record SelectionChange(string OfferId, ImmutableArray<int> Before, ImmutableArray<int> After);
 public sealed record ChoiceRevision(Guid Id, Guid? PreviousRevisionId, string StudentId,
     DateTimeOffset ChangedAt, string ActorId, ActorRole ActorRole, RevisionSource Source, string Reason,
@@ -89,7 +118,11 @@ public sealed record PlanningSnapshot(Guid Id, DateTimeOffset CreatedAt, OfferCa
     bool IncludeExpectedDepartures);
 public sealed record PlanningScenario(Guid Id, Guid BaseSnapshotId, ImmutableArray<string> CancelledOfferIds);
 
-public sealed record StoredChoice(CourseChoice Choice, string ContentToken);
+public sealed record StoredChoice(CourseChoice Choice, string ContentToken)
+{
+    // Set when the file uses an older schema and was converted in memory; the file itself is unchanged.
+    public int? UpgradedFromSchema { get; init; }
+}
 public interface IChoiceStore
 {
     Task<StoredChoice?> LoadAsync(CancellationToken cancellationToken = default);

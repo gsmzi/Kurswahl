@@ -49,7 +49,7 @@ public static class DemoCohort
                 var semesters = o.Schedule.Select(s => s.Semester).ToArray();
                 var economics = offers.Any(x => x.Id == "W-LF");
                 if (o.Type == CourseType.Bf && o.SubjectId == "GK")
-                    semesters = economics ? (index % 3) switch { 0 => new[] { 1 }, 1 => new[] { 1, 3, 4 }, _ => new[] { 1, 2, 3, 4 } }
+                    semesters = economics ? (index % 3) switch { 0 => new[] { 1 }, 1 => new[] { 1, 2 }, _ => new[] { 1, 2, 3, 4 } }
                         : index % 2 == 0 ? [1, 2] : [1, 2, 3, 4];
                 if (o.Type == CourseType.Bf && o.SubjectId == "GEO" && economics && index % 2 == 0) semesters = [3];
                 return new(o.Id, o.SubjectId, o.Type, o.Variant, [.. semesters]);
@@ -71,7 +71,7 @@ public static class DemoCohort
             var errors = validation.Messages.Where(m => m.Rule.Severity == ReviewStatus.Invalid).ToArray();
             if (errors.Length > 0) throw new InvalidOperationException(id + ": " + string.Join("; ", errors.Select(m => m.Rule.Id + " " + m.Explanation)));
             var departure = index % 20 == 19 ? DepartureStatus.ConfirmedDeparture : index % 20 >= 17 ? DepartureStatus.ExpectedDeparture : DepartureStatus.Active;
-            var record = new StudentRecord(1, new(Guid.NewGuid(), id, $"Testperson {number:000}, Demo", "10" + (char)('a' + index / 20),
+            var record = new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), id, $"Testperson {number:000}, Demo", "10" + (char)('a' + index / 20),
                 catalog.GraduationYear, departure, prerequisites), "", "", "", false, 1, "demo-generator", time, null);
             result.Add(new(record, choice));
         }

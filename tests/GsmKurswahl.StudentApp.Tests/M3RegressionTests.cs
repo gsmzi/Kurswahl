@@ -21,7 +21,7 @@ public sealed class M3RegressionTests : IDisposable
     const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
     public M3RegressionTests() => Directory.CreateDirectory(root);
     public void Dispose() => Directory.Delete(root, true);
-    StudentRecord Record(string id = "demo-001", bool confirmed = false) => new(1,
+    StudentRecord Record(string id = "demo-001", bool confirmed = false) => new(SchemaVersions.StudentRecord,
         new(Guid.NewGuid(), id, "Demo Muster", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown),
         "", "", Path.Combine(root, "10a", "Muster.Demo"), confirmed, 1, "demo-review", DateTimeOffset.UtcNow, null);
     TeacherWorkspace Workspace(StudentRecord record, YearSetupStep step = YearSetupStep.Complete)

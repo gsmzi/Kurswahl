@@ -1,4 +1,4 @@
-# JSON-Verträge: Wahl v2, Katalog v1
+# JSON-Verträge: Wahl v2, Katalog v2, Profil v2 (aktueller Stand am Ende: Kompatibilitätsvertrag 02.11.2026)
 
 Maschinenlesbare Schemata: `schemas/course-choice.v2.schema.json` und `schemas/offer-catalog.v1.schema.json` (JSON Schema 2020-12). UTF-8, camelCase-Eigenschaften, Enumwerte in snake_case. Alle modellierten Felder sind erforderlich; unbekannte Felder, ganzzahlige Enums, fehlende Felder, null statt Pflichtwerten und unbekannte Schemaversionen werden abgewiesen. Maximal 2 MiB pro Wahl und JSON-Tiefe 32. Zusätzliche strukturelle Grenzen prüft `ModelGuard` (eindeutige Kennungen, Zeitfolge, Halbjahre, Wochenstundenbereich). Schulische Angebotsgrenzen sind Regeln mit ID in `GsmKurswahl.Rules` (siehe [Regelkatalog](RECHTSQUELLEN.md)). Das JSON-Schema ersetzt keine Fachprüfung.
 
@@ -51,3 +51,39 @@ Keine Änderung der JSON-Strukturen oder Schema-Versionen. Neue Jahrgänge start
 Allgemeiner Tabellenvertrag `choice-table-v1`: sechs frei zuordenbare Spalten studentId/year/subject/type/variant/semester, eine Zeile je Halbjahreskurs. Kein ASV-Formatschema; Details in M5_ABSCHLUSS.md. Kein neues Schülerwahl-, Profil- oder Katalogschema.
 
 Verwaltungsdatenbank: optionale, ausdrücklich ausgelöste Erweiterung 2 → 3 mit append-only `transfer_receipts`. Vermerksschema 1: ID, StudentId, ChoiceRevisionId, StudentVersion, CatalogVersion, RuleVersion, At, Actor, Entered, Note. Alte Vermerke werden nicht geändert oder gelöscht. Wahl-/Stammdatenänderungen entwerten ihre aktuelle Zuordnung. Schema 1/2 bleibt ohne Aktivierung unverändert; unbekannte Datenbank-/Vermerksschemata werden abgewiesen. Transportmanifest bleibt v1; vollständige SQLite-Backups unterstützen DB-Schema 1, 2 und 3.
+
+## Kompatibilitätsvertrag vor Produktivbetrieb (02.11.2026)
+
+Ersetzt die früheren Aussagen „ältere Schemaversion wird abgewiesen, keine Migration“. Ziel: Spätere Programmversionen öffnen alle bestehenden Projekte und Schülerdateien.
+
+**Regeln**
+- Jede veröffentlichte Schemaversion bleibt lesbar. Ältere Versionen werden beim Einlesen **im Speicher** in die aktuelle Version umgewandelt (`VersionedDocuments` in `GsmKurswahl.Domain`). Die Datei bzw. der Datenbankeintrag bleibt dabei unverändert.
+- Geschrieben wird ausschließlich die aktuelle Version. Eine Schülerdatei wird erst beim nächsten Speichern im aktuellen Format geschrieben; die vorherige Datei bleibt als `.bak`. Das Schülerprogramm meldet die Umwandlung sichtbar. Append-only-Zeilen der Lehrerdatenbank werden nie umgeschrieben.
+- Versionen, die neuer sind als das Programm, werden abgewiesen; die Datei bleibt unverändert.
+- Jede Strukturänderung braucht: neue Schemaversion, ausdrückliche Umwandlung der Vorgängerversion, neue Schemadatei und eingefrorene Testdateien. Umbenennen oder Entfernen von Feldern oder Enum-Werten ist nur so zulässig.
+- Eingefrorene Testdateien: `tests/GsmKurswahl.Storage.Tests/Compatibility/current` (exakte Schreibform aller gespeicherten Typen) und `.../legacy` (historische Dateien und Lehrerdatenbank Schema 3, niemals ändern). `CompatibilityTests` schlägt fehl, sobald sich eine gespeicherte Struktur ändert. `scripts/Test-Schemas.ps1` prüft die Schemadateien gegen genau diese Dateien.
+- Feste Fachkennungen der AGVO-Fächer (D, M, E, F, L, BIO, CH, PH, G, GK, GEO, W, SP, BK, MU, ETH, ER, KR, INF, I, PSY, SIA …) sind Teil des Vertrags und werden nie umbenannt (Nutzerfestlegung 02.11.2026).
+
+**Aktuelle Versionen**
+
+| Datei / Inhalt | aktuell | lesbar | Änderung |
+| --- | --- | --- | --- |
+| Schülerwahl `aktuell.json` | 2 | 1, 2 | v1 ohne `plannedOralSubjects` → leere Liste |
+| Fachangebot `fachangebot.json` / eingebettete Kataloge | 2 | 1, 2 | v2: optionale Fachmerkmale `taskField`, `isForeignLanguage`, `isScience`; optional `submissionDeadline` (nur Hinweis, nur in der verteilten Kopie) |
+| Profil `profil.json` | 2 | 1, 2 | v2: `displayName`, `className`; entfallen: `keyId`, `accountId` (wirkungslose Reste der Signatur) |
+| Stammdatensatz (Lehrer-DB) | 2 | 1, 2 | v2: optionale `firstName`, `lastName` |
+| `workspace.json`, Transportmanifest `.gsm-transfer` | 2 | 1, 2 | v2: je Jahrgang optional `submissionDeadline`, `studentProgramDirectory`; entfallen: `certificateThumbprint`, `keyId` |
+| Lehrerdatenbank `verwaltung.db` | 4 | 1–4 | 4: Tabellen `collected_files`, `program_deliveries`, `deletions`; ältere Datenbanken erhalten nur die fehlenden leeren Tabellen |
+| `location.json`, Planungsstand, Übertragungsvermerk | 1 | 1 | unverändert |
+
+Die Zwischenstände vom 02.11.2026 (optionale neue Felder bereits in v1-Dateien) werden toleriert und als v1 gelesen.
+
+**Lehrerprüfung nach Versionswechsel:** Das Lehrerprogramm bewertet gespeicherte Wahlen stets mit dem aktuellen Angebot und Regelstand. Die bei einer Revision gespeicherte Angebots-/Regelversion dokumentiert die Herkunft; eine ältere Versionskennung allein ergibt keinen `OFFER-VERSION`-Befund und keine Nachwahl mehr.
+
+**Datenbank Schema 4**
+- `collected_files`: byte-genaue Kopie (mit SHA-256) jeder Datei, die beim abschließenden Einsammeln aus einem Wahlordner entfernt wird.
+- `program_deliveries`: Liste der vom Lehrerprogramm in einen Wahlordner kopierten Programmdateien mit Prüfsumme; nur diese unveränderten Dateien werden später entfernt.
+- `deletions`: Löschprotokoll ohne Name und Schüler-ID (nur interne Kennung, Bearbeiter, Grund, Anzahl).
+- Die Append-only-Sperren gelten für alle Tabellen. Einzige Ausnahme ist die ausdrücklich bestätigte Löschfunktion; sie hebt die Sperre nur innerhalb ihrer Transaktion auf.
+
+Entfernt: `profile-trust.json`, `schemas/profile-signature.v1.schema.json` und die zugehörigen Modelltypen (Signaturkonzept seit 27.10.2026 aufgegeben). In der Lehrerdatenbank bleibt das stets leere Feld `signatureBytes` der Profilzeilen erhalten, weil die Zeilen unveränderlich sind.

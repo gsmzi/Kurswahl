@@ -10,6 +10,8 @@
     "studentId": {"type": "string", "minLength": 1},
     "windowsUsername": {"type": "string"},
     "accountId": {"type": "string"},
+    "displayName": {"type": "string"},
+    "className": {"type": "string"},
     "graduationYear": {"type": "integer", "minimum": 2000, "maximum": 2200},
     "issuedAt": {"type": "string", "format": "date-time"},
     "keyId": {"type": "string"},

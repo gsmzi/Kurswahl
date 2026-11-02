@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "profileRevision": 2,
+  "studentId": "demo-001",
+  "windowsUsername": "DEMO\\eins",
+  "graduationYear": 2029,
+  "issuedAt": "2026-11-02T08:00:00+00:00",
+  "prerequisites": {
+    "italianProfile": "yes",
+    "informaticsBridge": "no",
+    "informaticsImp": "unknown",
+    "continuousBilingual": "yes",
+    "religionEthicsGrade10": "KR",
+    "sportExemptSemesters": [
+      1
+    ],
+    "continuedLanguages": [
+      "E",
+      "F"
+    ],
+    "religionEthicsPermission": "yes",
+    "religionEthicsExamPermission": "no",
+    "permanentSportExemption": "no"
+  },
+  "displayName": "Demo Eins",
+  "className": "10a"
+}

@@ -7,13 +7,15 @@ namespace GsmKurswahl.Storage.Tests;
 // Profile validation without certificate or SID requirement.
 public sealed class SignedProfileReaderTests
 {
-    private static StudentProfile Profile => new(1, 3, "demo-001", "", 2029,
-        DateTimeOffset.Parse("2026-01-01T12:00:00Z"), "local-profile", PriorEducation.Unknown with
-        { InformaticsImp = Knowledge.Yes, ContinuousBilingual = Knowledge.Yes, ItalianProfile = Knowledge.Yes }, "");
+    private static StudentProfile Profile => new(SchemaVersions.Profile, 3, "demo-001", "", 2029,
+        DateTimeOffset.Parse("2026-01-01T12:00:00Z"), PriorEducation.Unknown with
+        { InformaticsImp = Knowledge.Yes, ContinuousBilingual = Knowledge.Yes, ItalianProfile = Knowledge.Yes });
 
     private static ProfileContext Check(StudentProfile profile)
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(profile, JsonDocuments.Options);
+        // The writer only emits the current version; other versions are produced textually for reader tests.
+        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(profile with { SchemaVersion = SchemaVersions.Profile }, JsonDocuments.Options)
+            .Replace($"\"schemaVersion\": {SchemaVersions.Profile}", $"\"schemaVersion\": {profile.SchemaVersion}"));
         return new SignedProfileReader().Verify(bytes, "demo-001", 2029);
     }
 

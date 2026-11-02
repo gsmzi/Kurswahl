@@ -4,11 +4,8 @@ using GsmKurswahl.Domain;
 namespace GsmKurswahl.Storage;
 
 /// <summary>Read-only boundary for student profiles (profil.json). Authoritative validation always happens in the teacher app against the local database.</summary>
-public sealed class SignedProfileReader(ProfileTrust? trust = null, ICurrentIdentityProvider? identity = null)
+public sealed class SignedProfileReader
 {
-    private readonly ProfileTrust? configuredTrust = trust;
-    private readonly ICurrentIdentityProvider? identityProvider = identity;
-
     // Bootstrap an advisory identity from one explicitly selected personal directory, never from a shared roster.
     public (string StudentId, ProfileContext Profile) ReadPersonal(string directory, int graduationYear)
     {
@@ -50,21 +47,11 @@ public sealed class SignedProfileReader(ProfileTrust? trust = null, ICurrentIden
                 return Invalid("Profilgröße ungültig.");
             RejectDuplicates(profileBytes);
             var profile = JsonSerializer.Deserialize<StudentProfile>(profileBytes, JsonDocuments.Options);
-            if (profile is null || profile.SchemaVersion != 1 || profile.ProfileRevision < 1 || profile.IssuedAt == default
+            if (profile is null || profile.SchemaVersion != SchemaVersions.Profile || profile.ProfileRevision < 1 || profile.IssuedAt == default
                 || profile.IssuedAt > DateTimeOffset.UtcNow.AddMinutes(5))
                 return Invalid("Profilschema, Revision oder Ausstellungszeit ungültig.");
             if (profile.StudentId != studentId || profile.GraduationYear != graduationYear)
                 return Invalid("Schüler-ID oder Abiturjahrgang stimmt nicht mit dem Profil überein.");
-            if (identityProvider is not null && configuredTrust is { AllowedAccountDomains.IsDefaultOrEmpty: false }
-                && !string.IsNullOrWhiteSpace(profile.WindowsUsername))
-            {
-                var account = identityProvider.GetCurrent();
-                var domain = account.Username.Split('\\');
-                if (domain.Length != 2 || domain.Any(string.IsNullOrWhiteSpace)
-                    || !configuredTrust.AllowedAccountDomains.Contains(domain[0], StringComparer.OrdinalIgnoreCase)
-                    || !string.Equals(account.Username, profile.WindowsUsername, StringComparison.OrdinalIgnoreCase))
-                    return Invalid("Schulische Kontozuordnung stimmt nicht überein.");
-            }
             var p = profile.Prerequisites;
             if (p is null || p.ContinuedLanguages.IsDefault || p.ContinuedLanguages.Any(string.IsNullOrWhiteSpace)
                 || p.ContinuedLanguages.Distinct().Count() != p.ContinuedLanguages.Length
@@ -75,6 +62,7 @@ public sealed class SignedProfileReader(ProfileTrust? trust = null, ICurrentIden
             return new(ProfileStatus.Verified, p)
             {
                 Revision = profile.ProfileRevision, IssuedAt = profile.IssuedAt,
+                DisplayName = profile.DisplayName, ClassName = profile.ClassName,
                 Detail = "Persönliches Profil geladen. Verbindliche Prüfung erfolgt gegen den aktuellen Lehrerbestand."
             };
         }

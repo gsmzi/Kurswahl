@@ -18,9 +18,9 @@ public class StudentRevisionRegressionTests
     {
         public StudentSession Session { get; }
         public MainWindow Window { get; }
-        public Harness()
+        public Harness(ProfileContext? profile = null)
         {
-            Session = new StudentSession(Shipped, "demo-001", new NullStore());
+            Session = new StudentSession(Shipped, "demo-001", new NullStore(), profile);
             Window = new MainWindow(Session, "demo.json", "demo-account");
             Window.Show();
         }
@@ -192,6 +192,118 @@ public class StudentRevisionRegressionTests
         }
         finally { await session.SaveAsync(); window.Close(); }
         Assert.Contains(session.Choice.Selections, s => s.OfferId == "E-BF-ALT");
+    }
+
+    [AvaloniaFact]
+    public void CompletedChoiceSurvivesRepeatedBackButtonsAndOralChanges()
+    {
+        using var h = new Harness();
+        h.CompleteWithTwoBreadthCourses();
+        var original = h.Session.Choice.Selections.ToDictionary(s => s.OfferId, s => s.Semesters.ToArray());
+        for (var cycle = 0; cycle < 8; cycle++)
+        {
+            // Use the actual Back button all the way, not just the stepper shortcut.
+            for (var step = 5; step > 1; step--) h.Click("PreviousStep");
+            h.Click("NextStep");
+            h.Box("Oral_G").IsChecked = false;
+            h.Box("Oral_GK").IsChecked = true;
+            for (var step = 2; step < 5; step++) h.Click("NextStep");
+            Assert.Equal(new[] { 1, 2, 3, 4 }, h.Session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            h.Click("Step_2");
+            h.Box("Oral_GK").IsChecked = false;
+            h.Box("Oral_G").IsChecked = true;
+            for (var step = 2; step < 5; step++) h.Click("NextStep");
+            Assert.Equal(5, h.Session.Step);
+            foreach (var (id, semesters) in original)
+                Assert.All(semesters, semester => Assert.Contains(semester, h.Session.Choice.Selections.Single(s => s.OfferId == id).Semesters));
+            Assert.Contains(h.Session.ExamOptions, e => (e.First == "E" && e.Second == "G") || (e.First == "G" && e.Second == "E"));
+        }
+    }
+
+    [AvaloniaFact]
+    public void EconomicsLfRoundTripsRecalculateSemesterLocksWithoutLosingExtras()
+    {
+        using var h = new Harness();
+        h.CompleteWithTwoBreadthCourses();
+        for (var cycle = 0; cycle < 4; cycle++)
+        {
+            h.Click("Step_1");
+            h.Box("Offer_BIO_LF").IsChecked = false;
+            h.Box("Offer_W_LF").IsChecked = true;
+            h.Click("NextStep");
+            h.Box("Oral_G").IsChecked = false;
+            h.Box("Oral_GK").IsChecked = true;
+            h.Click("NextStep"); h.Click("NextStep");
+            Assert.Equal(new[] { 1, 2, 3, 4 }, h.Session.LockedSemesters("GK-BF"));
+            Assert.Equal(new[] { 3 }, h.Session.LockedSemesters("GEO-BF"));
+            Assert.Throws<InvalidOperationException>(() => h.Session.SetSelection("GK-BF", [1, 3, 4]));
+            h.Box("Sem_GEO_BF_4").IsChecked = false;
+            h.Click("NextStep");
+            h.Click("Step_1");
+            h.Box("Offer_W_LF").IsChecked = false;
+            h.Box("Offer_BIO_LF").IsChecked = true;
+            for (var step = 1; step < 5; step++) h.Click("NextStep");
+            Assert.Equal(5, h.Session.Step);
+            Assert.Equal(new[] { 1, 2, 3, 4 }, h.Session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Assert.Equal(new[] { 3, 4 }, h.Session.Choice.Selections.Single(s => s.SubjectId == "GEO").Semesters);
+            Assert.True(h.Has("F-BF") && h.Has("CH-BF"));
+            h.Click("Step_2");
+            h.Box("Oral_GK").IsChecked = false;
+            h.Box("Oral_G").IsChecked = true;
+            for (var step = 2; step < 5; step++) h.Click("NextStep");
+        }
+    }
+
+    [AvaloniaFact]
+    public void RemovingGermanLfForcesOralGermanAndReturningReleasesItAgain()
+    {
+        using var h = new Harness();
+        h.CompleteWithTwoBreadthCourses();
+        h.Click("Step_1");
+        h.Box("Offer_D_LF").IsChecked = false;
+        h.Box("Offer_E_LF").IsChecked = true;
+        h.Click("NextStep");
+        Assert.Contains("D", h.Session.ForcedOral);
+        Assert.Equal(new[] { "D", "G" }, h.Session.Choice.PlannedOralSubjects);
+        for (var step = 2; step < 5; step++) h.Click("NextStep");
+        Assert.True(h.Has("D-BF"));
+        h.Click("Step_1");
+        h.Box("Offer_E_LF").IsChecked = false;
+        h.Box("Offer_D_LF").IsChecked = true;
+        h.Click("NextStep");
+        Assert.Empty(h.Session.ForcedOral);
+        // E was displaced while oral slots were full (D/G). It can now be chosen again.
+        if (!h.Session.Choice.PlannedOralSubjects.Contains("E")) h.Box("Oral_E").IsChecked = true;
+        for (var step = 2; step < 5; step++) h.Click("NextStep");
+        Assert.Equal(5, h.Session.Step);
+        Assert.True(h.Has("E-BF") && h.Has("F-BF") && h.Has("CH-BF"));
+        Assert.False(h.Has("D-BF"));
+        Assert.DoesNotContain("D", h.Session.Choice.PlannedOralSubjects);
+    }
+
+    [AvaloniaFact]
+    public void OralBiologyWithBilingualPermissionRequiresExplicitVariantAfterBacktracking()
+    {
+        using var h = new Harness(new ProfileContext(ProfileStatus.Verified,
+            PriorEducation.Unknown with { ContinuousBilingual = Knowledge.Yes }));
+        h.CompleteWithTwoBreadthCourses();
+        h.Click("Step_1");
+        h.Box("Offer_BIO_LF").IsChecked = false;
+        h.Box("Offer_GK_LF").IsChecked = true;
+        h.Click("NextStep");
+        h.Box("Oral_G").IsChecked = false;
+        h.Box("Oral_BIO").IsChecked = true;
+        h.Click("NextStep");
+        // CH already satisfies the science area, but it cannot replace oral BIO.
+        Assert.True(h.Has("CH-BF"));
+        var task = Assert.Single(h.Session.Tasks.Where(t => t.Id == "PLAN-VARIANT-BIO"));
+        Assert.False(task.IsSatisfied);
+        Assert.Equal(2, task.OptionOfferIds.Length);
+        h.Box("Option_BIO_BF").IsChecked = true;
+        h.Click("NextStep"); h.Click("NextStep");
+        Assert.True(h.Has("BIO-BF"));
+        Assert.DoesNotContain(h.Session.Tasks, t => t.Id == "PLAN-VARIANT-BIO");
+        Assert.Contains(h.Session.ExamOptions, e => (e.First == "E" && e.Second == "BIO") || (e.First == "BIO" && e.Second == "E"));
     }
 
     private sealed class NullStore : IChoiceStore

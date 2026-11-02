@@ -24,7 +24,10 @@ public static class PlanningPrint
 
     public static byte[] Reselections(IEnumerable<ReselectionPrintItem> items, OfferCatalog catalog)
     {
-        var rows = items.OrderBy(x => x.Student.Student.ClassName).ThenBy(x => x.Student.Student.SyntheticDisplayName).ThenBy(x => x.Remaining.StudentId).ToArray();
+        var rows = items.OrderBy(x => x.Student.Student.ClassName, StringComparer.CurrentCulture)
+            .ThenBy(x => x.Student.Student.SortName().Last, StringComparer.CurrentCulture)
+            .ThenBy(x => x.Student.Student.SortName().First, StringComparer.CurrentCulture)
+            .ThenBy(x => x.Remaining.StudentId, StringComparer.Ordinal).ToArray();
         if (rows.Length == 0) throw new ArgumentException("Keine Nachwahlbögen vorhanden.");
         using var pdf = new Paper("Nachwahl - " + rows[0].Remaining.StudentId, catalog.GraduationYear);
         for (var i = 0; i < rows.Length; i++)

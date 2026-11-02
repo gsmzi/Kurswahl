@@ -13,9 +13,9 @@ public sealed class TeacherWorkspaceTests : IDisposable
     {
         var workspace = new TeacherWorkspace(root); Assert.Null(workspace.Active);
         workspace.Create(TestData.Catalog, "demo-beratung");
-        workspace.Update(workspace.Active! with { Step = YearSetupStep.Mapping, CertificateThumbprint = "synthetic-thumbprint", KeyId = "demo-key" });
+        workspace.Update(workspace.Active! with { Step = YearSetupStep.Mapping, SubmissionDeadline = new DateOnly(2027, 3, 15) });
         var reopened = new TeacherWorkspace(root);
-        Assert.Equal(YearSetupStep.Mapping, reopened.Active!.Step); Assert.Equal("demo-key", reopened.Active.KeyId);
+        Assert.Equal(YearSetupStep.Mapping, reopened.Active!.Step); Assert.Equal(new DateOnly(2027, 3, 15), reopened.Active.SubmissionDeadline);
         reopened.Create(TestData.Catalog with { GraduationYear = 2030, Version = "demo-2030-v1" }, "demo-beratung");
         reopened.Activate(2029);
         Assert.Equal(2029, new TeacherWorkspace(root).Active!.Catalog.GraduationYear);
@@ -52,7 +52,7 @@ public sealed class TeacherWorkspaceTests : IDisposable
     {
         Directory.CreateDirectory(root); var path = Path.Combine(root, "previous.db");
         using (var db = new SqliteAdministrationStore(path))
-            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         var workspace = new TeacherWorkspace(Path.Combine(root, "managed"));
         Assert.Throws<InvalidDataException>(() => workspace.Attach(TestData.Catalog with { GraduationYear = 2030 }, path, "demo-beratung"));
         workspace.Attach(TestData.Catalog, path, "demo-beratung");
@@ -72,7 +72,7 @@ public sealed class TeacherWorkspaceTests : IDisposable
     {
         Directory.CreateDirectory(root); var path = Path.Combine(root, "v2.db");
         using (var db = new SqliteAdministrationStore(path))
-            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         using (var raw = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()))
         {
             raw.Open(); using var cmd = raw.CreateCommand();

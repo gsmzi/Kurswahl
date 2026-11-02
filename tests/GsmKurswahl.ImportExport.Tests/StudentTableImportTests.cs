@@ -24,7 +24,7 @@ public class StudentTableImportTests
         var table = StudentTableImport.Csv("studentId;firstName;lastName;class;year;username;folder\ndemo-001;Demo;Muster;10a;2029;DEMO\\demo;" + folder);
         var row = StudentTableImport.Preview(table, table.Headers.ToDictionary(h => h, h => h), Origin, "demo-beratung").Single();
         if (error) Assert.NotEmpty(row.Error);
-        else { Assert.Empty(row.Error); Assert.Equal(expected, row.Candidate!.HomeDirectory); Assert.Equal("Demo Muster", row.Candidate.Student.SyntheticDisplayName); }
+        else { Assert.Empty(row.Error); Assert.Equal(expected, row.Candidate!.HomeDirectory); Assert.Equal("Demo Muster", row.Candidate.Student.SyntheticDisplayName); Assert.Equal(("Muster", "Demo"), row.Candidate.Student.SortName()); }
     }
     [Fact]
     public void ShippedDemoImportsWithoutErrorsAndLeavesMappingUnconfirmed()

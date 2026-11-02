@@ -14,7 +14,7 @@ public sealed class ChoiceTableTests
     {
         var catalog = TestData.WorkflowCatalog;
         var choice = TestData.Choice with { Selections = [TestData.Select(catalog.Offers.Single(o => o.Id == "D-LF")), TestData.Select(catalog.Offers.Single(o => o.Id == "GEO-BF"))] };
-        var student = new StudentRecord(1, new(Guid.NewGuid(), choice.StudentId, "Demo Export", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null);
+        var student = new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), choice.StudentId, "Demo Export", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null);
         var revision = new ChoiceRevision(Guid.NewGuid(), null, choice.StudentId, DateTimeOffset.UtcNow, "demo-test", ActorRole.Teacher, RevisionSource.TeacherEdit, "Test", catalog.Version, choice.RuleVersion, choice, [], null);
         var table = TableExport.Choices([new(student, revision, new(ReviewStatus.NeedsReview, []), false, null, "")]);
         var imported = xlsx ? StudentTableImport.Xlsx(new MemoryStream(TableExport.Xlsx(table))) : StudentTableImport.Csv(Encoding.UTF8.GetString(TableExport.Csv(table)));

@@ -102,6 +102,7 @@ public sealed class StudentSession
     {
         var selection = Choice.Selections.FirstOrDefault(s => s.OfferId == offerId);
         if (selection is null) return [];
+        if (Catalog.Offers.FirstOrDefault(o => o.Id == offerId) is not { } offer || !Availability(offer).CanSelect) return [];
         if (selection.Type == CourseType.Lf) return selection.Semesters;
         var locked = ChoiceWorkflow.Required(Choice, Profile).Where(r => r.SubjectId == selection.SubjectId).SelectMany(r => r.Semesters);
         var task = Tasks.FirstOrDefault(t => t.ChosenOfferIds.Contains(offerId));
@@ -117,7 +118,8 @@ public sealed class StudentSession
     public ImmutableArray<CourseOffer> LfOffers => [.. Catalog.Offers.Where(o => o.Type == CourseType.Lf && Availability(o).CanSelect)];
 
     public ImmutableArray<CourseOffer> ExtraOffers => [.. Catalog.Offers.Where(o => o.Type != CourseType.Lf && Availability(o).CanSelect
-        && !Choice.Selections.Any(s => s.SubjectId == o.SubjectId || AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, o.SubjectId)))];
+        && !Choice.Selections.Any(s => (s.SubjectId == o.SubjectId && Catalog.Offers.FirstOrDefault(x => x.Id == s.OfferId) is { } existing && Availability(existing).CanSelect)
+            || AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, o.SubjectId)))];
 
     public ImmutableArray<CourseOffer> RestrictedOffers(bool lf) => [.. Catalog.Offers.Where(o => (o.Type == CourseType.Lf) == lf
         && !Availability(o).CanSelect && !Choice.Selections.Any(s => s.OfferId == o.Id))];
@@ -158,6 +160,11 @@ public sealed class StudentSession
             else if (!task.IsExclusive && task.ChosenOfferIds.Length >= task.Choose)
                 throw new InvalidOperationException("Zuerst eine gewählte Option abwählen oder weitere Kurse in Schritt 4 ergänzen.");
             SetSelection(offerId, existing.Union(task.Semesters));
+            if (task.Rule.Id == "PLAN-REQUIRED")
+            {
+                ApplyRequired();
+                Changed?.Invoke();
+            }
         }
         catch (InvalidOperationException)
         {
@@ -288,6 +295,10 @@ public sealed class StudentSession
         if (IsBusy) throw new InvalidOperationException("Dateivorgang läuft; bitte warten.");
         var offer = Catalog.Offers.Single(o => o.Id == offerId);
         var selected = semesters.Order().ToImmutableArray();
+        var proposed = Choice with { Selections = [.. Choice.Selections.Where(s => s.OfferId != offerId),
+            new CourseSelection(offer.Id, offer.SubjectId, offer.Type, offer.Variant, selected)] };
+        if (offer.SubjectId == "GK" && AcademicRules.HasGkContinuityGap(proposed))
+            throw new InvalidOperationException(AcademicRules.GkContinuityExplanation);
         if (!selected.IsEmpty)
         {
             var availability = Availability(offer);
@@ -304,9 +315,14 @@ public sealed class StudentSession
                 && s.Semesters.Intersect(selected).Any()))
                 throw new InvalidOperationException("Religion und Ethik sowie verschiedene Religionsfächer können nicht gleichzeitig belegt werden. Wechsle das Fach im Schritt Pflichtbereiche; ein mündlich geplantes Fach zuerst in Prüfungsfächer ändern.");
             if (Choice.Selections.Any(s => s.OfferId != offerId && s.SubjectId == offer.SubjectId
-                && !(offer.Type == CourseType.Lf && s.Type == CourseType.Bf)))
+                && !(offer.Type == CourseType.Lf && s.Type == CourseType.Bf)
+                && Catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId) is { } existingOffer && Availability(existingOffer).CanSelect))
                 throw new InvalidOperationException("Dieses Fach ist bereits gewählt. Vor einem Wechsel die bisherige Kursart/Variante abwählen.");
         }
+        var replacedUnavailable = !selected.IsEmpty
+            ? Choice.Selections.FirstOrDefault(s => s.OfferId != offerId && s.SubjectId == offer.SubjectId
+                && !(offer.Type == CourseType.Lf && s.Type == CourseType.Bf)
+                && (Catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId) is not { } existingOffer || !Availability(existingOffer).CanSelect)) : null;
         var replacedBasic = !selected.IsEmpty && offer.Type == CourseType.Lf
             ? Choice.Selections.FirstOrDefault(s => s.SubjectId == offer.SubjectId && s.Type == CourseType.Bf) : null;
         var replacesBasic = replacedBasic is not null;
@@ -319,6 +335,7 @@ public sealed class StudentSession
                 || (AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, offer.SubjectId) && s.Semesters.Intersect(displaced.Basic.Semesters).Any()))))
             restored = displaced;
         var selections = Choice.Selections.Where(s => s.OfferId != offerId
+            && s.OfferId != replacedUnavailable?.OfferId
             && !(replacesBasic && s.SubjectId == offer.SubjectId && s.Type == CourseType.Bf)).ToImmutableArray();
         if (!selected.IsEmpty) selections = selections.Add(new(offer.Id, offer.SubjectId, offer.Type, offer.Variant, selected));
         if (restored is not null) selections = selections.Add(restored.Basic);
@@ -370,19 +387,24 @@ public sealed class StudentSession
                 var candidate = loaded.Choice;
                 ModelGuard.Choice(candidate);
                 if (candidate.StudentId != Choice.StudentId || candidate.GraduationYear != Catalog.GraduationYear
-                    || candidate.OfferVersion != Catalog.Version || candidate.RuleVersion != ChoiceValidator.Version
                     || candidate.SubmissionStatus != SubmissionStatus.Draft || candidate.Phase != ElectionPhase.Preliminary)
-                    throw new InvalidOperationException("Datei gehört zu anderer Demo-ID, anderem Jahrgang/Versionsstand oder ist kein unterstützter Vorwahlentwurf. Bestand bleibt erhalten.");
+                    throw new InvalidOperationException("Datei gehört zu anderer Demo-ID, anderem Jahrgang oder ist kein unterstützter Vorwahlentwurf. Bestand bleibt erhalten.");
+                var upgraded = loaded.UpgradedFromSchema is not null;
+                var versionUpdated = upgraded || candidate.OfferVersion != Catalog.Version || candidate.RuleVersion != ChoiceValidator.Version;
                 // Preserve even now-invalid selections; never silently discard unknown or restricted offers.
-                Choice = candidate;
+                Choice = versionUpdated ? candidate with { OfferVersion = Catalog.Version, RuleVersion = ChoiceValidator.Version } : candidate;
                 Step = 1;
                 AutomaticMessage = "";
                 LfChangeMessage = "";
                 lfChangeSubject = null;
                 displacedBasics.Clear();
                 contentToken = loaded.ContentToken;
-                IsDirty = false;
-                Message = $"Entwurf geladen (Revision {Choice.Revision}). Weiterhin fachlich zu klären.";
+                IsDirty = versionUpdated;
+                Message = upgraded
+                    ? $"Entwurf aus älterem Dateiformat (Version {loaded.UpgradedFromSchema}) geladen (Revision {Choice.Revision}). Beim nächsten Speichern wird das aktuelle Format geschrieben; die bisherige Datei bleibt als Sicherung erhalten."
+                    : versionUpdated
+                    ? $"Entwurf geladen (Revision {Choice.Revision}) und an aktuellen Angebots-/Regelstand angepasst. Bitte Wahl prüfen und speichern."
+                    : $"Entwurf geladen (Revision {Choice.Revision}). Weiterhin fachlich zu klären.";
             }
             LoadFailed = false;
         }

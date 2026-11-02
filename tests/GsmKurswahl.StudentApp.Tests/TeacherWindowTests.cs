@@ -19,7 +19,7 @@ public class TeacherWindowTests
         var root = Path.Combine(Path.GetTempPath(), "gsm-progress-" + Guid.NewGuid());
         var workspace = new TeacherWorkspace(root); workspace.Create(GsmKurswahl.Storage.JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json"))), "demo-beratung");
         using (var db = workspace.OpenActive())
-            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Muster", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Muster", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         var window = new TeacherWindow(root);
         void Click(string label)
         {
@@ -65,7 +65,7 @@ public class TeacherWindowTests
         var workspace = new TeacherWorkspace(root); workspace.Create(TestData.Catalog, "demo-beratung");
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
         using (var db = workspace.OpenActive())
-            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Muster", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "S-1-5-21-100-200-300-1", home, true, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Muster", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "S-1-5-21-100-200-300-1", home, true, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         var path = Path.Combine(home, "aktuell.json");
         File.WriteAllBytes(path, GsmKurswahl.Storage.JsonDocuments.WriteChoice(TestData.Choice));
         var window = new TeacherWindow(root);
@@ -158,7 +158,7 @@ public class TeacherWindowTests
     {
         var root = Path.Combine(Path.GetTempPath(), "gsm-teacher-ui-" + Guid.NewGuid());
         var workspace = new TeacherWorkspace(root); workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
-        using (var store = workspace.OpenActive()) store.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+        using (var store = workspace.OpenActive()) store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Import });
         var setup = new TeacherWindow(root);
         try
@@ -211,7 +211,7 @@ public class TeacherWindowTests
         var workspace = new TeacherWorkspace(root); workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
         using (var db = workspace.OpenActive())
-            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         var window = new TeacherWindow(root);
         try
         {
@@ -259,7 +259,7 @@ public class TeacherWindowTests
         var workspace = new TeacherWorkspace(root); workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Mapping });
         using (var db = workspace.OpenActive())
-            db.SaveStudent(new(1, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes }), "", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes }), "", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         var window = new TeacherWindow(root);
         try
         {

@@ -228,6 +228,9 @@ public class WindowTests
             next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(4, session.Step);
             Assert.False(Box("Sem_GK_BF_1").IsEnabled);
+            Box("Sem_GK_BF_3_4").IsChecked = true;
+            Assert.Equal(new[] { 1 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Assert.False(Box("Sem_GK_BF_3_4").IsChecked);
             Box("Sem_GK_BF_2").IsChecked = true;
             Assert.Equal(new[] { 1, 2 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
             Assert.False(Has("Sem_GK_BF_3"));
@@ -235,8 +238,10 @@ public class WindowTests
             Box("Sem_GK_BF_3_4").IsChecked = true;
             Assert.Equal(new[] { 1, 2, 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
             Box("Sem_GK_BF_2").IsChecked = false;
-            Assert.Equal(new[] { 1, 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Assert.Equal(new[] { 1, 2, 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
+            Assert.True(Box("Sem_GK_BF_2").IsChecked);
             Box("Sem_GK_BF_3_4").IsChecked = false;
+            Box("Sem_GK_BF_2").IsChecked = false;
             Assert.Equal(new[] { 1 }, session.Choice.Selections.Single(s => s.SubjectId == "GK").Semesters);
             Box("Sem_GEO_BF_4").IsChecked = true;
             Assert.Equal(new[] { 3, 4 }, session.Choice.Selections.Single(s => s.SubjectId == "GEO").Semesters);

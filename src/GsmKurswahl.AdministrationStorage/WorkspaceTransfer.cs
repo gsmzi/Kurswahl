@@ -19,7 +19,7 @@ public static class WorkspaceTransfer
         {
             store.BackupTo(database);
             var bytes = File.ReadAllBytes(database);
-            var manifest = new TransferManifest(1, DateTimeOffset.UtcNow, year with { DatabasePath = "verwaltung.db" }, Convert.ToHexString(SHA256.HashData(bytes)));
+            var manifest = new TransferManifest(TeacherWorkspace.CurrentSchema, DateTimeOffset.UtcNow, year with { DatabasePath = "verwaltung.db" }, Convert.ToHexString(SHA256.HashData(bytes)));
             using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
                 using (var zip = new ZipArchive(file, ZipArchiveMode.Create, true))
@@ -45,9 +45,9 @@ public static class WorkspaceTransfer
             if (entry.Length > limit) throw new InvalidDataException("Transportdatei zu groß.");
             using var stream = entry.Open(); var bytes = new byte[checked((int)entry.Length)]; stream.ReadExactly(bytes); return bytes;
         }
-        var manifest = JsonSerializer.Deserialize<TransferManifest>(Entry("transfer.json", 4 * 1024 * 1024), DocumentJson.Options)
+        var manifest = JsonSerializer.Deserialize<TransferManifest>(TeacherWorkspace.UpgradeYears(Entry("transfer.json", 4 * 1024 * 1024), "Transportdatei"), DocumentJson.Options)
             ?? throw new InvalidDataException("Leere Transportdatei.");
-        if (manifest.SchemaVersion != 1 || manifest.Year is null || manifest.Year.DatabasePath != "verwaltung.db" || !Enum.IsDefined(manifest.Year.Step)
+        if (manifest.SchemaVersion != TeacherWorkspace.CurrentSchema || manifest.Year is null || manifest.Year.DatabasePath != "verwaltung.db" || !Enum.IsDefined(manifest.Year.Step)
             || !manifest.Year.Catalog.IsDemo || string.IsNullOrWhiteSpace(manifest.Year.Actor))
             throw new InvalidDataException("Unbekannte Transportversion oder ungültiger Inhalt.");
         ModelGuard.Catalog(manifest.Year.Catalog);
@@ -71,11 +71,12 @@ public static class WorkspaceTransfer
         using (var check = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = database, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString()))
         {
             check.Open(); using var command = check.CreateCommand(); command.CommandText = "PRAGMA user_version";
-            if (Convert.ToInt32(command.ExecuteScalar()) is not (1 or 2 or 3)) throw new InvalidDataException("Unbekannte oder unversionierte Transportdatenbank; keine Migration.");
+            if (Convert.ToInt32(command.ExecuteScalar()) is not (>= 1 and <= SqliteAdministrationStore.CurrentSchema)) throw new InvalidDataException("Unbekannte oder unversionierte Transportdatenbank; keine Migration.");
         }
         // Attach validates DB schema and graduation year before registering it.
         workspace.Attach(manifest.Year.Catalog, database, manifest.Year.Actor);
-        workspace.Update(manifest.Year with { DatabasePath = Path.GetFullPath(database) });
+        // The program folder is a local path of the exporting computer and must be chosen again here.
+        workspace.Update(manifest.Year with { DatabasePath = Path.GetFullPath(database), StudentProgramDirectory = "" });
         return workspace;
     }
 }

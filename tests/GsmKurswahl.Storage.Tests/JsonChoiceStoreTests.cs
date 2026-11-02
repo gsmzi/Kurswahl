@@ -7,16 +7,16 @@ namespace GsmKurswahl.Storage.Tests;
 
 public sealed class JsonChoiceStoreTests : IDisposable
 {
-    [Fact] public async Task LegacySchemaIsRejectedAndFileRemainsUntouched()
+    [Fact] public async Task MalformedLegacySchemaIsRejectedAndFileRemainsUntouched()
     {
+        // Version 1 never had plannedOralSubjects; such a hybrid is defective, not an upgradable v1 file.
         Directory.CreateDirectory(directory);
         var legacy = Encoding.UTF8.GetString(JsonDocuments.WriteChoice(TestData.Choice))
             .Replace("\"schemaVersion\": 2", "\"schemaVersion\": 1");
         await File.WriteAllTextAsync(FilePath, legacy);
         var store = new JsonChoiceStore(FilePath);
-        var error = await Assert.ThrowsAsync<ArgumentException>(() => store.LoadAsync());
-        Assert.Contains("Version 2 erforderlich", error.Message);
-        await Assert.ThrowsAsync<ArgumentException>(() => store.SaveAsync(TestData.Choice, null));
+        await Assert.ThrowsAnyAsync<JsonException>(() => store.LoadAsync());
+        await Assert.ThrowsAnyAsync<JsonException>(() => store.SaveAsync(TestData.Choice, null));
         Assert.Equal(legacy, await File.ReadAllTextAsync(FilePath));
     }
 

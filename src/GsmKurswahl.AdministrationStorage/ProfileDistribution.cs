@@ -14,8 +14,9 @@ public sealed class ProfileDistribution(IAdministrationStore store)
         if (!record.MappingConfirmed || !Path.IsPathFullyQualified(record.HomeDirectory))
             throw new ArgumentException("Bestätigte Schüler-/Ordnerzuordnung erforderlich.");
         var previous = store.LatestProfile(record.Student.ExternalStudentId);
-        var profile = new StudentProfile(1, (previous?.Profile.ProfileRevision ?? 0) + 1, record.Student.ExternalStudentId,
-            record.WindowsUsername, record.Student.GraduationYear, DateTimeOffset.UtcNow, "local-profile", record.Student.Prerequisites, record.AccountId);
+        var profile = new StudentProfile(SchemaVersions.Profile, (previous?.Profile.ProfileRevision ?? 0) + 1, record.Student.ExternalStudentId,
+            record.WindowsUsername, record.Student.GraduationYear, DateTimeOffset.UtcNow, record.Student.Prerequisites)
+        { DisplayName = record.Student.SyntheticDisplayName, ClassName = record.Student.ClassName };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(profile, DocumentJson.Options);
         if (bytes.Length > 65536) throw new ArgumentException("Profil überschreitet 64 KiB.");
         var issued = new IssuedProfile(profile, bytes, []);
@@ -44,7 +45,7 @@ public sealed class ProfileDistribution(IAdministrationStore store)
             if (before is not null)
             {
                 var old = JsonSerializer.Deserialize<StudentProfile>(before, DocumentJson.Options);
-                if (old is null || old.SchemaVersion != 1 || old.StudentId != issued.Profile.StudentId || old.GraduationYear != issued.Profile.GraduationYear)
+                if (old is null || old.SchemaVersion != SchemaVersions.Profile || old.StudentId != issued.Profile.StudentId || old.GraduationYear != issued.Profile.GraduationYear)
                     throw new InvalidDataException("Profil_abweichend");
                 if (old.ProfileRevision > issued.Profile.ProfileRevision) throw new InvalidDataException("veraltet");
                 if (old.ProfileRevision == issued.Profile.ProfileRevision && !before.SequenceEqual(issued.ProfileBytes)) throw new InvalidDataException("Profil_abweichend");
@@ -72,6 +73,57 @@ public sealed class ProfileDistribution(IAdministrationStore store)
         catch (IOException) { status = "Zugriff_verweigert"; detail = "Ziel gesperrt, verändert oder Schreibvorgang fehlgeschlagen; Wiederholung erforderlich."; }
         var entry = new DistributionEntry(Guid.NewGuid(), record.Student.ExternalStudentId, issued.Profile.ProfileRevision, DateTimeOffset.UtcNow, status, detail);
         store.LogDistribution(entry); return entry;
+    }
+    /// <summary>
+    /// Copies the published pupil program into the confirmed pupil folder and records every file with its hash, so
+    /// the final collection can later remove exactly these unchanged copies. Foreign or modified files are never replaced.
+    /// </summary>
+    public DistributionEntry DeliverProgram(StudentRecord record, string sourceDirectory)
+    {
+        var status = "verteilt"; var detail = "Schülerprogramm bereitgestellt.";
+        try
+        {
+            if (store is not SqliteAdministrationStore sql) throw new InvalidOperationException("Programmverteilung benötigt den lokalen Lehrerbestand.");
+            if (!Path.IsPathFullyQualified(sourceDirectory) || !Directory.Exists(sourceDirectory)) throw new ArgumentException("Programmordner nicht gefunden.");
+            if (!File.Exists(Path.Combine(sourceDirectory, "GsmKurswahl.StudentApp.exe")) && !File.Exists(Path.Combine(sourceDirectory, "GsmKurswahl.StudentApp.dll")))
+                throw new ArgumentException("Im Programmordner fehlt das Schülerprogramm.");
+            if (!record.MappingConfirmed || !Path.IsPathFullyQualified(record.HomeDirectory) || !Directory.Exists(record.HomeDirectory)) throw new DirectoryNotFoundException();
+            var source = Path.GetFullPath(sourceDirectory);
+            var target = Path.Combine(record.HomeDirectory, StudentFolderCleanup.ProgramFolder);
+            if (target.StartsWith(source.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Programmordner darf nicht im Schülerordner liegen.");
+            var previous = sql.LatestProgramDelivery(record.Student.ExternalStudentId)?.Files.ToDictionary(f => f.Path, f => f.Sha256, StringComparer.OrdinalIgnoreCase) ?? [];
+            var files = Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories)
+                .Select(f => (Relative: Path.GetRelativePath(source, f).Replace(Path.DirectorySeparatorChar, '/'), Bytes: File.ReadAllBytes(f))).ToArray();
+            // Check every target first; nothing is written if any existing file is foreign or changed.
+            foreach (var (relative, bytes) in files)
+            {
+                var path = Path.Combine(target, relative);
+                if (!File.Exists(path)) continue;
+                var current = StudentFolderCleanup.Token(File.ReadAllBytes(path));
+                if (current != StudentFolderCleanup.Token(bytes) && (!previous.TryGetValue(relative, out var known) || known != current))
+                    throw new InvalidDataException("Programm_abweichend");
+            }
+            foreach (var (relative, bytes) in files)
+            {
+                var path = Path.Combine(target, relative);
+                if (File.Exists(path) && StudentFolderCleanup.Token(File.ReadAllBytes(path)) == StudentFolderCleanup.Token(bytes)) continue;
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                Replace(path, bytes, File.Exists(path) ? File.ReadAllBytes(path) : null);
+            }
+            foreach (var (relative, hash) in previous.Where(p => !files.Any(f => string.Equals(f.Relative, p.Key, StringComparison.OrdinalIgnoreCase))))
+            {
+                var path = Path.Combine(target, relative);
+                if (File.Exists(path) && StudentFolderCleanup.Token(File.ReadAllBytes(path)) == hash) File.Delete(path);
+            }
+            sql.RecordProgramDelivery(new(1, Guid.NewGuid(), record.Student.ExternalStudentId, DateTimeOffset.UtcNow, StudentFolderCleanup.ProgramFolder,
+                [.. files.Select(f => new DeliveredFile(f.Relative, StudentFolderCleanup.Token(f.Bytes)))]));
+        }
+        catch (DirectoryNotFoundException) { status = "nicht_gefunden"; detail = "Bestätigtes Zielverzeichnis nicht erreichbar."; }
+        catch (UnauthorizedAccessException) { status = "Zugriff_verweigert"; detail = "Keine Schreibberechtigung am Ziel."; }
+        catch (InvalidDataException ex) { status = ex.Message; detail = "Vorhandene Programmdateien weichen ab und bleiben unverändert."; }
+        catch (IOException) { status = "Zugriff_verweigert"; detail = "Programmdatei gesperrt (Programm geöffnet?) oder Schreibvorgang fehlgeschlagen."; }
+        return new(Guid.NewGuid(), record.Student.ExternalStudentId, 0, DateTimeOffset.UtcNow, status, detail);
     }
     private static byte[]? ReadExisting(string path)
     {

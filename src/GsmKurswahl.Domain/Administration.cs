@@ -11,6 +11,16 @@ public sealed record TeacherState(StudentRecord Record, ChoiceRevision? Active, 
 public sealed record DistributionEntry(Guid Id, string StudentId, int ProfileRevision, DateTimeOffset At,
     string Status, string Detail);
 public sealed record IssuedProfile(StudentProfile Profile, byte[] ProfileBytes, byte[] SignatureBytes);
+// Database schema 4: byte-exact archive of pupil files before they are removed from a pupil folder.
+public sealed record CollectedFile(int SchemaVersion, Guid Id, string StudentId, DateTimeOffset At, string Actor,
+    string FileName, string Sha256, byte[] Content);
+public sealed record DeliveredFile(string Path, string Sha256);
+// Files the teacher app itself copied into a pupil folder; only unchanged copies are removed again.
+public sealed record ProgramDelivery(int SchemaVersion, Guid Id, string StudentId, DateTimeOffset At, string Directory,
+    ImmutableArray<DeliveredFile> Files);
+// Deletion log without name or school ID; only the internal key, so a deletion stays traceable but not personal.
+public sealed record StudentDeletion(int SchemaVersion, Guid Id, Guid InternalStudentId, DateTimeOffset At, string Actor,
+    string Reason, int RemovedRows, int UpdatedPlanningSnapshots);
 public interface IAdministrationStore : IDisposable
 {
     ImmutableArray<StudentRecord> Students();

@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "profileRevision": 1,
   "studentId": "demo-001",
   "windowsUsername": "DEMO-SCHOOL\\demo01",
+  "displayName": "Demo Eins",
+  "className": "10a",
   "graduationYear": 2029,
   "issuedAt": "2026-10-26T10:00:00Z",
-  "keyId": "demo-key-not-installed",
-  "accountId": "synthetic-sid-001",
   "prerequisites": {
     "italianProfile": "yes",
     "informaticsBridge": "no",

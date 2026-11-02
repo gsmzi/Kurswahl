@@ -12,7 +12,7 @@ public sealed class AdministrationTests : IDisposable
     private readonly string root = Path.Combine(Path.GetTempPath(), "gsm-admin-" + Guid.NewGuid());
     public AdministrationTests() => Directory.CreateDirectory(root);
     private string DbPath => Path.Combine(root, "admin.db");
-    private StudentRecord Record(int number = 1) => new(1,
+    private StudentRecord Record(int number = 1) => new(SchemaVersions.StudentRecord,
         new(Guid.NewGuid(), $"demo-{number:000}", $"Demo Person {number}", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown),
         $"DEMO\\test{number}", $"S-1-5-21-100-200-300-{number}", Path.Combine(root, "home" + number), true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
     [Fact]

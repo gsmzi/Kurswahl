@@ -108,7 +108,7 @@ public class AcademicRulesTests
         var required = ChoiceWorkflow.Required(c);
         Assert.Equal(economics ? new[] { 1 } : [1, 2], required.Single(r => r.SubjectId == "GK").Semesters);
         Assert.Equal(economics ? new[] { 3 } : [3, 4], required.Single(r => r.SubjectId == "GEO").Semesters);
-        Assert.Equal(economics ? new[] { 1, 3, 4 } : [1, 2, 3, 4], ChoiceWorkflow.OralSemesters(c, "GK"));
+        Assert.Equal(new[] { 1, 2, 3, 4 }, ChoiceWorkflow.OralSemesters(c, "GK"));
     }
 
     [Theory]
@@ -138,6 +138,27 @@ public class AcademicRulesTests
                 Assert.Equal(semesters.ToArray(), issues[0].Semesters.ToArray());
             }
         }
+    }
+
+    [Theory]
+    [InlineData(new[] { 1 }, false)]
+    [InlineData(new[] { 1, 2 }, false)]
+    [InlineData(new[] { 1, 3, 4 }, true)]
+    [InlineData(new[] { 1, 2, 3, 4 }, false)]
+    public void GsmRejectsGkGapWithEconomicsWithoutRewritingChoice(int[] semesters, bool invalid)
+    {
+        var c = Choice("D-LF", "M-LF", "W-LF", "GK-BF");
+        c = c with { Selections = [.. c.Selections.Select(s => s.SubjectId == "GK" ? s with { Semesters = [.. semesters] } : s)] };
+        var before = System.Text.Json.JsonSerializer.Serialize(c, DocumentJson.Options);
+        var issues = Check(c).Messages.Where(m => m.Rule.Id == "GSM-GK-CONTINUITY").ToArray();
+        Assert.Equal(invalid, issues.Length > 0);
+        if (invalid)
+        {
+            Assert.Equal(ReviewStatus.Invalid, Assert.Single(issues).Rule.Severity);
+            Assert.Contains("GK", issues[0].SubjectIds);
+            Assert.DoesNotContain(AcademicRules.ExamOptions(c, TestData.WorkflowCatalog, Profile), e => e.First == "GK" || e.Second == "GK");
+        }
+        Assert.Equal(before, System.Text.Json.JsonSerializer.Serialize(c, DocumentJson.Options));
     }
 
     [Fact]

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "student": {
+    "id": "22222222-2222-2222-2222-222222222222",
+    "externalStudentId": "demo-001",
+    "syntheticDisplayName": "Demo Eins",
+    "className": "10a",
+    "graduationYear": 2029,
+    "departure": "expected_departure",
+    "prerequisites": {
+      "italianProfile": "yes",
+      "informaticsBridge": "no",
+      "informaticsImp": "unknown",
+      "continuousBilingual": "yes",
+      "religionEthicsGrade10": "KR",
+      "sportExemptSemesters": [
+        1
+      ],
+      "continuedLanguages": [
+        "E",
+        "F"
+      ],
+      "religionEthicsPermission": "yes",
+      "religionEthicsExamPermission": "no",
+      "permanentSportExemption": "no"
+    },
+    "firstName": "Demo",
+    "lastName": "Eins"
+  },
+  "windowsUsername": "DEMO\\eins",
+  "accountId": "",
+  "homeDirectory": "C:\\Demo\\10a\\Eins.Demo",
+  "mappingConfirmed": true,
+  "version": 2,
+  "actor": "demo-beratung",
+  "changedAt": "2026-11-02T08:00:00+00:00",
+  "origin": {
+    "sourceId": "klasse10.csv",
+    "contentHash": "ABC",
+    "mappingVersion": "map-1",
+    "importedAt": "2026-11-02T08:00:00+00:00",
+    "authenticatedAccount": "DEMO\\beratung"
+  }
+}

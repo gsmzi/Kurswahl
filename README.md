@@ -67,9 +67,9 @@ Autosave nach 1,5 Sekunden ohne Änderung ist abschaltbar. Laden und Schließen 
 
 `appsettings.json` liegt neben der EXE. Konfigurierbar: `homeDirectory`, `choiceDirectory`, `choiceFileName`, `catalogPath`, `demoStudentId`. `GSM_KURSWAHL_SETTINGS` kann einen absoluten Pfad zu einer Testkonfiguration angeben. Standardziel ist der synthetische Demoordner `{HOME}/GSM-Kurswahl-Demo/aktuell.json`, kein Schulnetzpfad.
 
-Profil und Signatur heißen `profil.json` und `profil.sig` im selben Wahlordner. Die **öffentlichen** Prüfschlüssel und erlaubten Kontodomänen kommen ausschließlich aus `profile-trust.json` in der geschützten Installation. Das unsignierte Profilsample ist kein gültiger Berechtigungsnachweis.
+Das Profil heißt `profil.json` und liegt im Wahlordner (ohne Signatur, Nutzerentscheidung 27.10.2026). Es ist nur Arbeitshilfe; verbindlich prüft das Lehrerprogramm gegen den eigenen Bestand.
 
-Wahlschema bleibt v2, Katalogschema v1. Neuer Kataloginhalt: `demo-2029-v3`; Regelversion: `m2-2`; erstes Profilschema: v1. Entwürfe mit früherem Angebots-/Regelstand werden geschützt abgewiesen, nicht automatisch migriert oder überschrieben. Für M2 einen separaten Testordner mit aktualisiertem Sample verwenden. [Dateiformat](docs/DATEIFORMAT.md).
+Aktuelle Versionen: Wahl v2, Fachangebot v2, Profil v2, Arbeitsstand/Transport v2, Lehrerdatenbank 4. Alle älteren Versionen bleiben lesbar und werden nur im Speicher umgewandelt; neuere Versionen werden abgewiesen. Kompatibilitätsvertrag und Versionstabelle: [Dateiformat](docs/DATEIFORMAT.md).
 
 ## Manueller Probelauf
 

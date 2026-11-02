@@ -9,7 +9,8 @@ public class ControlSheetTests
 {
     [Fact] public void ExportsActualPdfWithoutBrowserOrPrintPipeline()
     {
-        var bytes = ControlSheet.Render(TestData.Choice, TestData.Catalog, ProfileContext.Missing,
+        var profile = new ProfileContext(ProfileStatus.Verified, PriorEducation.Unknown) { Revision = 2, DisplayName = "Demo Muster", ClassName = "10a" };
+        var bytes = ControlSheet.Render(TestData.Choice, TestData.Catalog, profile,
             new(ReviewStatus.NeedsReview, []), [new(1, 1, 3)], []);
         Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(bytes.AsSpan(0, 8)));
         Assert.Contains("%%EOF", Encoding.ASCII.GetString(bytes.AsSpan(Math.Max(0, bytes.Length - 64))));

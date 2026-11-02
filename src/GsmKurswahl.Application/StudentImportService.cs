@@ -20,7 +20,9 @@ public static class StudentImportService
     {
         candidate = KeepResolvedDirectory(current, candidate);
         var differences = new List<string>();
-        if (current.Student.SyntheticDisplayName != candidate.Student.SyntheticDisplayName) differences.Add("Name");
+        if (current.Student.SyntheticDisplayName != candidate.Student.SyntheticDisplayName
+            || current.Student.FirstName != candidate.Student.FirstName
+            || current.Student.LastName != candidate.Student.LastName) differences.Add("Name");
         if (current.Student.ClassName != candidate.Student.ClassName) differences.Add("Klasse");
         if (current.Student.GraduationYear != candidate.Student.GraduationYear) differences.Add("Jahrgang");
         if (current.Student.Departure != candidate.Student.Departure) differences.Add("Abgängerstatus");

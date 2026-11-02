@@ -42,7 +42,7 @@
           ],
           "properties": {
             "schemaVersion": {
-              "const": 1
+              "enum": [1, 2]
             },
             "version": {
               "type": "string",
@@ -74,6 +74,20 @@
                   "name": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "taskField": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "isForeignLanguage": {
+                    "type": "boolean"
+                  },
+                  "isScience": {
+                    "type": "boolean"
                   }
                 }
               }

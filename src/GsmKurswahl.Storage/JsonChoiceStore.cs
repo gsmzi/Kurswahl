@@ -48,7 +48,9 @@ public sealed class JsonChoiceStore : IChoiceStore
         try
         {
             var bytes = await ReadBoundedAsync(target, cancellationToken);
-            return new(JsonDocuments.ReadChoice(bytes), Token(bytes));
+            var stored = JsonDocuments.SchemaVersionOf(bytes);
+            return new(JsonDocuments.ReadChoice(bytes), Token(bytes))
+            { UpgradedFromSchema = stored is { } v && v != SchemaVersions.Choice ? v : null };
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {

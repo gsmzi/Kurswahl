@@ -138,6 +138,38 @@ public class StudentSessionTests
     [Fact] public void ProductionCatalogRejected() => Assert.Throws<ArgumentException>(() =>
         new StudentSession(TestData.Catalog with { IsDemo = false }, "demo-001", new MemoryStore()));
 
+    [Fact] public async Task UpdatedCatalogOrRuleVersionLoadsDraftAndAllowsReplacingCancelledOffer()
+    {
+        var bili = TestData.Offer("BIO-BF-BILI", "BIO") with { Variant = CourseVariant.Bilingual, Requirements = [Requirement.ContinuousBilingual] };
+        var normal = TestData.Offer("BIO-BF", "BIO");
+        var initialCatalog = TestData.Catalog with { Version = "demo-v1", Subjects = [new("BIO", "Biologie")], Offers = [bili, normal] };
+        var profile = new ProfileContext(ProfileStatus.Verified, PriorEducation.Unknown with { ContinuousBilingual = Knowledge.Yes });
+        var store = new MemoryStore();
+        var initial = new StudentSession(initialCatalog, "demo-001", store, profile);
+        initial.SetSelection(bili.Id, [1, 2, 3, 4]);
+        await initial.SaveAsync();
+
+        var updatedCatalog = initialCatalog with
+        {
+            Version = "demo-v2-cancelled",
+            Offers = [bili with { Status = OfferStatus.Cancelled }, normal]
+        };
+        var reloaded = new StudentSession(updatedCatalog, "demo-001", store, profile);
+        await reloaded.LoadAsync();
+        Assert.False(reloaded.LoadFailed);
+        Assert.True(reloaded.IsDirty);
+        Assert.Equal("demo-v2-cancelled", reloaded.Choice.OfferVersion);
+        Assert.Single(reloaded.Choice.Selections, s => s.OfferId == bili.Id);
+        Assert.Contains(reloaded.Validation.Messages, m => m.Rule.Id == "OFFER-SELECTION");
+        Assert.DoesNotContain(reloaded.Validation.Messages, m => m.Rule.Id == "OFFER-VERSION");
+
+        reloaded.SetSelection(normal.Id, [1, 2, 3, 4]);
+        Assert.Equal(normal.Id, Assert.Single(reloaded.Choice.Selections).OfferId);
+        await reloaded.SaveAsync();
+        Assert.Equal(2, reloaded.Choice.Revision);
+        Assert.False(reloaded.IsDirty);
+    }
+
     private sealed class MemoryStore : IChoiceStore
     {
         public StoredChoice? Value { get; set; }

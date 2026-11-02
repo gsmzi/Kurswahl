@@ -5,7 +5,7 @@ namespace GsmKurswahl.AdministrationStorage;
 
 public sealed partial class SqliteAdministrationStore
 {
-    public bool TransferTrackingEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) == 3;
+    public bool TransferTrackingEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) >= 3;
     public void EnableTransferTracking() { }
     public ImmutableArray<TransferReceipt> TransferReceipts()
     {

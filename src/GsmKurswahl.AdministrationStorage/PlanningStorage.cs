@@ -6,8 +6,8 @@ namespace GsmKurswahl.AdministrationStorage;
 public sealed partial class SqliteAdministrationStore
 {
     // Since 28.10.2026 every administrative database is created directly with schema 3 (planning and
-    // transfer receipts included). Older schema versions are rejected on open; there is no migration.
-    public bool PlanningEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) == 3;
+    // transfer receipts included). Older databases only receive the missing empty tables on open.
+    public bool PlanningEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) >= 3;
     public void EnablePlanning() { }
     private void RequirePlanning() { if (!PlanningEnabled) throw new InvalidOperationException("Unbekannte Verwaltungsschemaversion."); }
     private static void ValidatePlanning(PlanningDocument document)
@@ -18,7 +18,7 @@ public sealed partial class SqliteAdministrationStore
             throw new InvalidDataException("Unbekanntes oder ungültiges Planungsschema.");
         ModelGuard.Catalog(document.Catalog);
         var ids = document.Students.Select(s => s.Student.ExternalStudentId).ToArray();
-        if (ids.Distinct().Count() != ids.Length || document.Students.Any(s => s.SchemaVersion != 1 || s.Student.GraduationYear != document.Catalog.GraduationYear)
+        if (ids.Distinct().Count() != ids.Length || document.Students.Any(s => s.SchemaVersion != SchemaVersions.StudentRecord || s.Student.GraduationYear != document.Catalog.GraduationYear)
             || document.Choices.Select(c => c.StudentId).Distinct().Count() != document.Choices.Length
             || document.FollowUps.Select(f => f.StudentId).Distinct().Count() != ids.Length || document.FollowUps.Any(f => !ids.Contains(f.StudentId)))
             throw new InvalidDataException("Planungsbestand inkonsistent.");

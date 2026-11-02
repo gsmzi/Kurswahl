@@ -4,7 +4,7 @@ Der Schülerclient liest `profil.json` im gleichen konfigurierten Verzeichnis wi
 
 ## Austauschvertrag
 
-`profil.json`: UTF-8-Bytes, Modell `StudentProfile`, Schema `schemas/student-profile.v1.schema.json`, maximal 64 KiB. Minimierte Verwaltungsbestätigungen, keine Diagnose oder Begründung. `continuedLanguages` bestätigt die rechtlich geeignete fortgeführte Sprachlaufbahn; `italianProfile=yes` allein bestätigt das nicht. Leere/unbekannte Angaben werden nicht zu `yes`. `sportExemptSemesters=null` bedeutet unbekannt, `[]` ausdrücklich keine Befreiung. Die beiden Religion/Ethik-Freigaben sind administrative Entscheidungen für Belegung bzw. Prüfung; sie sind nicht aus einer Zeichenfolge zur Klasse-10-Vorbildung herleitbar. Doppelte JSON-Eigenschaften und unbekannte Schemas werden abgewiesen.
+`profil.json`: UTF-8-Bytes, Modell `StudentProfile`, Schema `schemas/student-profile.v2.schema.json` (v1 bleibt lesbar), maximal 64 KiB. v2 enthält Anzeigename und Klasse (Nutzerentscheidung 02.11.2026) und keine Signaturfelder mehr. Minimierte Verwaltungsbestätigungen, keine Diagnose oder Begründung. `continuedLanguages` bestätigt die rechtlich geeignete fortgeführte Sprachlaufbahn; `italianProfile=yes` allein bestätigt das nicht. Leere/unbekannte Angaben werden nicht zu `yes`. `sportExemptSemesters=null` bedeutet unbekannt, `[]` ausdrücklich keine Befreiung. Die beiden Religion/Ethik-Freigaben sind administrative Entscheidungen für Belegung bzw. Prüfung; sie sind nicht aus einer Zeichenfolge zur Klasse-10-Vorbildung herleitbar. Doppelte JSON-Eigenschaften und unbekannte Schemas werden abgewiesen.
 
 ## Verbindliche Prüfung im Lehrerbestand
 

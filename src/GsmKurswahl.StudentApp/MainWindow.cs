@@ -60,7 +60,19 @@ public sealed class MainWindow : Window
         ToolTip.SetTip(badge, "Die automatische Prüfung unterstützt deine Planung. Die Oberstufenberatung muss den Regelstand für deinen Abiturjahrgang fachlich freigeben und offene Einzelfragen klären. In dieser Demo ist keine verbindliche Abgabe möglich.");
         titleLine.Children.Add(badge);
         title.Children.Add(titleLine);
-        title.Children.Add(Text($"Synthetische Person {session.Choice.StudentId} · Abitur {session.Catalog.GraduationYear} · Demoangebot ohne schulische Freigabe", 13, color: Muted));
+        var identityText = string.IsNullOrWhiteSpace(session.Profile.DisplayName)
+            ? $"Synthetische Person {session.Choice.StudentId}"
+            : $"{session.Profile.DisplayName}" + (string.IsNullOrWhiteSpace(session.Profile.ClassName) ? "" : $" · Klasse {session.Profile.ClassName}") + $" ({session.Choice.StudentId})";
+        title.Children.Add(Text($"{identityText} · Abitur {session.Catalog.GraduationYear} · Demoangebot ohne schulische Freigabe", 13, color: Muted));
+        if (session.Catalog.SubmissionDeadline is { } deadline)
+        {
+            var overdue = DateOnly.FromDateTime(DateTime.Today) > deadline;
+            var hint = Text(overdue
+                ? $"Der Abgabetermin ({deadline:dd.MM.yyyy}) ist vorbei. Deine Wahl wird von der Oberstufenberatung eingesammelt; Änderungen bitte nur noch nach Rücksprache."
+                : $"Bitte bis {deadline:dd.MM.yyyy} fertig wählen und speichern. Danach sammelt die Oberstufenberatung die Wahl ein.", 13, FontWeight.SemiBold, overdue ? Warn : null);
+            hint.Name = "SubmissionDeadlineHint";
+            title.Children.Add(hint);
+        }
         header.Children.Add(title);
         var toolbar = new StackPanel { Name = "FileToolbar", Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
         title.Name = "WindowHeading";

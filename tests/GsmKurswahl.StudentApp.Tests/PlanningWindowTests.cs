@@ -24,7 +24,7 @@ public sealed class PlanningWindowTests
         {
             foreach (var (id, name) in new[] { ("demo-001", "Demo Eins"), ("demo-002", "Demo Zwei") })
             {
-            store.SaveStudent(new(1, new(Guid.NewGuid(), id, name, "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), id, name, "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
             new TeacherSession(store, TestData.WorkflowCatalog, "demo-beratung").Save(TestData.Choice with
             { StudentId = id, Selections = [TestData.Select(TestData.WorkflowCatalog.Offers.Single(o => o.Id == "BIO-LF"))] }, null, RevisionSource.StudentSubmission, "Demo Abgabe");
             }

@@ -6,11 +6,22 @@ namespace GsmKurswahl.Application;
 public static class CatalogConfiguration
 {
     // Produces a separate version before distribution. Never changes an administrative choice.
-    public static OfferCatalog Prepare(OfferCatalog basis, int year, string version, IReadOnlySet<string> enabledLf)
+    public static OfferCatalog Prepare(OfferCatalog basis, int year, string version, IReadOnlySet<string> enabledLf, IReadOnlySet<string>? enabledOptional = null)
     {
         if (string.IsNullOrWhiteSpace(version) || version == basis.Version) throw new ArgumentException("Neue eindeutige Angebotsversion erforderlich.");
         if (enabledLf.Any(id => !basis.Offers.Any(o => o.Id == id && o.Type == CourseType.Lf))) throw new ArgumentException("Unbekanntes LF-Angebot.");
-        var catalog = basis with { GraduationYear = year, Version = version, Offers = [.. basis.Offers.Select(o => o.Type == CourseType.Lf ? o with { Status = enabledLf.Contains(o.Id) ? OfferStatus.Offered : OfferStatus.Planned } : o)] };
+        if (enabledOptional is not null && enabledOptional.Any(id => !basis.Offers.Any(o => o.Id == id && o.Type != CourseType.Lf && PlanningPresentation.CanCancel(o))))
+            throw new ArgumentException("Unbekanntes oder verpflichtendes Basis-/Wahlfachangebot.");
+        var catalog = basis with
+        {
+            GraduationYear = year,
+            Version = version,
+            Offers = [.. basis.Offers.Select(o => o.Type == CourseType.Lf
+                ? o with { Status = enabledLf.Contains(o.Id) ? OfferStatus.Offered : OfferStatus.Planned }
+                : enabledOptional is not null && PlanningPresentation.CanCancel(o)
+                    ? o with { Status = enabledOptional.Contains(o.Id) ? OfferStatus.Offered : OfferStatus.Planned }
+                    : o)]
+        };
         ModelGuard.Catalog(catalog);
         var invalid = catalog.Offers.Where(o => o.Status == OfferStatus.Offered).SelectMany(o => CatalogRules.Check(o)).FirstOrDefault();
         if (invalid is not null) throw new ArgumentException(invalid.Rule.Id + ": " + invalid.Explanation);

@@ -118,14 +118,18 @@ public sealed partial class TeacherWindow
                 var before = preview.Basis.Catalog.Offers.Single(o => o.Id == offer.Id);
                 if (before.Status != offer.Status) impact.Children.Add(Text(offer.Status == OfferStatus.Cancelled ? "Entfällt: " + offer.Id : "Angebot geändert: " + offer.Id));
             }
-            var affected = preview.Changes.Where(c => !c.RemovedOffers.IsEmpty).ToArray();
+            var affected = preview.Changes.Where(c => !c.RemovedOffers.IsEmpty)
+                .Select(c => (Change: c, Student: preview.Basis.Students.Single(s => s.Student.ExternalStudentId == c.StudentId)))
+                .OrderBy(x => x.Student.Student.ClassName, StringComparer.CurrentCulture)
+                .ThenBy(x => x.Student.Student.SortName().Last, StringComparer.CurrentCulture)
+                .ThenBy(x => x.Student.Student.SortName().First, StringComparer.CurrentCulture)
+                .ThenBy(x => x.Change.StudentId, StringComparer.Ordinal).ToArray();
             impact.Children.Add(Text($"{affected.Length} betroffene Schüler · Vorschau, noch keine Änderung gespeichert"));
             const string columns = "180,55,150,190,*";
             impact.Children.Add(CompactLine(columns, [Text("Schüler"), Text("Klasse"), Text("Entfällt"), Text("Verbleibende LF"), Text("Verbleibende BF / Wahlfächer")]));
             var rowIndex = 0;
-            foreach (var change in affected)
+            foreach (var (change, student) in affected)
             {
-                var student = preview.Basis.Students.Single(s => s.Student.ExternalStudentId == change.StudentId);
                 var row = CompactLine(columns, [Text(student.Student.SyntheticDisplayName), Text(student.Student.ClassName),
                     Text(string.Join(", ", change.RemovedOffers)), Text(PlanningPresentation.Choices(change.Choice, true)), Text(PlanningPresentation.Choices(change.Choice, false))]);
                 ToolTip.SetTip(row, string.Join("\n", change.Validation.Messages.Select(m => m.Explanation)));

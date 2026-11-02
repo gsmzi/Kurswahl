@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-28T10:00:00+00:00",
+  "year": {
+    "catalog": {
+      "schemaVersion": 1,
+      "version": "demo-2029-v3",
+      "graduationYear": 2029,
+      "isDemo": true,
+      "subjects": [
+        {
+          "id": "D",
+          "name": "Deutsch"
+        },
+        {
+          "id": "NEU",
+          "name": "Neues Fach"
+        }
+      ],
+      "offers": [
+        {
+          "id": "D-LF",
+          "subjectId": "D",
+          "type": "lf",
+          "variant": "normal",
+          "status": "offered",
+          "schedule": [
+            {
+              "semester": 1,
+              "weeklyHours": 3
+            },
+            {
+              "semester": 2,
+              "weeklyHours": 3
+            },
+            {
+              "semester": 3,
+              "weeklyHours": 3
+            },
+            {
+              "semester": 4,
+              "weeklyHours": 3
+            }
+          ],
+          "requirements": []
+        },
+        {
+          "id": "NEU-BF",
+          "subjectId": "NEU",
+          "type": "bf",
+          "variant": "bilingual",
+          "status": "planned",
+          "schedule": [
+            {
+              "semester": 1,
+              "weeklyHours": 3
+            },
+            {
+              "semester": 2,
+              "weeklyHours": 3
+            },
+            {
+              "semester": 3,
+              "weeklyHours": 3
+            },
+            {
+              "semester": 4,
+              "weeklyHours": 3
+            }
+          ],
+          "requirements": [
+            "continuous_bilingual"
+          ]
+        }
+      ]
+    },
+    "databasePath": "verwaltung.db",
+    "step": "complete",
+    "actor": "demo-transfer",
+    "certificateThumbprint": "",
+    "keyId": ""
+  },
+  "databaseHash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+}
