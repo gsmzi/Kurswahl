@@ -431,15 +431,39 @@ public sealed partial class TeacherWindow : Window
             status.Text = $"{count} Profile neu erstellt, aber noch nicht zugestellt. Jetzt „An Wahlordner zustellen“ klicken. " + string.Join(" · ", failed);
         }, "Erstellt für die ausgewählten Personen eine neue Profilversion aus der aktuellen Vorbildung. Die Dateien liegen danach noch nicht im Schülerordner.");
         issue.Margin = new Thickness(0, 0, 10, 8); advancedActions.Children.Add(issue);
-        var deliver = Button("An Wahlordner zustellen", () =>
+        var deliver = Button("An Wahlordner zustellen", async () =>
         {
             Ready(); var distribution = new ProfileDistribution(store!); var reports = new List<string>();
-            foreach (var target in profileTargets.SelectedItems!.Cast<Target>())
+            var targets = profileTargets.SelectedItems!.Cast<Target>().Select(t => t.Record).ToArray();
+            var catalog = DistributedCatalog(); var programDirectory = EffectiveProgramDirectory();
+            await RunWithProgress(targets.Length, async report =>
             {
-                var issued = store!.LatestProfile(target.Record.Student.ExternalStudentId);
-                if (issued is null) { reports.Add(target.Record.Student.SyntheticDisplayName + ": noch kein Profil erstellt"); continue; }
-                var entry = distribution.Distribute(target.Record, issued, DistributedCatalog()); reports.Add(target.Record.Student.SyntheticDisplayName + ": " + DistributionText(entry.Status) + DeliverProgramIfConfigured(distribution, target.Record));
-            }
+                StudentProgramSource? program = null;
+                if (programDirectory.Length > 0)
+                {
+                    report(0, "Schülerprogramm wird eingelesen …");
+                    try { program = await Task.Run(() => StudentProgramSource.Load(programDirectory)); }
+                    catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException) { reports.Add("Schülerprogramm nicht mitverteilt: " + ex.Message); }
+                }
+                for (var i = 0; i < targets.Length; i++)
+                {
+                    var record = targets[i];
+                    report(i, $"{i + 1} von {targets.Length}: {record.Student.SyntheticDisplayName}");
+                    reports.Add(await Task.Run(() =>
+                    {
+                        var issued = store!.LatestProfile(record.Student.ExternalStudentId);
+                        if (issued is null) return record.Student.SyntheticDisplayName + ": noch kein Profil erstellt";
+                        var entry = distribution.Distribute(record, issued, catalog);
+                        var programText = "";
+                        if (program is not null)
+                        {
+                            var delivery = distribution.DeliverProgram(store.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId), program);
+                            programText = delivery.Status == "verteilt" ? " · Programm bereitgestellt" : " · Programm: " + DistributionText(delivery.Status);
+                        }
+                        return record.Student.SyntheticDisplayName + ": " + DistributionText(entry.Status) + programText;
+                    }));
+                }
+            });
             status.Text = string.Join(" · ", reports);
         }, "Kopiert das zuletzt erstellte Profil und das aktuelle Fachangebot in die bestätigten Wahlordner. Vorhandene Kurswahlen werden nicht verändert.");
         deliver.Margin = new Thickness(0, 0, 10, 8); advancedActions.Children.Add(deliver);
@@ -477,12 +501,19 @@ public sealed partial class TeacherWindow : Window
             if (store is not SqliteAdministrationStore sql) throw new InvalidOperationException("Nur im lokalen Lehrerbestand möglich.");
             await CollectAutomatically();
             var results = new List<CleanupResult>();
-            foreach (var record in CurrentStudents().Where(r => r.MappingConfirmed))
+            var records = CurrentStudents().Where(r => r.MappingConfirmed).ToArray();
+            var actorName = Actor;
+            await RunWithProgress(records.Length, async report =>
             {
-                var accepted = dismissedConflicts.Where(k => k.StartsWith(record.Student.ExternalStudentId + ":", StringComparison.Ordinal))
-                    .Select(k => k[(record.Student.ExternalStudentId.Length + 1)..]).ToHashSet();
-                results.Add(await Task.Run(() => StudentFolderCleanup.Clean(sql, record, Actor, accepted)));
-            }
+                for (var i = 0; i < records.Length; i++)
+                {
+                    var record = records[i];
+                    report(i, $"Räumen {i + 1} von {records.Length}: {record.Student.SyntheticDisplayName}");
+                    var accepted = dismissedConflicts.Where(k => k.StartsWith(record.Student.ExternalStudentId + ":", StringComparison.Ordinal))
+                        .Select(k => k[(record.Student.ExternalStudentId.Length + 1)..]).ToHashSet();
+                    results.Add(await Task.Run(() => StudentFolderCleanup.Clean(sql, record, actorName, accepted)));
+                }
+            });
             finalConfirm.IsChecked = false;
             var names = CurrentStudents().ToDictionary(s => s.Student.ExternalStudentId, s => s.Student.SyntheticDisplayName);
             collectionResults.Children.Clear();

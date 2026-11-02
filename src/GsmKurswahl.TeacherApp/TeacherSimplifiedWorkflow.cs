@@ -15,7 +15,10 @@ namespace GsmKurswahl.TeacherApp;
 public sealed partial class TeacherWindow
 {
     private readonly DispatcherTimer collectionTimer = new() { Interval = TimeSpan.FromSeconds(60) };
-    private bool collecting;
+    private bool collecting, busy;
+    private readonly ProgressBar busyProgress = new() { Name = "BusyProgress", Minimum = 0, Height = 14, MinWidth = 300 };
+    private readonly TextBlock busyText = new() { Name = "BusyText", FontSize = 13, TextWrapping = TextWrapping.Wrap };
+    private readonly StackPanel busyPanel = new() { Spacing = 4, IsVisible = false };
     private readonly TextBox distributionRoot = new() { Watermark = "Laufwerk oder Grundverzeichnis der Klassenordner", Name = "DistributionRoot" };
     private readonly StackPanel deliveryPreview = new() { Spacing = 4 };
     private readonly List<(CheckBox Box, CollectionPreview Preview)> conflictSelection = [];
@@ -121,25 +124,25 @@ public sealed partial class TeacherWindow
             if (prepared.Count == 0) throw new InvalidOperationException("Keine verteilbaren Schüler. Hinweise in der Tabelle prüfen.");
             if (prepared.Any(r => store!.Students().Single(s => s.Student.ExternalStudentId == r.Student.ExternalStudentId).Version != r.Version)) throw new InvalidOperationException("Schülerbestand geändert. Ziele erneut prüfen.");
             var service = new ProfileDistribution(store!); var reports = new List<string>(); var count = 0;
-            foreach (var record in prepared)
+            // Everything the background work needs is read from controls here, on the UI thread.
+            var root = distributionRoot.Text ?? ""; var actorName = Actor; var catalog = DistributedCatalog(); var programDirectory = EffectiveProgramDirectory();
+            await RunWithProgress(prepared.Count, async report =>
             {
-                try
+                StudentProgramSource? program = null;
+                if (programDirectory.Length > 0)
                 {
-                    StudentDirectories.Resolve(distributionRoot.Text ?? "", record.HomeDirectory);
-                    var current = store!.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId);
-                    if (!current.MappingConfirmed || current.HomeDirectory != record.HomeDirectory)
-                    {
-                        current = record with { MappingConfirmed = true, Version = record.Version + 1, Actor = Actor, ChangedAt = DateTimeOffset.UtcNow };
-                        store.SaveStudent(current, record.Version);
-                    }
-                    var latest = store.LatestProfile(current.Student.ExternalStudentId);
-                    if (latest is null || latest.Profile.GraduationYear != current.Student.GraduationYear || System.Text.Json.JsonSerializer.Serialize(latest.Profile.Prerequisites, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(current.Student.Prerequisites, DocumentJson.Options))
-                        latest = service.Issue(current);
-                    var result = service.Distribute(current, latest, DistributedCatalog()); if (result.Status == "verteilt") count++;
-                    reports.Add(current.Student.SyntheticDisplayName + ": " + result.Status + DeliverProgramIfConfigured(service, current));
+                    report(0, "Schülerprogramm wird eingelesen …");
+                    try { program = await Task.Run(() => StudentProgramSource.Load(programDirectory)); }
+                    catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException) { reports.Add("Schülerprogramm nicht mitverteilt: " + ex.Message); }
                 }
-                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException) { reports.Add(record.Student.SyntheticDisplayName + ": " + ex.Message); }
-            }
+                for (var i = 0; i < prepared.Count; i++)
+                {
+                    var record = prepared[i];
+                    report(i, $"{i + 1} von {prepared.Count}: {record.Student.SyntheticDisplayName}");
+                    var (line, delivered) = await Task.Run(() => DistributeOne(service, record, root, actorName, catalog, program));
+                    reports.Add(line); if (delivered) count++;
+                }
+            });
             deliveryPreview.Children.Clear(); foreach (var report in reports) deliveryPreview.Children.Add(Text(report));
             if (count == records.Length && workspace!.Active!.Step != YearSetupStep.Complete) SetStep(YearSetupStep.Complete);
             Refresh(); status.Text = $"{count} von {records.Length} Schülerdateien verteilt. " + string.Join(" · ", reports);
@@ -163,14 +166,62 @@ public sealed partial class TeacherWindow
     }
     // The deadline is a hint in the pupils' copy of the offer; the protected catalog itself stays unchanged.
     private OfferCatalog DistributedCatalog() => session!.Catalog with { SubmissionDeadline = workspace?.Active?.SubmissionDeadline };
-    private string DeliverProgramIfConfigured(ProfileDistribution service, StudentRecord record)
+    private string EffectiveProgramDirectory()
     {
         var directory = workspace?.Active?.StudentProgramDirectory;
         if (string.IsNullOrWhiteSpace(directory)) directory = SchoolPresets().StudentProgramDirectory;
-        if (string.IsNullOrWhiteSpace(directory)) return "";
-        var current = store!.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId);
-        var result = service.DeliverProgram(current, directory);
-        return result.Status == "verteilt" ? " · Programm bereitgestellt" : " · Programm: " + DistributionText(result.Status);
+        return directory ?? "";
+    }
+    // Runs off the UI thread: no control access here. The store is not used concurrently, because the window is
+    // locked and automatic collection pauses while RunWithProgress is active.
+    private (string Line, bool Delivered) DistributeOne(ProfileDistribution service, StudentRecord record, string root, string actorName, OfferCatalog catalog, StudentProgramSource? program)
+    {
+        try
+        {
+            StudentDirectories.Resolve(root, record.HomeDirectory);
+            var current = store!.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId);
+            if (!current.MappingConfirmed || current.HomeDirectory != record.HomeDirectory)
+            {
+                current = record with { MappingConfirmed = true, Version = record.Version + 1, Actor = actorName, ChangedAt = DateTimeOffset.UtcNow };
+                store.SaveStudent(current, record.Version);
+            }
+            var latest = store.LatestProfile(current.Student.ExternalStudentId);
+            if (latest is null || latest.Profile.GraduationYear != current.Student.GraduationYear || System.Text.Json.JsonSerializer.Serialize(latest.Profile.Prerequisites, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(current.Student.Prerequisites, DocumentJson.Options))
+                latest = service.Issue(current);
+            var result = service.Distribute(current, latest, catalog);
+            var programText = "";
+            if (program is not null)
+            {
+                var delivery = service.DeliverProgram(store.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId), program);
+                programText = delivery.Status == "verteilt" ? " · Programm bereitgestellt" : " · Programm: " + DistributionText(delivery.Status);
+            }
+            return (current.Student.SyntheticDisplayName + ": " + result.Status + programText, result.Status == "verteilt");
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        { return (record.Student.SyntheticDisplayName + ": " + ex.Message, false); }
+    }
+    /// <summary>
+    /// Long file work with a visible progress bar in the footer. The window stays responsive but locked: navigation,
+    /// page and closing are blocked and automatic collection pauses, so nothing else touches the store meanwhile.
+    /// </summary>
+    private async Task RunWithProgress(int total, Func<Action<int, string>, Task> work)
+    {
+        var started = DateTime.Now;
+        void Report(int done, string text)
+        {
+            busyProgress.Maximum = Math.Max(total, 1); busyProgress.Value = done;
+            var remaining = done > 0 && done < total ? (DateTime.Now - started) / done * (total - done) : (TimeSpan?)null;
+            busyText.Text = text + (remaining is { } r ? $" · noch etwa {Math.Ceiling(r.TotalMinutes):0} min" : "");
+        }
+        if (busy || collecting) throw new InvalidOperationException("Es läuft gerade ein anderer Vorgang (z. B. automatisches Einsammeln). Bitte kurz warten und erneut starten.");
+        busy = true; collecting = true;
+        busyPanel.IsVisible = true; navigation.IsEnabled = false; pageHost.IsEnabled = false; yearSwitchButton.IsEnabled = false;
+        try { Report(0, "Vorbereitung …"); await work(Report); Report(total, "Abgeschlossen"); }
+        finally
+        {
+            busy = false; collecting = false;
+            busyPanel.IsVisible = false; navigation.IsEnabled = true; pageHost.IsEnabled = true; yearSwitchButton.IsEnabled = true;
+        }
     }
     private async Task CollectAutomatically()
     {

@@ -53,6 +53,8 @@ public sealed partial class TeacherWindow
         collectionTimer.Tick += async (_, _) => await CollectAutomatically();
         filter.TextChanged += (_, _) => Refresh(); followupFilter.IsCheckedChanged += (_, _) => Refresh(); statusFilter.SelectionChanged += (_, _) => Refresh();
         Opened += async (_, _) => { LoadWorkspace(); collectionTimer.Start(); await CollectAutomatically(); };
+        // Closing would dispose the store under running background file work.
+        Closing += (_, e) => { if (busy) { e.Cancel = true; status.Text = "Bitte warten: Die Verteilung läuft noch. Das Fenster lässt sich danach schließen."; } };
         Closed += (_, _) => { collectionTimer.Stop(); store?.Dispose(); store = null; session = null; };
     }
     private void LoadWorkspace()

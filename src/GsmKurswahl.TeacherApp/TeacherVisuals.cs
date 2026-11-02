@@ -133,6 +133,8 @@ public sealed partial class TeacherWindow
             statusBanner.BorderBrush = isError ? Brush.Parse("#E09B9B") : isSuccess ? Accent : Line;
             status.Foreground = isError ? Brush.Parse("#8C1D1D") : isSuccess ? Brush.Parse("#13544E") : Ink;
         };
+        busyPanel.Children.Add(busyText); busyPanel.Children.Add(busyProgress);
+        footer.Children.Add(busyPanel);
         footer.Children.Add(statusBanner);
         footer.Children.Add(new TextBlock { Text = "Synthetische Daten · fachliche Freigabe offen · keine verbindliche Abgabe", FontSize = 11, Foreground = Muted });
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);

@@ -80,38 +80,37 @@ public sealed class ProfileDistribution(IAdministrationStore store)
     /// Copies the published pupil program into the confirmed pupil folder and records every file with its hash, so
     /// the final collection can later remove exactly these unchanged copies. Foreign or modified files are never replaced.
     /// </summary>
-    public DistributionEntry DeliverProgram(StudentRecord record, string sourceDirectory)
+    public DistributionEntry DeliverProgram(StudentRecord record, string sourceDirectory) => DeliverProgram(record, StudentProgramSource.Load(sourceDirectory));
+    // A whole cohort reuses one loaded source, so the ~100 MB program is read and hashed only once.
+    public DistributionEntry DeliverProgram(StudentRecord record, StudentProgramSource program)
     {
         var status = "verteilt"; var detail = "Schülerprogramm bereitgestellt.";
         try
         {
             if (store is not SqliteAdministrationStore sql) throw new InvalidOperationException("Programmverteilung benötigt den lokalen Lehrerbestand.");
-            StudentProgramPackage.Validate(sourceDirectory);
             if (!record.MappingConfirmed || !Path.IsPathFullyQualified(record.HomeDirectory) || !Directory.Exists(record.HomeDirectory)) throw new DirectoryNotFoundException();
-            var source = Path.GetFullPath(sourceDirectory);
             var target = StudentFolderLayout.Program(record.HomeDirectory);
-            if (target.StartsWith(source.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            if (target.StartsWith(program.Directory.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("Programmordner darf nicht im Schülerordner liegen.");
             var previous = sql.LatestProgramDelivery(record.Student.ExternalStudentId)?.Files.ToDictionary(f => f.Path, f => f.Sha256, StringComparer.OrdinalIgnoreCase) ?? [];
-            var files = Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories)
-                .Select(f => (Relative: Path.GetRelativePath(source, f).Replace(Path.DirectorySeparatorChar, '/'), Bytes: File.ReadAllBytes(f))).ToArray();
+            var files = program.Files;
             // Check every target first; nothing is written if any existing file is foreign or changed.
-            foreach (var (relative, bytes) in files)
+            foreach (var (relative, _, token) in files)
             {
                 var path = Path.Combine(target, relative);
                 if (!File.Exists(path)) continue;
                 var current = StudentFolderCleanup.Token(File.ReadAllBytes(path));
-                if (current != StudentFolderCleanup.Token(bytes) && (!previous.TryGetValue(relative, out var known) || known != current))
+                if (current != token && (!previous.TryGetValue(relative, out var known) || known != current))
                     throw new InvalidDataException("Programm_abweichend");
             }
             var launcher = StudentFolderLayout.Launcher(record.HomeDirectory);
             var launcherBytes = StudentFolderCleanup.LauncherBytes;
             var existingLauncher = File.Exists(launcher) ? File.ReadAllBytes(launcher) : null;
             if (existingLauncher is not null && !existingLauncher.AsSpan().SequenceEqual(launcherBytes)) throw new InvalidDataException("Programm_abweichend");
-            foreach (var (relative, bytes) in files)
+            foreach (var (relative, bytes, token) in files)
             {
                 var path = Path.Combine(target, relative);
-                if (File.Exists(path) && StudentFolderCleanup.Token(File.ReadAllBytes(path)) == StudentFolderCleanup.Token(bytes)) continue;
+                if (File.Exists(path) && new FileInfo(path).Length == bytes.Length && StudentFolderCleanup.Token(File.ReadAllBytes(path)) == token) continue;
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 Replace(path, bytes, File.Exists(path) ? File.ReadAllBytes(path) : null);
             }
@@ -122,7 +121,7 @@ public sealed class ProfileDistribution(IAdministrationStore store)
             }
             if (existingLauncher is null) { Directory.CreateDirectory(Path.GetDirectoryName(launcher)!); Replace(launcher, launcherBytes, null); }
             sql.RecordProgramDelivery(new(1, Guid.NewGuid(), record.Student.ExternalStudentId, DateTimeOffset.UtcNow, StudentFolderCleanup.ProgramFolder,
-                [.. files.Select(f => new DeliveredFile(f.Relative, StudentFolderCleanup.Token(f.Bytes)))]));
+                [.. files.Select(f => new DeliveredFile(f.Relative, f.Token))]));
         }
         catch (DirectoryNotFoundException) { status = "nicht_gefunden"; detail = "Bestätigtes Zielverzeichnis nicht erreichbar."; }
         catch (UnauthorizedAccessException) { status = "Zugriff_verweigert"; detail = "Keine Schreibberechtigung am Ziel."; }

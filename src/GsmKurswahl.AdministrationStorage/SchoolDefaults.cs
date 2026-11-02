@@ -29,6 +29,22 @@ public sealed record SchoolDefaults(int SchemaVersion, string DistributionRoot, 
     }
 }
 
+/// <summary>A validated pupil program read once into memory with the hash of every file, for delivery to many pupils.</summary>
+public sealed record StudentProgramSource(string Directory, IReadOnlyList<(string Relative, byte[] Bytes, string Token)> Files)
+{
+    public static StudentProgramSource Load(string directory)
+    {
+        StudentProgramPackage.Validate(directory);
+        var source = Path.GetFullPath(directory);
+        var files = System.IO.Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories).Select(f =>
+        {
+            var bytes = File.ReadAllBytes(f);
+            return (Path.GetRelativePath(source, f).Replace(Path.DirectorySeparatorChar, '/'), bytes, StudentFolderCleanup.Token(bytes));
+        }).ToArray();
+        return new(source, files);
+    }
+}
+
 /// <summary>Accepts only a self-contained pupil program, so pupil computers need no installed .NET runtime.</summary>
 public static class StudentProgramPackage
 {

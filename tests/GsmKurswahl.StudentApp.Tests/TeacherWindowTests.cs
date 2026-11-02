@@ -251,7 +251,7 @@ public class TeacherWindowTests
         finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
     [AvaloniaFact]
-    public void SimpleDistributionDeliversProfilesWithoutCertificateOrSid()
+    public async Task SimpleDistributionDeliversProfilesWithoutCertificateOrSid()
     {
         var root = Path.Combine(Path.GetTempPath(), "gsm-distribute-ui-" + Guid.NewGuid());
         var targetFolder = Path.Combine(root, "homes", "10a", "Eins.Demo");
@@ -272,6 +272,13 @@ public class TeacherWindowTests
             }
             Click("Ziele prüfen und gemeinsame Verteilung vorbereiten");
             Click("1 Zuordnungen bestätigen und Schülerdateien verteilen");
+            // Distribution runs in the background; the window stays responsive and shows progress until it ends.
+            var progress = window.GetLogicalDescendants().OfType<ProgressBar>().Single(p => p.Name == "BusyProgress");
+            for (var wait = 0; wait < 500 && new TeacherWorkspace(root).Active!.Step != YearSetupStep.Complete; wait++)
+            { Avalonia.Threading.Dispatcher.UIThread.RunJobs(); await Task.Delay(10); }
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.Equal(progress.Maximum, progress.Value);
+            Assert.False(((Control)progress.Parent!).IsVisible);
             Assert.True(File.Exists(Path.Combine(StudentFolderLayout.Data(targetFolder), "profil.json")));
             Assert.False(File.Exists(Path.Combine(StudentFolderLayout.Data(targetFolder), "profil.sig")));
             Assert.Equal(YearSetupStep.Complete, new TeacherWorkspace(root).Active!.Step);
