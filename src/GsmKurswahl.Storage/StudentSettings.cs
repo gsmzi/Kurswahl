@@ -18,6 +18,18 @@ public sealed record StudentSettings(int SchemaVersion, string HomeDirectory, st
         return settings;
     }
 
+    // Fallback when the delivered program is started directly instead of via the launcher: Kurswahl/Programm sits next
+    // to Kurswahl/Daten. Used only if that data folder already holds a profile, so a copy elsewhere never guesses a folder.
+    public static string? DeliveredChoiceDirectory(string programDirectory)
+    {
+        var program = new DirectoryInfo(Path.TrimEndingDirectorySeparator(Path.GetFullPath(programDirectory)));
+        if (!string.Equals(program.Name, StudentFolderLayout.ProgramFolder, StringComparison.OrdinalIgnoreCase) || program.Parent is null
+            || !string.Equals(program.Parent.Name, StudentFolderLayout.RootFolder, StringComparison.OrdinalIgnoreCase))
+            return null;
+        var data = Path.Combine(program.Parent.FullName, StudentFolderLayout.DataFolder);
+        return File.Exists(Path.Combine(data, "profil.json")) ? data : null;
+    }
+
     public string ResolveHomeDirectory()
     {
         var home = HomeDirectory == "{HOME}" ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : HomeDirectory;

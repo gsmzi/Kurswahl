@@ -8,11 +8,12 @@ public sealed record CleanupResult(string StudentId, string Status, string Detai
 /// <summary>
 /// Final collection: empties a confirmed pupil folder after the choice is in the protected stock. Every data file is
 /// archived byte-exactly in the database first; program files are removed only if unchanged since our own delivery.
-/// Anything not provably saved stays in place.
+/// Anything not provably saved stays in place. Our own Kurswahl folder is removed once it is empty.
 /// </summary>
 public static class StudentFolderCleanup
 {
-    public const string ProgramFolder = "Kurswahl-Programm";
+    public const string ProgramFolder = StudentFolderLayout.RootFolder + "/" + StudentFolderLayout.ProgramFolder;
+    public static byte[] LauncherBytes => System.Text.Encoding.ASCII.GetBytes(StudentFolderLayout.LauncherContent);
     private static readonly string[] DataFiles = ["aktuell.json", "aktuell.json.bak", "profil.json", "fachangebot.json"];
     private static readonly string[] LockFiles = ["aktuell.json.lock", ".profil.lock"];
     private const long MaximumBytes = 2 * 1024 * 1024;
@@ -26,10 +27,11 @@ public static class StudentFolderCleanup
         {
             if (!record.MappingConfirmed || !Path.IsPathFullyQualified(record.HomeDirectory) || !Directory.Exists(record.HomeDirectory))
                 return new(id, "nicht_gefunden", "Bestätigter Wahlordner nicht erreichbar; nichts entfernt.");
+            var data = StudentFolderLayout.Data(record.HomeDirectory);
             var found = new List<(string Path, byte[] Bytes)>();
             foreach (var name in DataFiles)
             {
-                var path = Path.Combine(record.HomeDirectory, name);
+                var path = Path.Combine(data, name);
                 if (!File.Exists(path)) continue;
                 if (new FileInfo(path).Length > MaximumBytes) return new(id, "nicht_eingesammelt", name + " ist ungewöhnlich groß; nichts entfernt.");
                 found.Add((path, File.ReadAllBytes(path)));
@@ -56,10 +58,19 @@ public static class StudentFolderCleanup
             }
             foreach (var name in LockFiles)
             {
-                var path = Path.Combine(record.HomeDirectory, name);
+                var path = Path.Combine(data, name);
                 if (File.Exists(path) && new FileInfo(path).Length == 0) File.Delete(path);
             }
             kept.AddRange(RemoveProgram(store, record));
+            var launcher = StudentFolderLayout.Launcher(record.HomeDirectory);
+            if (File.Exists(launcher) && File.ReadAllBytes(launcher).AsSpan().SequenceEqual(LauncherBytes)) File.Delete(launcher);
+            else if (File.Exists(launcher)) kept.Add(StudentFolderLayout.RootFolder + "/" + StudentFolderLayout.LauncherFile);
+            // Pupils' own additions stay; they are reported and keep the folders alive.
+            if (Directory.Exists(data))
+                kept.AddRange(Directory.EnumerateFileSystemEntries(data).Select(Path.GetFileName)
+                    .Where(n => !DataFiles.Contains(n) && !LockFiles.Contains(n)).Select(n => StudentFolderLayout.RootFolder + "/" + StudentFolderLayout.DataFolder + "/" + n));
+            foreach (var directory in new[] { data, StudentFolderLayout.Root(record.HomeDirectory) })
+                if (Directory.Exists(directory) && !Directory.EnumerateFileSystemEntries(directory).Any()) Directory.Delete(directory);
             return kept.Count == 0
                 ? new(id, "geräumt", $"{archive.Length} Datei(en) archiviert und entfernt; Programm entfernt.")
                 : new(id, "teilweise", "Archiviert; unverändert belassen: " + string.Join(", ", kept));
@@ -71,7 +82,7 @@ public static class StudentFolderCleanup
     private static IEnumerable<string> RemoveProgram(SqliteAdministrationStore store, StudentRecord record)
     {
         var delivery = store.LatestProgramDelivery(record.Student.ExternalStudentId);
-        var root = Path.Combine(record.HomeDirectory, ProgramFolder);
+        var root = StudentFolderLayout.Program(record.HomeDirectory);
         if (!Directory.Exists(root)) return [];
         var kept = new List<string>();
         var delivered = delivery?.Files.ToDictionary(f => f.Path, f => f.Sha256, StringComparer.OrdinalIgnoreCase) ?? [];

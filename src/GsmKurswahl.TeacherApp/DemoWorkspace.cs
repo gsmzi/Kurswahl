@@ -33,7 +33,7 @@ public static class DemoWorkspace
             store.SaveStudent(record, null);
             var delivery = distribution.Distribute(record, distribution.Issue(record), catalog);
             if (delivery.Status != "verteilt") throw new IOException("Demo-Verteilung fehlgeschlagen: " + delivery.Status);
-            var path = Path.Combine(folder, "aktuell.json");
+            var path = Path.Combine(StudentFolderLayout.Data(folder), "aktuell.json");
             var bytes = JsonDocuments.WriteChoice(row.Choice);
             using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             { stream.Write(bytes); stream.Flush(true); }

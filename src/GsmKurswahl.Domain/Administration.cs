@@ -35,3 +35,20 @@ public interface IAdministrationStore : IDisposable
     void LogDistribution(DistributionEntry entry);
     ImmutableArray<DistributionEntry> DistributionLog();
 }
+
+// Layout below the pupil's home folder, shared by distribution (teacher) and the delivered pupil program:
+// Kurswahl/<launcher>, Kurswahl/Programm/..., Kurswahl/Daten/{profil,fachangebot,aktuell}.json.
+// Pure path composition; no file system access in Domain.
+public static class StudentFolderLayout
+{
+    public const string RootFolder = "Kurswahl";
+    public const string DataFolder = "Daten";
+    public const string ProgramFolder = "Programm";
+    public const string LauncherFile = "Kurswahl starten oder weiterführen.bat";
+    public const string LauncherContent = "@echo off\r\nrem GSM-Kurswahl: startet das Schuelerprogramm mit dem persoenlichen Wahlordner.\r\n"
+        + "start \"\" \"%~dp0" + ProgramFolder + "\\GsmKurswahl.StudentApp.exe\" --wahlordner \"%~dp0" + DataFolder + "\"\r\n";
+    public static string Root(string home) => Path.Combine(home, RootFolder);
+    public static string Data(string home) => Path.Combine(home, RootFolder, DataFolder);
+    public static string Program(string home) => Path.Combine(home, RootFolder, ProgramFolder);
+    public static string Launcher(string home) => Path.Combine(home, RootFolder, LauncherFile);
+}

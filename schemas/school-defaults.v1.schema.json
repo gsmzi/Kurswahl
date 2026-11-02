@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Schulvorgaben des Lehrerprogramms v1 (schulvorgaben.json)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "distributionRoot", "studentProgramDirectory"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "distributionRoot": { "type": "string", "description": "Vollständiger Pfad des Grundverzeichnisses mit den Klassenordnern oder leer." },
+    "studentProgramDirectory": { "type": "string", "description": "Ordner des selbstenthaltenden Schülerprogramms, absolut oder relativ zum Lehrerprogramm, oder leer." }
+  }
+}

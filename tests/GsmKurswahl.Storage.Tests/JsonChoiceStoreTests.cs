@@ -105,6 +105,18 @@ public sealed class JsonChoiceStoreTests : IDisposable
         new StudentSettings(1, directory, folder, name, "catalog.json", "demo-001").ResolveChoicePath());
     [Fact] public void RelativeSettingsFilePathRejected() => Assert.Throws<ArgumentException>(() =>
         StudentSettings.Load("appsettings.json"));
+    [Fact] public void DeliveredProgramUsesParentFolderOnlyWithProfile()
+    {
+        var program = StudentFolderLayout.Program(directory);
+        Directory.CreateDirectory(program); Directory.CreateDirectory(StudentFolderLayout.Data(directory));
+        Assert.Null(StudentSettings.DeliveredChoiceDirectory(program + Path.DirectorySeparatorChar));
+        File.WriteAllText(Path.Combine(StudentFolderLayout.Data(directory), "profil.json"), "{}");
+        Assert.Equal(StudentFolderLayout.Data(directory), StudentSettings.DeliveredChoiceDirectory(program + Path.DirectorySeparatorChar));
+        Assert.Null(StudentSettings.DeliveredChoiceDirectory(StudentFolderLayout.Root(directory)));
+        var foreign = Path.Combine(directory, "Anderes", StudentFolderLayout.ProgramFolder);
+        Directory.CreateDirectory(foreign);
+        Assert.Null(StudentSettings.DeliveredChoiceDirectory(foreign));
+    }
     [Fact] public void ConfigurablePathUsesSpecifiedHome()
     {
         var settings = new StudentSettings(1, directory, "Demo", "wahl.json", "catalog.json", "demo-001");

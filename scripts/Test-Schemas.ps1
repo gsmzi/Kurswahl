@@ -8,6 +8,7 @@ foreach ($pair in @(
     @('samples/schueler-demo.json', 'schemas/course-choice.v2.schema.json'),
     @('samples/fachangebot-demo.json', 'schemas/offer-catalog.v2.schema.json'),
     @('samples/profil-demo-unsigned.json', 'schemas/student-profile.v2.schema.json'),
+    @('src/GsmKurswahl.TeacherApp/schulvorgaben.json', 'schemas/school-defaults.v1.schema.json'),
     @("$fixtures/current/choice-v2.json", 'schemas/course-choice.v2.schema.json'),
     @("$fixtures/current/catalog-v2.json", 'schemas/offer-catalog.v2.schema.json'),
     @("$fixtures/current/profile-v2.json", 'schemas/student-profile.v2.schema.json'),

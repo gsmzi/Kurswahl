@@ -78,6 +78,13 @@ public sealed partial class TeacherWindow
         panel.Children.Add(Button("Speicherort und Einstellungen", ShowSettings));
         pageHost.Content = Scroll(panel); status.Text = "Keine Änderungen am gespeicherten Bestand.";
     }
+    // School presets beside the teacher program; a broken file only disables the presets and is reported.
+    private SchoolDefaults SchoolPresets()
+    {
+        try { return SchoolDefaults.Load(AppContext.BaseDirectory); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+        { status.Text = SchoolDefaults.FileName + " nicht verwendet: " + ex.Message; return SchoolDefaults.None; }
+    }
     private void OpenActiveYear()
     {
         store?.Dispose(); store = null; session = null;
@@ -101,7 +108,7 @@ public sealed partial class TeacherWindow
         status.Text = "Aktueller Stand geladen. Bestätigte Änderungen werden automatisch gespeichert.";
         var roots = CurrentStudents().Where(s => Path.IsPathFullyQualified(s.HomeDirectory))
             .Select(s => Path.GetDirectoryName(Path.GetDirectoryName(s.HomeDirectory))).Where(p => p is not null).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        if (roots.Length == 1) distributionRoot.Text = roots[0];
+        distributionRoot.Text = roots.Length == 1 ? roots[0] : SchoolPresets().DistributionRoot;
         Refresh(); RebuildNavigation(); ShowCurrentStep();
     }
     private void RebuildNavigation()
@@ -285,18 +292,16 @@ public sealed partial class TeacherWindow
             catch (Exception ex) { status.Text = "Abgabetermin nicht gespeichert: " + ex.Message; }
         };
         panel.Children.Add(Labeled("Abgabetermin (nur Hinweis)", deadline, "Wird den Schülern im Programm angezeigt. Das Programm sperrt danach nichts; Sie sammeln nach dem Termin unter „Kurswahlen einsammeln“ abschließend ein."));
-        var program = new TextBox { Name = "SetupStudentProgram", Text = active.StudentProgramDirectory, Watermark = "Ordner mit dem veröffentlichten Schülerprogramm (optional)", Width = 520 };
+        var program = new TextBox { Name = "SetupStudentProgram", Text = active.StudentProgramDirectory.Length > 0 ? active.StudentProgramDirectory : SchoolPresets().StudentProgramDirectory, Watermark = "Ordner mit dem veröffentlichten Schülerprogramm (optional)", Width = 520 };
         var saveProgram = Button("Programmordner übernehmen", () =>
         {
             var value = (program.Text ?? "").Trim();
-            if (value.Length > 0 && (!Path.IsPathFullyQualified(value) || !Directory.Exists(value)
-                || (!File.Exists(Path.Combine(value, "GsmKurswahl.StudentApp.exe")) && !File.Exists(Path.Combine(value, "GsmKurswahl.StudentApp.dll")))))
-                throw new ArgumentException("Bitte den vollständigen Pfad des Ordners mit GsmKurswahl.StudentApp.exe angeben.");
+            if (value.Length > 0) StudentProgramPackage.Validate(value);
             workspace.Update(workspace.Active! with { StudentProgramDirectory = value.Length == 0 ? "" : Path.GetFullPath(value) });
             status.Text = value.Length == 0 ? "Schülerprogramm wird nicht mitverteilt." : "Schülerprogramm wird bei der Verteilung in jeden Wahlordner kopiert.";
         }, "Leer lassen, wenn das Schülerprogramm anders bereitgestellt wird.");
         var programRow = new WrapPanel { Orientation = Orientation.Horizontal }; programRow.Children.Add(program); programRow.Children.Add(saveProgram);
-        panel.Children.Add(Labeled("Schülerprogramm mitverteilen", programRow, "Optional. Das Programm wird nach „" + StudentFolderCleanup.ProgramFolder + "“ im Wahlordner kopiert und beim abschließenden Einsammeln wieder entfernt. Die appsettings.json im Programmordner muss auf den Wahlordner aus Sicht des Schülerrechners zeigen."));
+        panel.Children.Add(Labeled("Schülerprogramm mitverteilen", programRow, "Optional. Das Programm wird nach „" + StudentFolderCleanup.ProgramFolder + "“ im persönlichen Ordner kopiert, daneben liegt die Startdatei „" + StudentFolderLayout.LauncherFile + "“. Beim abschließenden Einsammeln wird beides wieder entfernt. Die Startdatei übergibt den Datenordner; appsettings.json muss nicht angepasst werden."));
         var next = Button("Fachangebot bestätigen · weiter zur Schülerliste", () =>
         {
             if (workspace.Active!.Catalog.Offers.Count(o => o.Type == CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established) < 3)

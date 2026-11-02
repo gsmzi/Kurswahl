@@ -54,7 +54,7 @@ public sealed class AdministrationTests : IDisposable
         using var store = new SqliteAdministrationStore(DbPath); var record = Record(); store.SaveStudent(record, null);
         var session = new TeacherSession(store, TestData.Catalog, "demo-beratung");
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToIssue);
-        Directory.CreateDirectory(record.HomeDirectory);
+        Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory));
         var service = new ProfileDistribution(store);
         var profile = service.Issue(record);
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, session).ProfilesToDeliver);
@@ -144,18 +144,18 @@ public sealed class AdministrationTests : IDisposable
     [Fact]
     public void ProfilesRoundTripAndOldProfileCannotWinAgainstCorrection()
     {
-        using var store = new SqliteAdministrationStore(DbPath); var record = Record() with { WindowsUsername = "", AccountId = "" }; store.SaveStudent(record, null); Directory.CreateDirectory(record.HomeDirectory);
+        using var store = new SqliteAdministrationStore(DbPath); var record = Record() with { WindowsUsername = "", AccountId = "" }; store.SaveStudent(record, null); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory));
         var distribution = new ProfileDistribution(store);
         var issued = distribution.Issue(record);
         var reader = new SignedProfileReader();
         Assert.Equal("verteilt", distribution.Distribute(record, issued).Status);
-        Assert.Equal(ProfileStatus.Verified, reader.Read(record.HomeDirectory, "demo-001", 2029).Status);
+        Assert.Equal(ProfileStatus.Verified, reader.Read(StudentFolderLayout.Data(record.HomeDirectory), "demo-001", 2029).Status);
         Assert.Equal("verteilt", distribution.Distribute(record, issued).Status); Assert.Empty(store.History("demo-001"));
         var corrected = record with { Version = 2, Student = record.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } }; store.SaveStudent(corrected, 1);
         Assert.Equal("veraltet", distribution.Distribute(corrected, issued).Status);
         var newer = distribution.Issue(corrected); Assert.Equal(2, newer.Profile.ProfileRevision);
         Assert.Equal("verteilt", distribution.Distribute(corrected, newer).Status);
-        Assert.Equal(Knowledge.Yes, reader.Read(record.HomeDirectory, "demo-001", 2029).Prerequisites.InformaticsImp);
+        Assert.Equal(Knowledge.Yes, reader.Read(StudentFolderLayout.Data(record.HomeDirectory), "demo-001", 2029).Prerequisites.InformaticsImp);
         Assert.Equal("veraltet", distribution.Distribute(record, issued).Status);
     }
     [Fact]
@@ -163,19 +163,19 @@ public sealed class AdministrationTests : IDisposable
     {
         using var store = new SqliteAdministrationStore(DbPath);
         var distribution = new ProfileDistribution(store); var records = Enumerable.Range(1, 100).Select(Record).ToArray();
-        foreach (var record in records) { store.SaveStudent(record, null); Directory.CreateDirectory(record.HomeDirectory); File.WriteAllText(Path.Combine(record.HomeDirectory, "aktuell.json"), "synthetic unchanged choice"); }
-        using var locked = new FileStream(Path.Combine(records[49].HomeDirectory, ".profil.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        foreach (var record in records) { store.SaveStudent(record, null); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory)); File.WriteAllText(Path.Combine(StudentFolderLayout.Data(record.HomeDirectory), "aktuell.json"), "synthetic unchanged choice"); }
+        using var locked = new FileStream(Path.Combine(StudentFolderLayout.Data(records[49].HomeDirectory), ".profil.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var reports = records.Select(r => distribution.Distribute(r, distribution.Issue(r))).ToArray();
         Assert.Equal(99, reports.Count(r => r.Status == "verteilt")); Assert.Single(reports, r => r.Status == "Zugriff_verweigert");
         Assert.Equal(100, store.DistributionLog().Length);
-        Assert.All(records, r => Assert.Equal("synthetic unchanged choice", File.ReadAllText(Path.Combine(r.HomeDirectory, "aktuell.json"))));
+        Assert.All(records, r => Assert.Equal("synthetic unchanged choice", File.ReadAllText(Path.Combine(StudentFolderLayout.Data(r.HomeDirectory), "aktuell.json"))));
     }
     [Fact]
     public void CorruptOrForeignProfileIsNotOverwritten()
     {
-        using var store = new SqliteAdministrationStore(DbPath); var record = Record(); store.SaveStudent(record, null); Directory.CreateDirectory(record.HomeDirectory);
+        using var store = new SqliteAdministrationStore(DbPath); var record = Record(); store.SaveStudent(record, null); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory));
         var distribution = new ProfileDistribution(store); var issued = distribution.Issue(record);
-        var path = Path.Combine(record.HomeDirectory, "profil.json"); File.WriteAllText(path, "broken");
+        var path = Path.Combine(StudentFolderLayout.Data(record.HomeDirectory), "profil.json"); File.WriteAllText(path, "broken");
         Assert.Equal("Profil_abweichend", distribution.Distribute(record, issued).Status); Assert.Equal("broken", File.ReadAllText(path));
     }
     public void Dispose() => Directory.Delete(root, true);

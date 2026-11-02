@@ -31,7 +31,7 @@ public sealed class DemoWorkspaceTests
                     Assert.DoesNotContain(s.Validation.Messages, m => m.Rule.Severity == ReviewStatus.Invalid);
                     Assert.False(s.RequiresReselection); Assert.Equal(3, s.Active!.Snapshot.Selections.Count(c => c.Type == CourseType.Lf));
                     Assert.Equal(SubmissionStatus.Draft, s.Active.Snapshot.SubmissionStatus);
-                    Assert.True(File.Exists(Path.Combine(s.Record.HomeDirectory, "profil.json"))); });
+                    Assert.True(File.Exists(Path.Combine(StudentFolderLayout.Data(s.Record.HomeDirectory), "profil.json"))); });
                 Assert.Equal(4, states.Select(s => s.Record.Student.ClassName).Distinct().Count());
                 var selections = states.SelectMany(s => s.Active!.Snapshot.Selections).ToArray();
                 foreach (var semesters in new[] { new[] { 1 }, new[] { 1, 2 }, new[] { 1, 2, 3, 4 } })

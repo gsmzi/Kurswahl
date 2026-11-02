@@ -55,22 +55,22 @@ public sealed class M3RegressionTests : IDisposable
     public void ChangingConfirmedFolderMustInvalidatePreviousDelivery()
     {
         using var store = new SqliteAdministrationStore(Path.Combine(root, "db.db"));
-        var record = Record(confirmed:true); Directory.CreateDirectory(record.HomeDirectory); store.SaveStudent(record, null);
+        var record = Record(confirmed:true); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory)); store.SaveStudent(record, null);
         var service = new ProfileDistribution(store); var profile = service.Issue(record);
         Assert.Equal("verteilt", service.Distribute(record,profile).Status);
         var moved = record with { Version = 2, ChangedAt = DateTimeOffset.UtcNow.AddSeconds(1), HomeDirectory = Path.Combine(root,"10b","Muster.Demo") };
         Directory.CreateDirectory(moved.HomeDirectory); store.SaveStudent(moved,1);
-        Assert.False(File.Exists(Path.Combine(moved.HomeDirectory,"profil.json")));
+        Assert.False(File.Exists(Path.Combine(StudentFolderLayout.Data(moved.HomeDirectory), "profil.json")));
         var summary = TeacherDashboardBuilder.Build(store,new TeacherSession(store,TestData.WorkflowCatalog,"demo-review"));
         Assert.Equal(0,summary.Delivered);
     }
     [AvaloniaFact]
     public async Task BackgroundCollectionMustPreserveExcludedConflict()
     {
-        var record = Record(confirmed:true); Directory.CreateDirectory(record.HomeDirectory); var workspace = Workspace(record);
+        var record = Record(confirmed:true); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory)); var workspace = Workspace(record);
         using(var store = workspace.OpenActive())
             new TeacherSession(store, TestData.WorkflowCatalog,"demo-review").Save(TestData.Choice,null,RevisionSource.TeacherEdit,"Demo Lehrerentscheidung");
-        File.WriteAllBytes(Path.Combine(record.HomeDirectory,"aktuell.json"),JsonDocuments.WriteChoice(TestData.Choice));
+        File.WriteAllBytes(Path.Combine(StudentFolderLayout.Data(record.HomeDirectory), "aktuell.json"),JsonDocuments.WriteChoice(TestData.Choice));
         var window = new TeacherWindow(workspace.Root);
         try
         {
@@ -102,9 +102,9 @@ public sealed class M3RegressionTests : IDisposable
     public void DistributionIntoStudentFolderMustBeFoundByStudentSettings()
     {
         using var store = new SqliteAdministrationStore(Path.Combine(root,"db.db"));
-        var record = Record(confirmed:true); Directory.CreateDirectory(record.HomeDirectory); store.SaveStudent(record,null);
+        var record = Record(confirmed:true); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory)); store.SaveStudent(record,null);
         var service = new ProfileDistribution(store); Assert.Equal("verteilt",service.Distribute(record,service.Issue(record),TestData.WorkflowCatalog).Status);
-        var settings = new StudentSettings(2,record.HomeDirectory,"","aktuell.json","{WAHLORDNER}/fachangebot.json","");
+        var settings = new StudentSettings(2, StudentFolderLayout.Data(record.HomeDirectory),"","aktuell.json","{WAHLORDNER}/fachangebot.json","");
         Assert.Equal(TestData.WorkflowCatalog.Version, JsonDocuments.ReadCatalog(File.ReadAllBytes(settings.ResolveCatalogPath(Path.Combine(root, "appsettings.json")))).Version);
         Assert.Equal(ProfileStatus.Verified,settings.ReadPersonalProfile(2029).Profile.Status);
     }
@@ -112,8 +112,8 @@ public sealed class M3RegressionTests : IDisposable
     public void SharedStudentConfigurationMustOpenSecondDistributedStudent()
     {
         using var store = new SqliteAdministrationStore(Path.Combine(root,"db.db"));
-        var record = Record("demo-002",true); Directory.CreateDirectory(record.HomeDirectory); store.SaveStudent(record,null);
+        var record = Record("demo-002",true); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory)); store.SaveStudent(record,null);
         var service = new ProfileDistribution(store); Assert.Equal("verteilt",service.Distribute(record,service.Issue(record),TestData.WorkflowCatalog).Status);
-        var settings = new StudentSettings(2, record.HomeDirectory, "", "aktuell.json", "{WAHLORDNER}/fachangebot.json", ""); var personal = settings.ReadPersonalProfile(2029); Assert.Equal("demo-002", personal.StudentId); Assert.Equal(ProfileStatus.Verified, personal.Profile.Status); Assert.Equal(ProfileStatus.ProfileInvalid, new SignedProfileReader().Read(record.HomeDirectory, "demo-001", 2029).Status);
+        var settings = new StudentSettings(2, StudentFolderLayout.Data(record.HomeDirectory), "", "aktuell.json", "{WAHLORDNER}/fachangebot.json", ""); var personal = settings.ReadPersonalProfile(2029); Assert.Equal("demo-002", personal.StudentId); Assert.Equal(ProfileStatus.Verified, personal.Profile.Status); Assert.Equal(ProfileStatus.ProfileInvalid, new SignedProfileReader().Read(StudentFolderLayout.Data(record.HomeDirectory), "demo-001", 2029).Status);
     }
 }

@@ -61,12 +61,12 @@ public class TeacherWindowTests
     public async Task AutomaticCollectionImportsOnceAndLeavesTeacherConflictsOpen()
     {
         var root = Path.Combine(Path.GetTempPath(), "gsm-auto-" + Guid.NewGuid());
-        var home = Path.Combine(root, "homes", "10a", "Muster.Demo"); Directory.CreateDirectory(home);
+        var home = Path.Combine(root, "homes", "10a", "Muster.Demo"); Directory.CreateDirectory(StudentFolderLayout.Data(home));
         var workspace = new TeacherWorkspace(root); workspace.Create(TestData.Catalog, "demo-beratung");
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
         using (var db = workspace.OpenActive())
             db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Muster", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "S-1-5-21-100-200-300-1", home, true, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
-        var path = Path.Combine(home, "aktuell.json");
+        var path = Path.Combine(StudentFolderLayout.Data(home), "aktuell.json");
         File.WriteAllBytes(path, GsmKurswahl.Storage.JsonDocuments.WriteChoice(TestData.Choice));
         var window = new TeacherWindow(root);
         var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
@@ -272,8 +272,8 @@ public class TeacherWindowTests
             }
             Click("Ziele prüfen und gemeinsame Verteilung vorbereiten");
             Click("1 Zuordnungen bestätigen und Schülerdateien verteilen");
-            Assert.True(File.Exists(Path.Combine(targetFolder, "profil.json")));
-            Assert.False(File.Exists(Path.Combine(targetFolder, "profil.sig")));
+            Assert.True(File.Exists(Path.Combine(StudentFolderLayout.Data(targetFolder), "profil.json")));
+            Assert.False(File.Exists(Path.Combine(StudentFolderLayout.Data(targetFolder), "profil.sig")));
             Assert.Equal(YearSetupStep.Complete, new TeacherWorkspace(root).Active!.Step);
         }
         finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }

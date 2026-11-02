@@ -87,3 +87,7 @@ Die Zwischenstände vom 02.11.2026 (optionale neue Felder bereits in v1-Dateien)
 - Die Append-only-Sperren gelten für alle Tabellen. Einzige Ausnahme ist die ausdrücklich bestätigte Löschfunktion; sie hebt die Sperre nur innerhalb ihrer Transaktion auf.
 
 Entfernt: `profile-trust.json`, `schemas/profile-signature.v1.schema.json` und die zugehörigen Modelltypen (Signaturkonzept seit 27.10.2026 aufgegeben). In der Lehrerdatenbank bleibt das stets leere Feld `signatureBytes` der Profilzeilen erhalten, weil die Zeilen unveränderlich sind.
+
+## Schulvorgaben v1 (02.11.2026)
+
+Neue, eigenständige Konfigurationsdatei `schulvorgaben.json` neben dem Lehrerprogramm: `schemaVersion` (1), `distributionRoot` (vollständiger Pfad oder leer), `studentProgramDirectory` (absolut, relativ zum Lehrerprogramm oder leer). Schema `schemas/school-defaults.v1.schema.json`; GSM-Datei `src/GsmKurswahl.TeacherApp/schulvorgaben.json` (in `Test-Schemas.ps1` geprüft, nur im veröffentlichten Lehrerprogramm). Nur gelesen, nie geschrieben; andere Versionen werden abgelehnt. Keine Änderung bestehender Formate.

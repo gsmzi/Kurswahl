@@ -39,8 +39,10 @@ public sealed class ProfileDistribution(IAdministrationStore store)
                 || !latest.ProfileBytes.SequenceEqual(issued.ProfileBytes))
                 throw new InvalidDataException("veraltet");
             if (!Path.IsPathFullyQualified(record.HomeDirectory) || !Directory.Exists(record.HomeDirectory)) throw new DirectoryNotFoundException();
-            using var lease = new FileStream(Path.Combine(record.HomeDirectory, ".profil.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            var path = Path.Combine(record.HomeDirectory, "profil.json");
+            // The home folder must exist; only our own Kurswahl/Daten below it is created.
+            var data = Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory)).FullName;
+            using var lease = new FileStream(Path.Combine(data, ".profil.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            var path = Path.Combine(data, "profil.json");
             var before = ReadExisting(path);
             if (before is not null)
             {
@@ -55,7 +57,7 @@ public sealed class ProfileDistribution(IAdministrationStore store)
             {
                 ModelGuard.Catalog(catalog);
                 if (catalog.GraduationYear != record.Student.GraduationYear) throw new InvalidDataException("Profil_abweichend");
-                var catalogPath = Path.Combine(record.HomeDirectory, "fachangebot.json");
+                var catalogPath = Path.Combine(data, "fachangebot.json");
                 var oldCatalog = ReadExisting(catalogPath);
                 if (oldCatalog is not null)
                 {
@@ -84,12 +86,10 @@ public sealed class ProfileDistribution(IAdministrationStore store)
         try
         {
             if (store is not SqliteAdministrationStore sql) throw new InvalidOperationException("Programmverteilung benötigt den lokalen Lehrerbestand.");
-            if (!Path.IsPathFullyQualified(sourceDirectory) || !Directory.Exists(sourceDirectory)) throw new ArgumentException("Programmordner nicht gefunden.");
-            if (!File.Exists(Path.Combine(sourceDirectory, "GsmKurswahl.StudentApp.exe")) && !File.Exists(Path.Combine(sourceDirectory, "GsmKurswahl.StudentApp.dll")))
-                throw new ArgumentException("Im Programmordner fehlt das Schülerprogramm.");
+            StudentProgramPackage.Validate(sourceDirectory);
             if (!record.MappingConfirmed || !Path.IsPathFullyQualified(record.HomeDirectory) || !Directory.Exists(record.HomeDirectory)) throw new DirectoryNotFoundException();
             var source = Path.GetFullPath(sourceDirectory);
-            var target = Path.Combine(record.HomeDirectory, StudentFolderCleanup.ProgramFolder);
+            var target = StudentFolderLayout.Program(record.HomeDirectory);
             if (target.StartsWith(source.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("Programmordner darf nicht im Schülerordner liegen.");
             var previous = sql.LatestProgramDelivery(record.Student.ExternalStudentId)?.Files.ToDictionary(f => f.Path, f => f.Sha256, StringComparer.OrdinalIgnoreCase) ?? [];
@@ -104,6 +104,10 @@ public sealed class ProfileDistribution(IAdministrationStore store)
                 if (current != StudentFolderCleanup.Token(bytes) && (!previous.TryGetValue(relative, out var known) || known != current))
                     throw new InvalidDataException("Programm_abweichend");
             }
+            var launcher = StudentFolderLayout.Launcher(record.HomeDirectory);
+            var launcherBytes = StudentFolderCleanup.LauncherBytes;
+            var existingLauncher = File.Exists(launcher) ? File.ReadAllBytes(launcher) : null;
+            if (existingLauncher is not null && !existingLauncher.AsSpan().SequenceEqual(launcherBytes)) throw new InvalidDataException("Programm_abweichend");
             foreach (var (relative, bytes) in files)
             {
                 var path = Path.Combine(target, relative);
@@ -116,6 +120,7 @@ public sealed class ProfileDistribution(IAdministrationStore store)
                 var path = Path.Combine(target, relative);
                 if (File.Exists(path) && StudentFolderCleanup.Token(File.ReadAllBytes(path)) == hash) File.Delete(path);
             }
+            if (existingLauncher is null) { Directory.CreateDirectory(Path.GetDirectoryName(launcher)!); Replace(launcher, launcherBytes, null); }
             sql.RecordProgramDelivery(new(1, Guid.NewGuid(), record.Student.ExternalStudentId, DateTimeOffset.UtcNow, StudentFolderCleanup.ProgramFolder,
                 [.. files.Select(f => new DeliveredFile(f.Relative, StudentFolderCleanup.Token(f.Bytes)))]));
         }

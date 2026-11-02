@@ -25,6 +25,8 @@ public sealed class App : Avalonia.Application
                 var folderIndex = Array.IndexOf(arguments, "--wahlordner");
                 var personalFolder = folderIndex >= 0 && folderIndex + 1 < arguments.Length
                     ? arguments[folderIndex + 1] : Environment.GetEnvironmentVariable("GSM_KURSWAHL_HOME");
+                if (string.IsNullOrWhiteSpace(personalFolder))
+                    personalFolder = StudentSettings.DeliveredChoiceDirectory(AppContext.BaseDirectory);
                 if (!string.IsNullOrWhiteSpace(personalFolder))
                     settings = settings with { HomeDirectory = personalFolder, ChoiceDirectory = "" };
                 var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(settings.ResolveCatalogPath(settingsPath)));

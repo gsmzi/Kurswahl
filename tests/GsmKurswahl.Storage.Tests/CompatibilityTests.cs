@@ -60,7 +60,7 @@ public sealed class CompatibilityTests : IDisposable
             [new("demo-001", true, T.AddDays(7), "Nachwahl")], true, 20, true, G2),
         "transfer-receipt" => new TransferReceipt(1, G1, "demo-001", G3, 2, "demo-2029-compat", "m2-2", T, "demo-beratung", true, "eingegeben"),
         "collected-file" => new CollectedFile(1, G1, "demo-001", T, "demo-beratung", "aktuell.json", StudentFolderCleanup.Token([123, 125]), [123, 125]),
-        "program-delivery" => new ProgramDelivery(1, G1, "demo-001", T, StudentFolderCleanup.ProgramFolder, [new("GsmKurswahl.StudentApp.exe", "AB")]),
+        "program-delivery" => new ProgramDelivery(1, G1, "demo-001", T, "Kurswahl-Programm", [new("GsmKurswahl.StudentApp.exe", "AB")]),
         "student-deletion" => new StudentDeletion(1, G1, G2, T, "demo-beratung", "Schulwechsel", 7, 1),
         "workspace-v2" => new TeacherWorkspaceDocument(TeacherWorkspace.CurrentSchema, 2029, [Year]),
         "transfer-v2" => new TransferManifest(TeacherWorkspace.CurrentSchema, T, Year with { DatabasePath = "verwaltung.db" }, new string('A', 64)),
@@ -276,18 +276,20 @@ public sealed class CompatibilityTests : IDisposable
         var home = Path.Combine(root, "home"); Directory.CreateDirectory(home);
         var record = Record with { HomeDirectory = home, Version = 1, Origin = null };
         store.SaveStudent(record, null);
-        var program = Path.Combine(root, "publish"); Directory.CreateDirectory(Path.Combine(program, "runtimes"));
+        var program = Path.Combine(root, "publish"); Directory.CreateDirectory(Path.Combine(program, "runtimes")); SchoolDefaultsTests.SelfContainedStub(program);
         File.WriteAllText(Path.Combine(program, "GsmKurswahl.StudentApp.exe"), "exe");
         File.WriteAllText(Path.Combine(program, "runtimes", "lib.dll"), "lib");
         var distribution = new ProfileDistribution(store);
         Assert.Equal("verteilt", distribution.Distribute(record, distribution.Issue(record), Catalog).Status);
         Assert.Equal("verteilt", distribution.DeliverProgram(record, program).Status);
-        Assert.Equal("exe", File.ReadAllText(Path.Combine(home, StudentFolderCleanup.ProgramFolder, "GsmKurswahl.StudentApp.exe")));
-        Assert.Equal(new DateOnly(2027, 3, 15), JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(home, "fachangebot.json"))).SubmissionDeadline);
+        Assert.Equal("exe", File.ReadAllText(Path.Combine(StudentFolderLayout.Program(home), "GsmKurswahl.StudentApp.exe")));
+        Assert.Equal(new DateOnly(2027, 3, 15), JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(StudentFolderLayout.Data(home), "fachangebot.json"))).SubmissionDeadline);
+        Assert.Equal(StudentFolderLayout.LauncherContent, File.ReadAllText(StudentFolderLayout.Launcher(home)));
+        Assert.Equal([StudentFolderLayout.RootFolder], Directory.EnumerateFileSystemEntries(home).Select(Path.GetFileName));
         // A pupil's own file inside the program folder is never removed.
-        File.WriteAllText(Path.Combine(home, StudentFolderCleanup.ProgramFolder, "notiz.txt"), "eigene Datei");
+        File.WriteAllText(Path.Combine(StudentFolderLayout.Program(home), "notiz.txt"), "eigene Datei");
 
-        var choicePath = Path.Combine(home, "aktuell.json");
+        var choicePath = Path.Combine(StudentFolderLayout.Data(home), "aktuell.json");
         var choiceBytes = JsonDocuments.WriteChoice(Choice with { StudentId = "demo-001" });
         File.WriteAllBytes(choicePath, choiceBytes);
         var notCollected = StudentFolderCleanup.Clean(store, store.Students().Single(), "demo-beratung", new HashSet<string>());
@@ -300,13 +302,51 @@ public sealed class CompatibilityTests : IDisposable
         var result = StudentFolderCleanup.Clean(store, store.Students().Single(), "demo-beratung", new HashSet<string>());
         Assert.Equal("teilweise", result.Status);
         Assert.Contains("notiz.txt", result.Detail);
-        Assert.False(File.Exists(choicePath)); Assert.False(File.Exists(Path.Combine(home, "profil.json"))); Assert.False(File.Exists(Path.Combine(home, "fachangebot.json")));
-        Assert.False(File.Exists(Path.Combine(home, StudentFolderCleanup.ProgramFolder, "GsmKurswahl.StudentApp.exe")));
-        Assert.False(Directory.Exists(Path.Combine(home, StudentFolderCleanup.ProgramFolder, "runtimes")));
-        Assert.True(File.Exists(Path.Combine(home, StudentFolderCleanup.ProgramFolder, "notiz.txt")));
+        Assert.False(File.Exists(choicePath)); Assert.False(File.Exists(Path.Combine(StudentFolderLayout.Data(home), "profil.json"))); Assert.False(File.Exists(Path.Combine(StudentFolderLayout.Data(home), "fachangebot.json")));
+        Assert.False(File.Exists(Path.Combine(StudentFolderLayout.Program(home), "GsmKurswahl.StudentApp.exe")));
+        Assert.False(Directory.Exists(Path.Combine(StudentFolderLayout.Program(home), "runtimes")));
+        Assert.True(File.Exists(Path.Combine(StudentFolderLayout.Program(home), "notiz.txt")));
+        Assert.False(File.Exists(StudentFolderLayout.Launcher(home)));
+        Assert.False(Directory.Exists(StudentFolderLayout.Data(home)));
         var archived = store.CollectedFiles("demo-001");
         Assert.Equal(choiceBytes, archived.Single(f => f.FileName == "aktuell.json").Content);
         Assert.Contains(archived, f => f.FileName == "profil.json");
+    }
+
+    [Fact]
+    public void FinalCollectionRemovesWholeKurswahlFolderButKeepsHome()
+    {
+        using var store = new SqliteAdministrationStore(Path.Combine(root, "admin.db"));
+        var home = Path.Combine(root, "home"); Directory.CreateDirectory(home);
+        File.WriteAllText(Path.Combine(home, "eigenes.txt"), "Schülerdatei");
+        var record = Record with { HomeDirectory = home, Version = 1, Origin = null };
+        store.SaveStudent(record, null);
+        var program = Path.Combine(root, "publish"); Directory.CreateDirectory(program); SchoolDefaultsTests.SelfContainedStub(program);
+        File.WriteAllText(Path.Combine(program, "GsmKurswahl.StudentApp.exe"), "exe");
+        var distribution = new ProfileDistribution(store);
+        Assert.Equal("verteilt", distribution.Distribute(record, distribution.Issue(record), Catalog).Status);
+        Assert.Equal("verteilt", distribution.DeliverProgram(record, program).Status);
+        Assert.True(File.Exists(Path.Combine(StudentFolderLayout.Data(home), "profil.json")));
+
+        var result = StudentFolderCleanup.Clean(store, store.Students().Single(), "demo-beratung", new HashSet<string>());
+        Assert.Equal("geräumt", result.Status);
+        Assert.False(Directory.Exists(StudentFolderLayout.Root(home)));
+        Assert.Equal("Schülerdatei", File.ReadAllText(Path.Combine(home, "eigenes.txt")));
+    }
+
+    [Fact]
+    public void ChangedLauncherIsNeitherReplacedNorRemoved()
+    {
+        using var store = new SqliteAdministrationStore(Path.Combine(root, "admin.db"));
+        var home = Path.Combine(root, "home"); Directory.CreateDirectory(StudentFolderLayout.Root(home));
+        File.WriteAllText(StudentFolderLayout.Launcher(home), "fremd");
+        var record = Record with { HomeDirectory = home, Version = 1, Origin = null };
+        store.SaveStudent(record, null);
+        var program = Path.Combine(root, "publish"); Directory.CreateDirectory(program); SchoolDefaultsTests.SelfContainedStub(program);
+        File.WriteAllText(Path.Combine(program, "GsmKurswahl.StudentApp.exe"), "exe");
+        Assert.Equal("Programm_abweichend", new ProfileDistribution(store).DeliverProgram(record, program).Status);
+        Assert.Equal("teilweise", StudentFolderCleanup.Clean(store, store.Students().Single(), "demo-beratung", new HashSet<string>()).Status);
+        Assert.Equal("fremd", File.ReadAllText(StudentFolderLayout.Launcher(home)));
     }
 
     [Fact]
@@ -316,15 +356,15 @@ public sealed class CompatibilityTests : IDisposable
         var home = Path.Combine(root, "home"); Directory.CreateDirectory(home);
         var record = Record with { HomeDirectory = home, Version = 1, Origin = null };
         store.SaveStudent(record, null);
-        var program = Path.Combine(root, "publish"); Directory.CreateDirectory(program);
+        var program = Path.Combine(root, "publish"); Directory.CreateDirectory(program); SchoolDefaultsTests.SelfContainedStub(program);
         File.WriteAllText(Path.Combine(program, "GsmKurswahl.StudentApp.exe"), "v1");
         var distribution = new ProfileDistribution(store);
         Assert.Equal("verteilt", distribution.DeliverProgram(record, program).Status);
         File.WriteAllText(Path.Combine(program, "GsmKurswahl.StudentApp.exe"), "v2");
         Assert.Equal("verteilt", distribution.DeliverProgram(record, program).Status);
-        File.WriteAllText(Path.Combine(home, StudentFolderCleanup.ProgramFolder, "GsmKurswahl.StudentApp.exe"), "fremd");
+        File.WriteAllText(Path.Combine(StudentFolderLayout.Program(home), "GsmKurswahl.StudentApp.exe"), "fremd");
         File.WriteAllText(Path.Combine(program, "GsmKurswahl.StudentApp.exe"), "v3");
         Assert.Equal("Programm_abweichend", distribution.DeliverProgram(record, program).Status);
-        Assert.Equal("fremd", File.ReadAllText(Path.Combine(home, StudentFolderCleanup.ProgramFolder, "GsmKurswahl.StudentApp.exe")));
+        Assert.Equal("fremd", File.ReadAllText(Path.Combine(StudentFolderLayout.Program(home), "GsmKurswahl.StudentApp.exe")));
     }
 }

@@ -166,6 +166,7 @@ public sealed partial class TeacherWindow
     private string DeliverProgramIfConfigured(ProfileDistribution service, StudentRecord record)
     {
         var directory = workspace?.Active?.StudentProgramDirectory;
+        if (string.IsNullOrWhiteSpace(directory)) directory = SchoolPresets().StudentProgramDirectory;
         if (string.IsNullOrWhiteSpace(directory)) return "";
         var current = store!.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId);
         var result = service.DeliverProgram(current, directory);
@@ -183,8 +184,9 @@ public sealed partial class TeacherWindow
             {
                 try
                 {
-                    var path = Path.Combine(record.HomeDirectory, "aktuell.json");
-                    var loaded = await Task.Run(async () => await new JsonChoiceStore(path, record.HomeDirectory).LoadAsync());
+                    var data = StudentFolderLayout.Data(record.HomeDirectory);
+                    var path = Path.Combine(data, "aktuell.json");
+                    var loaded = await Task.Run(async () => await new JsonChoiceStore(path, data).LoadAsync());
                     if (session != activeSession || store != activeStore) return;
                     if (loaded is null) continue;
                     var preview = activeSession.Preview(loaded.Choice, record.Student.ExternalStudentId, new(path, loaded.ContentToken, "m3-choice-v1", DateTimeOffset.UtcNow, record.WindowsUsername));
