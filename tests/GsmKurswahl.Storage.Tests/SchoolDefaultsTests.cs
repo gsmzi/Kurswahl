@@ -19,7 +19,7 @@ public sealed class SchoolDefaultsTests : IDisposable
 
     [Fact] public void MissingFileMeansNoPresets() => Assert.Equal(SchoolDefaults.None, SchoolDefaults.Load(root));
 
-    [Fact] public void CheckedInGsmPresetsAreValid()
+    [WindowsFact] public void CheckedInGsmPresetsAreValid()
     {
         var teacher = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../src/GsmKurswahl.TeacherApp"));
         var defaults = SchoolDefaults.Load(teacher);
@@ -27,7 +27,7 @@ public sealed class SchoolDefaultsTests : IDisposable
         Assert.Equal(Path.GetFullPath(Path.Combine(teacher, "..", "StudentApp")), defaults.StudentProgramDirectory);
     }
 
-    [Fact] public void RelativeProgramFolderIsResolvedNextToTeacherProgram()
+    [WindowsFact] public void RelativeProgramFolderIsResolvedNextToTeacherProgram()
     {
         var teacher = Path.Combine(root, "TeacherApp"); Directory.CreateDirectory(teacher);
         File.WriteAllText(Path.Combine(teacher, SchoolDefaults.FileName),

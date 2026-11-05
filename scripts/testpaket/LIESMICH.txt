@@ -1,0 +1,67 @@
+GSM-Kurswahl – Testpaket
+========================
+
+Nur zum Ausprobieren. Alle Personen sind erfunden. Bitte keine echten
+Schülerdaten eintragen. Dieses Paket ist keine Produktivfreigabe.
+
+
+So geht's
+---------
+
+1. ZIP-Datei vollständig entpacken, am besten auf die lokale Festplatte
+   (nicht direkt aus dem ZIP starten, nicht auf ein Netzlaufwerk).
+2. Eine der .cmd-Dateien doppelklicken. Windows braucht kein .NET und keine
+   Installation.
+
+Meldet Windows „Der Computer wurde durch Windows geschützt“, auf
+„Weitere Informationen“ und dann „Trotzdem ausführen“ klicken. Ist das nicht
+möglich, bitte kurz bei der Person melden, von der du das Paket hast.
+
+Der allererste Start kann ein bis zwei Minuten dauern, jeder neue Stand danach
+rund 15 Sekunden. Ein schon vorbereiteter Stand öffnet sich nach wenigen Sekunden.
+
+
+Die Stände
+----------
+
+Lehrerprogramm:
+
+  Lehrer 1   Ganz am Anfang: Der Einrichtungsassistent startet. Der Ordner mit
+             der Schülerliste schuelerliste-80.csv öffnet sich automatisch.
+             Beim Import diese Datei wählen.
+  Lehrer 2   80 Schüler importiert, Dateien noch nicht verteilt.
+  Lehrer 3   Ausgeteilt, noch keine Wahl da.
+  Lehrer 4   60 von 80 Schülern haben gewählt. Das Lehrerprogramm liest die
+             Wahlen beim Öffnen selbst ein.
+  Lehrer 5   Alle 80 Wahlen eingesammelt, Kursplanung vorbereitet.
+  Lehrer 6   BIO LF bilingual gestrichen, Nachwahl offen.
+
+Schülerprogramm:
+
+  Schueler 1   Blanko: noch keine Wahl.
+  Schueler 2   Wahl angefangen: drei Leistungsfächer stehen.
+  Schueler 3   Wahl fertig.
+  Schueler 4   Blanko mit Bili, Informatik und Italienisch.
+  Schueler 5   Blanko mit Sportbefreiung in Halbjahr 3 und 4.
+
+Lehrer und Schüler zusammen:
+
+  Durchlauf - Schueler zu Lehrer 3
+             Öffnet das Schülerprogramm von Testperson 001 aus Stand Lehrer 3.
+             Dort wählen und speichern, dann „Lehrer 3“ starten: Die Wahl kommt
+             im Lehrerprogramm an (beim Öffnen oder spätestens nach einer Minute).
+
+
+Änderungen und Neustart
+-----------------------
+
+Jeder Stand ist getrennt. Änderungen bleiben erhalten, auch nach dem Schließen.
+Um wieder bei null zu beginnen: alle Programmfenster schließen und
+„Alles zuruecksetzen.cmd“ starten. Das löscht alle Testdaten dieses Pakets.
+
+„Testdaten-Ordner oeffnen.cmd“ zeigt, wo die Dateien liegen. Die normale
+Lehrerverwaltung und das Laufwerk M: werden von diesem Paket nicht berührt.
+
+Beim Verteilen im Testpaket wird das Schülerprogramm nicht in jeden Ordner
+kopiert, sonst wären es rund 8 GB. Den Einstieg für Schüler bilden hier die
+Schueler-Dateien.

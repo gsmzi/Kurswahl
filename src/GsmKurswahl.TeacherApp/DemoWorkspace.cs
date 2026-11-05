@@ -33,19 +33,9 @@ public static class DemoWorkspace
             store.SaveStudent(record, null);
             var delivery = distribution.Distribute(record, distribution.Issue(record), catalog);
             if (delivery.Status != "verteilt") throw new IOException("Demo-Verteilung fehlgeschlagen: " + delivery.Status);
-            var path = Path.Combine(StudentFolderLayout.Data(folder), "aktuell.json");
-            var bytes = JsonDocuments.WriteChoice(row.Choice);
-            using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            { stream.Write(bytes); stream.Flush(true); }
-            var contentToken = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
-            var preview = session.Preview(row.Choice, row.Choice.StudentId, new(path, contentToken, "demo-80-v1", DateTimeOffset.UtcNow, ""));
-            session.Confirm(preview, true, false, "Synthetischer Testbestand; strukturell geprüft, keine verbindliche Abgabe");
+            Collect(session, row.Choice, WriteChoice(folder, row.Choice));
         }
-        var baseline = CoursePlanning.Capture(store, catalog, "demo-generator", "Ausgangsstand · 80 synthetische Schüler", true);
-        store.SavePlanningDocument(baseline);
-        store.SavePlanningDocument(baseline with { Id = Guid.NewGuid(), Name = "Vergleich · ohne voraussichtliche Abgänger", IncludeExpectedDepartures = false });
-        var scenario = CoursePlanning.PreviewCancellation(baseline, ["BIO-LF-BILI"]);
-        store.SavePlanningDocument(CoursePlanning.Scenario(scenario, "Szenario · BIO LF bilingual entfällt"));
+        var baseline = SavePlanning(store, catalog);
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
         var overview = new { students = students.Length, active = 68, expectedDepartures = 8, confirmedDepartures = 4,
             invalidChoices = 0, status = "needs_review", detail = "Strukturell geprüft; fachliche Jahrgangsfreigabe bleibt offen.",
@@ -68,5 +58,28 @@ public static class DemoWorkspace
             unverändert; eigene Experimente werden nicht zurückgesetzt.
             """);
         File.WriteAllText(marker, "GSM-DEMO-80-v1");
+    }
+    // Places a pupil's choice file exactly where the pupil program would have saved it.
+    internal static string WriteChoice(string home, CourseChoice choice)
+    {
+        var path = Path.Combine(StudentFolderLayout.Data(home), "aktuell.json");
+        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        stream.Write(JsonDocuments.WriteChoice(choice)); stream.Flush(true);
+        return path;
+    }
+    internal static void Collect(TeacherSession session, CourseChoice choice, string path)
+    {
+        var contentToken = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+        var preview = session.Preview(choice, choice.StudentId, new(path, contentToken, "demo-80-v1", DateTimeOffset.UtcNow, ""));
+        session.Confirm(preview, true, false, "Synthetischer Testbestand; strukturell geprüft, keine verbindliche Abgabe");
+    }
+    internal static PlanningDocument SavePlanning(SqliteAdministrationStore store, OfferCatalog catalog)
+    {
+        var baseline = CoursePlanning.Capture(store, catalog, "demo-generator", "Ausgangsstand · 80 synthetische Schüler", true);
+        store.SavePlanningDocument(baseline);
+        store.SavePlanningDocument(baseline with { Id = Guid.NewGuid(), Name = "Vergleich · ohne voraussichtliche Abgänger", IncludeExpectedDepartures = false });
+        var scenario = CoursePlanning.PreviewCancellation(baseline, ["BIO-LF-BILI"]);
+        store.SavePlanningDocument(CoursePlanning.Scenario(scenario, "Szenario · BIO LF bilingual entfällt"));
+        return baseline;
     }
 }

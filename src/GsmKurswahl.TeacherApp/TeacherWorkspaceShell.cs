@@ -81,9 +81,10 @@ public sealed partial class TeacherWindow
         pageHost.Content = Scroll(panel); status.Text = "Keine Änderungen am gespeicherten Bestand.";
     }
     // School presets beside the teacher program; a broken file only disables the presets and is reported.
+    // A test stage brings its own file, so it can never preselect the real school drive.
     private SchoolDefaults SchoolPresets()
     {
-        try { return SchoolDefaults.Load(AppContext.BaseDirectory); }
+        try { return SchoolDefaults.Load(explicitWorkspaceRoot is not null && File.Exists(Path.Combine(explicitWorkspaceRoot, SchoolDefaults.FileName)) ? explicitWorkspaceRoot : AppContext.BaseDirectory); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
         { status.Text = SchoolDefaults.FileName + " nicht verwendet: " + ex.Message; return SchoolDefaults.None; }
     }

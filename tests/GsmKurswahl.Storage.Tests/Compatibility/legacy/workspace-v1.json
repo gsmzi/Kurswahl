@@ -75,7 +75,7 @@
           }
         ]
       },
-      "databasePath": "C:\\Demo\\Abitur-2029\u000berwaltung.db",
+      "databasePath": "C:\\Demo\\Abitur-2029\\verwaltung.db",
       "step": "complete",
       "actor": "demo-beratung",
       "certificateThumbprint": "",

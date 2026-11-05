@@ -117,6 +117,24 @@ Vier Klassen (10a–10d) mit je 20 Personen, 16 LF-Kombinationen, normale/biling
 
 Alle 80 Wahlen werden beim Erzeugen mit dem produktiven Regelkern auf Invalid-Meldungen geprüft. Sie sind strukturell vollständig; `needs_review` bleibt wegen offener Jahrgangsfreigabe bestehen. Keine verbindliche Abgabe wird fingiert. Daten ausschließlich synthetisch. Das Startskript baut bei fehlender EXE mit .NET 10; nach Quellcodeänderungen die Testversion wie oben beschrieben neu bauen.
 
+## Testpaket für Kolleginnen und Kollegen
+
+`Testpaket-bauen.cmd` doppelklicken (benötigt das .NET-10-SDK). Es entsteht `artifacts/testpaket/GSM-Kurswahl-Testpaket-<Datum>.zip` mit beiden Programmen (selbstenthaltend, keine Installation nötig) und einer `.cmd`-Datei je Stand. Auf dem Testrechner entpacken und den gewünschten Stand doppelklicken; `LIESMICH.txt` im Paket erklärt die Bedienung.
+
+| Stand | Inhalt |
+| --- | --- |
+| Lehrer 1 | Ganz am Anfang: Einrichtungsassistent, Schülerliste und leere Klassenordner liegen bereit |
+| Lehrer 2 | 80 Schüler importiert, nichts verteilt |
+| Lehrer 3 | Profile und Fachangebot verteilt, keine Wahl |
+| Lehrer 4 | 60 von 80 Wahlen liegen in den Schülerordnern, das Programm liest sie beim Öffnen ein |
+| Lehrer 5 | Alle 80 Wahlen eingesammelt, Kursplanung vorbereitet |
+| Lehrer 6 | BIO LF bilingual gestrichen, Nachwahl offen |
+| Schüler 1–3 | Blanko, Wahl angefangen, Wahl fertig |
+| Schüler 4–5 | Blanko mit Bili/INF/Italienisch, Blanko mit Sportbefreiung |
+| Durchlauf | Schüler aus Stand Lehrer 3: wählen, danach kommt die Wahl in Lehrer 3 an |
+
+Die Stände entstehen erst beim ersten Start auf dem Testrechner, weil der Lehrerbestand absolute Ordnerpfade speichert; das Paket enthält daher keine Datenbank. Die Lehrerstände nutzen dieselben Import-, Verteil- und Sammeldienste wie der echte Ablauf (`DemoStages.cs`). Daten liegen unter `%LOCALAPPDATA%\GSM-Kurswahl-Testpaket`, je Stand ein eigener Ordner. Änderungen bleiben erhalten, bis `Alles zuruecksetzen.cmd` läuft. Der normale Verwaltungsort wird nicht berührt, und das Paket enthält keine `schulvorgaben.json`: Jeder Stand bringt eigene Vorgaben mit, damit nie das Schullaufwerk vorbelegt ist. Das Schülerprogramm wird in den Ständen nicht in die 80 Ordner kopiert (rund 8 GB). Neue Stände: Eintrag in `DemoStages.All` und in der Tabelle in `scripts/Publish-Testpaket.ps1`.
+
 ## Arbeitsphasen und kompakte Kursplanung (28.10.2026)
 
 Die obere Navigation lautet jetzt **Übersicht → Wahl → Wahlergebnisse → Kursplanung**. Unter Wahl stehen Fachauswahl, Schülerimport/Vorbildung, Verteilung und Einsammeln bereit. Nur dort wird der vierstufige Verlauf angezeigt. Jahrgangsverwaltung liegt unter Einstellungen.
