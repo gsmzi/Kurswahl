@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "id": "11111111-1111-1111-1111-111111111111",
+  "createdAt": "2026-11-02T08:00:00+00:00",
+  "name": "Ausgangsstand",
+  "actor": "demo-beratung",
+  "ruleVersion": "m2-2",
+  "catalog": {
+    "schemaVersion": 2,
+    "version": "demo-2029-compat",
+    "graduationYear": 2029,
+    "isDemo": true,
+    "subjects": [
+      {
+        "id": "D",
+        "name": "Deutsch"
+      },
+      {
+        "id": "NEU",
+        "name": "Neues Fach",
+        "taskField": 3,
+        "isScience": true
+      }
+    ],
+    "offers": [
+      {
+        "id": "D-LF",
+        "subjectId": "D",
+        "type": "lf",
+        "variant": "normal",
+        "status": "offered",
+        "schedule": [
+          {
+            "semester": 1,
+            "weeklyHours": 3
+          },
+          {
+            "semester": 2,
+            "weeklyHours": 3
+          },
+          {
+            "semester": 3,
+            "weeklyHours": 3
+          },
+          {
+            "semester": 4,
+            "weeklyHours": 3
+          }
+        ],
+        "requirements": []
+      },
+      {
+        "id": "NEU-BF",
+        "subjectId": "NEU",
+        "type": "bf",
+        "variant": "bilingual",
+        "status": "planned",
+        "schedule": [
+          {
+            "semester": 1,
+            "weeklyHours": 3
+          },
+          {
+            "semester": 2,
+            "weeklyHours": 3
+          },
+          {
+            "semester": 3,
+            "weeklyHours": 3
+          },
+          {
+            "semester": 4,
+            "weeklyHours": 3
+          }
+        ],
+        "requirements": [
+          "continuous_bilingual"
+        ]
+      }
+    ],
+    "submissionDeadline": "2027-03-15"
+  },
+  "students": [
+    {
+      "schemaVersion": 2,
+      "student": {
+        "id": "22222222-2222-2222-2222-222222222222",
+        "externalStudentId": "demo-001",
+        "syntheticDisplayName": "Demo Eins",
+        "className": "10a",
+        "graduationYear": 2029,
+        "departure": "expected_departure",
+        "prerequisites": {
+          "italianProfile": "yes",
+          "informaticsBridge": "no",
+          "informaticsImp": "unknown",
+          "continuousBilingual": "yes",
+          "religionEthicsGrade10": "KR",
+          "sportExemptSemesters": [
+            1
+          ],
+          "continuedLanguages": [
+            "E",
+            "F"
+          ],
+          "religionEthicsPermission": "yes",
+          "religionEthicsExamPermission": "no",
+          "permanentSportExemption": "no"
+        },
+        "firstName": "Demo",
+        "lastName": "Eins"
+      },
+      "windowsUsername": "DEMO\\eins",
+      "accountId": "",
+      "homeDirectory": "C:\\Demo\\10a\\Eins.Demo",
+      "mappingConfirmed": true,
+      "version": 2,
+      "actor": "demo-beratung",
+      "changedAt": "2026-11-02T08:00:00+00:00",
+      "origin": {
+        "sourceId": "klasse10.csv",
+        "contentHash": "ABC",
+        "mappingVersion": "map-1",
+        "importedAt": "2026-11-02T08:00:00+00:00",
+        "authenticatedAccount": "DEMO\\beratung"
+      }
+    }
+  ],
+  "choices": [
+    {
+      "id": "33333333-3333-3333-3333-333333333333",
+      "previousRevisionId": "11111111-1111-1111-1111-111111111111",
+      "studentId": "demo-001",
+      "changedAt": "2026-11-02T08:00:00+00:00",
+      "actorId": "demo-beratung",
+      "actorRole": "teacher",
+      "source": "teacher_edit",
+      "reason": "Korrektur",
+      "offerVersion": "demo-2029-compat",
+      "ruleVersion": "m2-2",
+      "snapshot": {
+        "schemaVersion": 2,
+        "documentId": "11111111-1111-1111-1111-111111111111",
+        "studentId": "demo-001",
+        "graduationYear": 2029,
+        "offerVersion": "demo-2029-compat",
+        "ruleVersion": "m2-2",
+        "revision": 3,
+        "createdAt": "2026-11-02T08:00:00+00:00",
+        "updatedAt": "2026-11-02T09:00:00+00:00",
+        "submissionStatus": "draft",
+        "phase": "preliminary",
+        "selections": [
+          {
+            "offerId": "D-LF",
+            "subjectId": "D",
+            "type": "lf",
+            "variant": "normal",
+            "semesters": [
+              1,
+              2,
+              3,
+              4
+            ]
+          }
+        ],
+        "plannedOralSubjects": [
+          "D",
+          "NEU"
+        ]
+      },
+      "changes": [
+        {
+          "offerId": "D-LF",
+          "before": [],
+          "after": [
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "importOrigin": {
+        "sourceId": "aktuell.json",
+        "contentHash": "ABC",
+        "mappingVersion": "m3-choice-v1",
+        "importedAt": "2026-11-02T08:00:00+00:00",
+        "authenticatedAccount": "DEMO\\eins"
+      }
+    }
+  ],
+  "followUps": [
+    {
+      "studentId": "demo-001",
+      "required": true,
+      "deadline": "2026-11-09T08:00:00+00:00",
+      "note": "Nachwahl"
+    }
+  ],
+  "includeExpectedDepartures": true,
+  "targetGroupSize": 20,
+  "isScenario": true,
+  "basisId": "22222222-2222-2222-2222-222222222222"
+}

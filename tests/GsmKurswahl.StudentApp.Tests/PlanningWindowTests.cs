@@ -63,7 +63,7 @@ public sealed class PlanningWindowTests
             {
                 var document = System.Xml.Linq.XDocument.Load(xml);
                 System.Xml.Linq.XNamespace w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-                Assert.Single(document.Descendants(w + "pageBreakBefore"));
+                Assert.Equal(2, document.Descendants(w + "sectPr").Count());
                 Assert.Equal(2, document.Descendants(w + "tbl").Count());
                 Assert.Contains("Demo Eins", document.ToString()); Assert.Contains("Demo Zwei", document.ToString());
             }

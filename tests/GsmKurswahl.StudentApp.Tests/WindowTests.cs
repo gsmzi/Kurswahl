@@ -66,29 +66,74 @@ public class WindowTests
         finally { await session.SaveAsync(); window.Close(); }
     }
 
-    [AvaloniaFact]
-    public void ContinuingReligionHasNoBlanketBadgeAndSwitchToEthicsShowsAction()
+    [AvaloniaTheory]
+    [InlineData(ProfileStatus.Verified)]
+    [InlineData(ProfileStatus.Missing)]
+    [InlineData(ProfileStatus.Unverified)]
+    [InlineData(ProfileStatus.ProfileInvalid)]
+    public void UnknownReligionOffersEverySubjectWithVisibleReviewHint(ProfileStatus status)
     {
         var catalog = TestData.WorkflowCatalog with
         {
-            Subjects = TestData.WorkflowCatalog.Subjects.Add(new("KR", "Katholische Religion")),
-            Offers = TestData.WorkflowCatalog.Offers.Add(TestData.Offer("KR-BF", "KR"))
+            Subjects = [.. TestData.WorkflowCatalog.Subjects, new("KR", "Katholische Religion"), new("ER", "Evangelische Religion")],
+            Offers = [.. TestData.WorkflowCatalog.Offers, TestData.Offer("KR-BF", "KR"), TestData.Offer("ER-BF", "ER")]
         };
-        var profile = new ProfileContext(ProfileStatus.Verified, PriorEducation.Unknown with { ReligionEthicsGrade10 = "KR" });
+        var profile = new ProfileContext(status, PriorEducation.Unknown with { ReligionEthicsPermission = Knowledge.Yes });
         var session = new StudentSession(catalog, "demo-001", new UiMemoryStore(), profile);
         var window = new MainWindow(session, "demo.json", "demo-account");
         try
         {
             window.Show();
             foreach (var subject in new[] { "E", "BIO", "W" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
-            session.NextStep(); session.NextStep();
-            session.ChooseTaskOption("PLAN-AREA-RELIGION", "KR-BF", true);
-            Assert.Null(session.Plan.Single(r => r.OfferId == "KR-BF").Issue);
+            session.NextStep();
+            Assert.Contains("ER", session.OralCandidates); Assert.Contains("KR", session.OralCandidates);
+            session.NextStep();
+            window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "Task_PLAN_AREA_RELIGION")
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            foreach (var subject in new[] { "ER", "KR", "ETH" })
+                Assert.True(window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == $"Option_{subject}_BF").IsEnabled);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("beide Religionsfächer vorläufig wählbar") == true);
+            foreach (var subject in new[] { "ER", "KR" })
+            {
+                window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == $"Option_{subject}_BF").IsChecked = true;
+                Assert.Contains(session.Choice.Selections, s => s.SubjectId == subject);
+                var row = session.Plan.Single(r => r.OfferId == subject + "-BF");
+                Assert.Equal(ReviewStatus.NeedsReview, row.Issue);
+                Assert.Contains("PREREQUISITE-UNKNOWN", row.IssueText);
+            }
+        }
+        finally { session.SaveAsync().GetAwaiter().GetResult(); window.Close(); }
+    }
+
+    [AvaloniaTheory]
+    [InlineData("ER", "KR")]
+    [InlineData("KR", "ER")]
+    public void ContinuingReligionHasNoBlanketBadgeAndSwitchToEthicsShowsAction(string grade10, string other)
+    {
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = [.. TestData.WorkflowCatalog.Subjects, new("KR", "Katholische Religion"), new("ER", "Evangelische Religion")],
+            Offers = [.. TestData.WorkflowCatalog.Offers, TestData.Offer("KR-BF", "KR"), TestData.Offer("ER-BF", "ER")]
+        };
+        var profile = new ProfileContext(ProfileStatus.Verified, PriorEducation.Unknown with { ReligionEthicsGrade10 = grade10 });
+        var session = new StudentSession(catalog, "demo-001", new UiMemoryStore(), profile);
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            foreach (var subject in new[] { "E", "BIO", "W" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
+            session.NextStep();
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<ToggleButton>(), b => b.Name == "Oral_" + other);
+            session.NextStep();
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<ToggleButton>(), b => b.Name == "Option_" + other + "_BF");
+            Assert.Contains(grade10 + "-BF", session.Tasks.Single(t => t.Id == "PLAN-AREA-RELIGION").OptionOfferIds);
+            session.ChooseTaskOption("PLAN-AREA-RELIGION", grade10 + "-BF", true);
+            Assert.Null(session.Plan.Single(r => r.OfferId == grade10 + "-BF").Issue);
             session.NextStep();
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<ToggleButton>(), b => b.Name == "Offer_ETH_BF");
             session.GoToStep(3);
             session.ChooseTaskOption("PLAN-AREA-RELIGION", "ETH-BF", true);
-            Assert.DoesNotContain(session.Choice.Selections, s => s.SubjectId == "KR");
+            Assert.DoesNotContain(session.Choice.Selections, s => s.SubjectId == grade10);
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Austritt aus Religionsunterricht muss beantragt werden.") == true);
             session.NextStep(); session.NextStep();
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig.") == true);

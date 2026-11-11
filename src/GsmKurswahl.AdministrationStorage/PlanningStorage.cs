@@ -51,6 +51,21 @@ public sealed partial class SqliteAdministrationStore
     }
     public DateTimeOffset? PlanningCatalogChangedAt() => PlanningEnabled
         ? Read<PlanningDecision>("SELECT body FROM planning_decisions ORDER BY seq DESC LIMIT 1").FirstOrDefault()?.At : null;
+    public void SaveCourseAnnotations(OfferCatalog expected, OfferCatalog next, string actor)
+    {
+        RequirePlanning(); ModelGuard.Catalog(next);
+        var withoutChanges = next with { Offers = [.. next.Offers.Select(o => expected.Offers.FirstOrDefault(e => e.Id == o.Id) is { } old
+            ? o with { CooperationSchool = old.CooperationSchool, IsTopUpCourse = old.IsTopUpCourse } : o)] };
+        if (string.IsNullOrWhiteSpace(actor) || Json(withoutChanges) != Json(expected))
+            throw new ArgumentException("Nur Kursmarkierungen dürfen hier geändert werden.");
+        using var tx = db.BeginTransaction();
+        if (ActivePlanningCatalog() is { } current && Json(current) != Json(expected))
+            throw new InvalidOperationException("Fachangebot inzwischen geändert. Jahrgang neu öffnen.");
+        // Append a full catalog snapshot; no pupil revisions or follow-up changes.
+        Execute("INSERT INTO planning_decisions(body) VALUES($p0)", Json(new PlanningDecision(1, Guid.NewGuid(), DateTimeOffset.UtcNow,
+            actor, "Kursmarkierungen aktualisiert", Guid.Empty, next)));
+        tx.Commit();
+    }
     public void CommitCancellation(CancellationPreview preview, string actor, string reason,
         ImmutableArray<ChoiceRevision> revisions, ImmutableArray<PlanningFollowUp> followUps)
     {

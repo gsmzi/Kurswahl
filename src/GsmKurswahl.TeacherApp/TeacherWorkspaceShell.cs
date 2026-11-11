@@ -103,7 +103,8 @@ public sealed partial class TeacherWindow
         catch (Exception ex) { ShowStartupError(ex); return; }
         // A committed planning decision and all corresponding revisions live in one SQLite transaction.
         // The workspace catalog is only synchronized after that transaction, including after a crash.
-        if (store is IPlanningStore planning && planning.ActivePlanningCatalog() is { } authoritative && year.Catalog.Version != authoritative.Version)
+        if (store is IPlanningStore planning && planning.ActivePlanningCatalog() is { } authoritative
+            && System.Text.Json.JsonSerializer.Serialize(year.Catalog, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(authoritative, DocumentJson.Options))
         {
             year = year with { Catalog = authoritative };
             workspace!.Update(year);
@@ -285,6 +286,7 @@ public sealed partial class TeacherWindow
             optional.Children.Add(card);
         }
         panel.Children.Add(new Expander { Header = "Optionale Basis-, Wahl- und Seminarkurse anpassen (z. B. Italienisch, Psychologie, SIA)", Content = optional });
+        panel.Children.Add(CourseAnnotationEditor());
         var deadline = new CalendarDatePicker { Name = "SetupDeadline", Width = 220, SelectedDate = active.SubmissionDeadline?.ToDateTime(TimeOnly.MinValue) };
         deadline.SelectedDateChanged += (_, _) =>
         {

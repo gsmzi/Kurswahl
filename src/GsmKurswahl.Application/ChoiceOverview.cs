@@ -56,7 +56,7 @@ public static class ChoiceOverview
     public static string OfferTitle(OfferCatalog catalog, CourseOffer offer) =>
         (catalog.Subjects.FirstOrDefault(s => s.Id == offer.SubjectId)?.Name ?? offer.SubjectId) + " "
         + offer.Type switch { CourseType.Lf => "LF", CourseType.Bf => "BF", CourseType.Elective => "Wahlfach", _ => "Seminarkurs" }
-        + (offer.Variant == CourseVariant.Bilingual ? " bilingual" : "");
+        + (offer.Variant == CourseVariant.Bilingual ? " bilingual" : "") + CourseAnnotations.Suffix(offer);
 
     // Everyone attending the offer (in the given semester). Confirmed leavers are listed too; the caller decides about display.
     public static CourseList Members(IEnumerable<TeacherState> states, OfferCatalog catalog, string offerId, int? semester = null)

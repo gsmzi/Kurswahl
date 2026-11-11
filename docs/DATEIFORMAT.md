@@ -1,4 +1,4 @@
-# JSON-Verträge: Wahl v2, Katalog v2, Profil v2 (aktueller Stand am Ende: Kompatibilitätsvertrag 02.11.2026)
+# JSON-Verträge: Wahl v2, Katalog v3, Profil v2
 
 Maschinenlesbare Schemata: `schemas/course-choice.v2.schema.json` und `schemas/offer-catalog.v1.schema.json` (JSON Schema 2020-12). UTF-8, camelCase-Eigenschaften, Enumwerte in snake_case. Alle modellierten Felder sind erforderlich; unbekannte Felder, ganzzahlige Enums, fehlende Felder, null statt Pflichtwerten und unbekannte Schemaversionen werden abgewiesen. Maximal 2 MiB pro Wahl und JSON-Tiefe 32. Zusätzliche strukturelle Grenzen prüft `ModelGuard` (eindeutige Kennungen, Zeitfolge, Halbjahre, Wochenstundenbereich). Schulische Angebotsgrenzen sind Regeln mit ID in `GsmKurswahl.Rules` (siehe [Regelkatalog](RECHTSQUELLEN.md)). Das JSON-Schema ersetzt keine Fachprüfung.
 
@@ -69,7 +69,7 @@ Ersetzt die früheren Aussagen „ältere Schemaversion wird abgewiesen, keine M
 | Datei / Inhalt | aktuell | lesbar | Änderung |
 | --- | --- | --- | --- |
 | Schülerwahl `aktuell.json` | 2 | 1, 2 | v1 ohne `plannedOralSubjects` → leere Liste |
-| Fachangebot `fachangebot.json` / eingebettete Kataloge | 2 | 1, 2 | v2: optionale Fachmerkmale `taskField`, `isForeignLanguage`, `isScience`; optional `submissionDeadline` (nur Hinweis, nur in der verteilten Kopie) |
+| Fachangebot `fachangebot.json` / eingebettete Kataloge | 3 | 1, 2, 3 | v3: beschreibende Angebotsmerkmale `cooperationSchool`, `isTopUpCourse`; v2-Fachmerkmale und `submissionDeadline` bleiben erhalten |
 | Profil `profil.json` | 2 | 1, 2 | v2: `displayName`, `className`; entfallen: `keyId`, `accountId` (wirkungslose Reste der Signatur) |
 | Stammdatensatz (Lehrer-DB) | 2 | 1, 2 | v2: optionale `firstName`, `lastName` |
 | `workspace.json`, Transportmanifest `.gsm-transfer` | 2 | 1, 2 | v2: je Jahrgang optional `submissionDeadline`, `studentProgramDirectory`; entfallen: `certificateThumbprint`, `keyId` |
@@ -91,3 +91,9 @@ Entfernt: `profile-trust.json`, `schemas/profile-signature.v1.schema.json` und d
 ## Schulvorgaben v1 (02.11.2026)
 
 Neue, eigenständige Konfigurationsdatei `schulvorgaben.json` neben dem Lehrerprogramm: `schemaVersion` (1), `distributionRoot` (vollständiger Pfad oder leer), `studentProgramDirectory` (absolut, relativ zum Lehrerprogramm oder leer). Schema `schemas/school-defaults.v1.schema.json`; GSM-Datei `src/GsmKurswahl.TeacherApp/schulvorgaben.json` (in `Test-Schemas.ps1` geprüft, nur im veröffentlichten Lehrerprogramm). Nur gelesen, nie geschrieben; andere Versionen werden abgelehnt. Keine Änderung bestehender Formate.
+
+## Katalog v3 und Kursmarkierungen (11.11.2026)
+
+Schema `schemas/offer-catalog.v3.schema.json`: je Angebot neue Pflichtfelder `cooperationSchool` (`none`, `ewg`, `gsm`) und `isTopUpCourse` (Boolean). Bestehende Kataloge v1/v2 erhalten beim Lesen ausschließlich im Speicher `none`/`false`. Geschrieben wird nur v3. Die Angebotsversion bleibt bei reinen Markierungsänderungen gleich; Markierungen verändern keine Wahl, Regel oder Kurszählung. Katalogversionen ab v4, fehlende v3-Pflichtfelder und unbekannte Standorte werden abgewiesen.
+
+Eingebettete Kataloge verwenden dieselbe Umwandlung; Workspace/Transport bleiben v2 und Planungsdokumente v1, da ihre eigene Struktur unverändert ist. Die entsprechenden Schemavarianten und eingefrorenen Altdateien sind ergänzt. Neue Markierungen nach einer Kursstreichung werden als vollständiger Katalog-Snapshot append-only gespeichert, ohne neue Schülerrevision. Bedienung, Ressourcen und Layout: [Schulvorlage](SCHULVORLAGE.md).

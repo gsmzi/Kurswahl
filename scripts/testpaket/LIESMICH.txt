@@ -31,6 +31,17 @@ Ausführung von einer echten Schulfreigabe und auf einem Zielrechner ohne
 Die Stände
 ----------
 
+Neu in diesem Stand: Koopkurse und Aufsetzerkurse markieren
+
+  Im Lehrerprogramm: Einstellungen > Jahrgang verwalten > Fachangebot
+  ansehen / fuer Schuelerprogramm exportieren. Dort den Abschnitt
+  "Koopkurse und Aufsetzerkurse markieren" oeffnen. Koop am EWG oder
+  GSM waehlen und unabhaengig davon Aufsetzerkurs ankreuzen.
+  Das sind reine Hinweise; Wahlen und Regeln bleiben unveraendert.
+  Alle PDF-Ausgaben und Word-Nachwahlboegen verwenden die GSM-Schulvorlage.
+  Fuer Hinweise im Schuelerprogramm Fachangebot erneut verteilen und
+  Schuelerprogramm neu starten.
+
 Lehrerprogramm (je 80 synthetische Personen):
 
   Lehrer 1   Ganz am Anfang: Einrichtungsassistent. Der Ordner mit der

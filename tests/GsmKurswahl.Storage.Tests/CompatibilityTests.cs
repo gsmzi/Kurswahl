@@ -32,7 +32,7 @@ public sealed class CompatibilityTests : IDisposable
     { ContinuedLanguages = ["E", "F"], ReligionEthicsPermission = Knowledge.Yes, ReligionEthicsExamPermission = Knowledge.No, PermanentSportExemption = Knowledge.No };
     private static OfferCatalog Catalog => new(SchemaVersions.Catalog, "demo-2029-compat", 2029, true,
         [new("D", "Deutsch"), new("NEU", "Neues Fach") { TaskField = 3, IsForeignLanguage = false, IsScience = true }],
-        [TestData.Offer("D-LF", "D", CourseType.Lf), TestData.Offer("NEU-BF", "NEU") with { Variant = CourseVariant.Bilingual, Status = OfferStatus.Planned, Requirements = [Requirement.ContinuousBilingual] }])
+        [TestData.Offer("D-LF", "D", CourseType.Lf) with { CooperationSchool = CooperationSchool.Ewg, IsTopUpCourse = true }, TestData.Offer("NEU-BF", "NEU") with { Variant = CourseVariant.Bilingual, Status = OfferStatus.Planned, Requirements = [Requirement.ContinuousBilingual] }])
     { SubmissionDeadline = new DateOnly(2027, 3, 15) };
     private static CourseChoice Choice => new(SchemaVersions.Choice, G1, "demo-001", 2029, "demo-2029-compat", "m2-2", 3, T, T.AddHours(1),
         SubmissionStatus.Draft, ElectionPhase.Preliminary, [new("D-LF", "D", CourseType.Lf, CourseVariant.Normal, [1, 2, 3, 4])], ["D", "NEU"]);
@@ -45,12 +45,12 @@ public sealed class CompatibilityTests : IDisposable
     private static TeacherYear Year => new(Catalog, @"C:\Demo\Abitur-2029\verwaltung.db", YearSetupStep.Complete, "demo-beratung")
     { SubmissionDeadline = new DateOnly(2027, 3, 15), StudentProgramDirectory = @"C:\Demo\Programm" };
 
-    public static TheoryData<string> CurrentNames() => ["choice-v2", "catalog-v2", "profile-v2", "student-record-v2", "revision", "issued-profile",
+    public static TheoryData<string> CurrentNames() => ["choice-v2", "catalog-v3", "profile-v2", "student-record-v2", "revision", "issued-profile",
         "distribution-entry", "planning-document", "transfer-receipt", "collected-file", "program-delivery", "student-deletion", "workspace-v2", "transfer-v2"];
     private static object Current(string name) => name switch
     {
         "choice-v2" => Choice,
-        "catalog-v2" => Catalog,
+        "catalog-v3" => Catalog,
         "profile-v2" => Profile,
         "student-record-v2" => Record,
         "revision" => Revision,
@@ -88,6 +88,7 @@ public sealed class CompatibilityTests : IDisposable
         static string Names<TEnum>() where TEnum : struct, Enum =>
             string.Join(",", Enum.GetValues<TEnum>().Select(v => JsonSerializer.Serialize(v, DocumentJson.Options).Trim('"')));
         Assert.Equal("lf,bf,elective,seminar", Names<CourseType>());
+        Assert.Equal("none,ewg,gsm", Names<CooperationSchool>());
         Assert.Equal("normal,bilingual", Names<CourseVariant>());
         Assert.Equal("planned,offered,cancelled,established", Names<OfferStatus>());
         Assert.Equal("unknown,yes,no", Names<Knowledge>());

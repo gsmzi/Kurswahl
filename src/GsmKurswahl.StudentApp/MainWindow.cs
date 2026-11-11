@@ -607,7 +607,7 @@ public sealed class MainWindow : Window
         var type = offer.Type switch { CourseType.Lf => "LF", CourseType.Bf => "BF", CourseType.Elective => "Wahlfach", _ => "Seminarkurs" };
         var hours = offer.Schedule.Select(h => h.WeeklyHours).Distinct().ToArray();
         return $"{session.SubjectName(offer.SubjectId)} · {type}" + (offer.Variant == CourseVariant.Bilingual ? " · bilingual" : "")
-            + $" · {string.Join("/", hours)} h · HJ {Semesters(offer.Schedule.Select(h => h.Semester))}";
+            + $" · {string.Join("/", hours)} h · HJ {Semesters(offer.Schedule.Select(h => h.Semester))}" + CourseAnnotations.Suffix(offer);
     }
 
     private static string Semesters(IEnumerable<int> semesters)

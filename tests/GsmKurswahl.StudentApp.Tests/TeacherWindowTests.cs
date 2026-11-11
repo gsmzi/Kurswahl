@@ -13,6 +13,74 @@ namespace GsmKurswahl.StudentApp.Tests;
 
 public class TeacherWindowTests
 {
+    [AvaloniaTheory]
+    [InlineData("ER", "KR", false)]
+    [InlineData("KR", "ER", false)]
+    [InlineData("ETH", "KR", false)]
+    [InlineData(null, "KR", false)]
+    [InlineData("ER", "KR", true)]
+    public void TeacherEditorRestrictsReligionAndPreservesInvalidEntriesForRemoval(string? grade10, string other, bool stored)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-religion-editor-" + Guid.NewGuid());
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = [.. TestData.WorkflowCatalog.Subjects, new("ER", "Evangelische Religion"), new("KR", "Katholische Religion")],
+            Offers = [.. TestData.WorkflowCatalog.Offers, TestData.Offer("ER-BF", "ER"), TestData.Offer("KR-BF", "KR")]
+        };
+        var workspace = new TeacherWorkspace(root); workspace.Create(catalog, "demo-beratung");
+        workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
+        using (var db = workspace.OpenActive())
+        {
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active,
+                PriorEducation.Unknown with { ReligionEthicsGrade10 = grade10, ReligionEthicsPermission = Knowledge.Yes }), "", "", "10a/Eins.Demo", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            if (stored) new GsmKurswahl.Application.TeacherSession(db, catalog, "demo-beratung").Save(TestData.Choice with
+            {
+                Selections = [new(other + "-BF", other, CourseType.Bf, CourseVariant.Normal, [1])], PlannedOralSubjects = [other]
+            }, null, RevisionSource.TeacherEdit, "Synthetischer Bestandsfall");
+        }
+        var window = new TeacherWindow(root);
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            void Click(string label)
+            {
+                window.GetLogicalDescendants().OfType<Button>().Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+            }
+            Click("Wahl"); Click("Schülerbestand"); Click("Öffnen");
+            var boxes = window.GetLogicalDescendants().OfType<CheckBox>().ToArray();
+            Assert.Contains(boxes, b => b.Name == "TeacherChoice_ETH_BF_1" && b.IsEnabled);
+            if (grade10 is "ER" or "KR")
+                Assert.Contains(boxes, b => b.Name == $"TeacherChoice_{grade10}_BF_1" && b.IsEnabled);
+            var wrong = boxes.Where(b => b.Name?.StartsWith($"TeacherChoice_{other}_BF_") == true).ToArray();
+            if (stored)
+            {
+                Assert.Equal(4, wrong.Length);
+                var first = wrong.Single(b => b.Name!.EndsWith("_1"));
+                Assert.True(first.IsChecked); Assert.True(first.IsEnabled);
+                Assert.All(wrong.Where(b => b != first), b => Assert.False(b.IsEnabled));
+                first.IsChecked = false;
+                Assert.False(first.IsEnabled);
+            }
+            else if (grade10 is null)
+            {
+                Assert.Equal(4, wrong.Length);
+                Assert.All(wrong, b => Assert.True(b.IsEnabled));
+                Assert.Contains(boxes, b => b.Name == "TeacherChoice_ER_BF_1" && b.IsEnabled);
+            }
+            else Assert.Empty(wrong);
+            foreach (var box in window.GetLogicalDescendants().OfType<ComboBox>().Where(b => b.Name is "OralSubject1" or "OralSubject2"))
+            {
+                var items = box.Items.OfType<ComboBoxItem>().ToArray();
+                if (grade10 is null)
+                    Assert.Contains(items, i => i.Content?.ToString() == "Katholische Religion" && i.IsEnabled);
+                else Assert.DoesNotContain(items, i => i.Content?.ToString() == (other == "ER" ? "Evangelische Religion" : "Katholische Religion") && i.IsEnabled);
+                if (stored && box.Name == "OralSubject1") Assert.False(((ComboBoxItem)box.SelectedItem!).IsEnabled);
+            }
+        }
+        finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
     [AvaloniaFact]
     public void ProgressShowsCurrentStepAndDoesNotMarkDeferredDeliveryComplete()
     {

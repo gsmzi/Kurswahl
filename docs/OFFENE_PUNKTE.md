@@ -1,5 +1,7 @@
 # Offene Punkte / keine Freigabe
 
+- Nutzerentscheidung 11.11.2026: Das bestätigte Religion/Ethik-Fach in Klasse 10 bestimmt die angebotene Religion (ER nur ER, KR nur KR, ETH keine Religion); Ethik bleibt wählbar. Eine separate Konfession wird nicht erfasst. Dies präzisiert die älteren Aussagen zur freien Religionswahl bei Wechsel. Ergänzende Nutzerentscheidung: Bei unbekannten oder ungeprüften Angaben bleiben ER/KR/ETH vorläufig wählbar, mit Klärhinweis und `needs_review` für gewählte Religion. Lehrerstammdaten und individuelles Profil sollen durch die Beratung vervollständigt beziehungsweise korrigiert und neu verteilt werden. Belegungs-/Prüfungsfreigaben umgehen die Einschränkung bei bestätigtem Fach nicht.
+
 - Vollständiger jahrgangsbezogener GSM-Katalog einschließlich aller LF, W, Sport, NwT und Kooperationen fehlt. Das Sample ist ausdrücklich ein synthetisches Demoangebot; geplante, unbestätigte Optionen bleiben gesperrt.
 - Abiturjahrgang 2029 ist ein Demowert. G8/G9, Wahlzeitraum und rechtsgültiger Regelstand sind schulisch zu bestätigen.
 - Die in Abschnitt 19 genannten AGVO-/KOE-/Leitfaden-PDFs und die Prozessbeschreibung liegen nicht im Arbeitsverzeichnis. M1 implementiert ausschließlich technische Prüfungen und ausdrücklich spezifizierte Angebotsgrenzen, keine rechtliche Vollvalidierung.

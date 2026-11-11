@@ -8,7 +8,7 @@ namespace GsmKurswahl.Domain;
 public static class SchemaVersions
 {
     public const int Choice = 2;
-    public const int Catalog = 2;
+    public const int Catalog = 3;
     public const int Profile = 2;
     public const int StudentRecord = 2;
 }
@@ -31,7 +31,9 @@ public static class VersionedDocuments
         new VersionedConverter<OfferCatalog>("Katalog", SchemaVersions.Catalog, c => c.SchemaVersion, new()
         {
             // v1: Fächer ohne taskField/isForeignLanguage/isScience (Zwischenstand 02.11.2026 tolerierte sie optional).
-            [1] = e => e.Deserialize<OfferCatalog>(DocumentJson.Plain) is { } v1 ? v1 with { SchemaVersion = SchemaVersions.Catalog } : null,
+            [1] = e => e.Deserialize<CatalogBeforeV3>(DocumentJson.Plain)?.Upgrade(),
+            // v2: no annotations; existing offers become unmarked, only in memory.
+            [2] = e => e.Deserialize<CatalogBeforeV3>(DocumentJson.Plain)?.Upgrade(),
         }),
         new VersionedConverter<StudentProfile>("Profil", SchemaVersions.Profile, p => p.SchemaVersion, new()
         {
@@ -45,6 +47,19 @@ public static class VersionedDocuments
             [1] = e => e.Deserialize<StudentRecord>(DocumentJson.Plain) is { } v1 ? v1 with { SchemaVersion = SchemaVersions.StudentRecord } : null,
         }),
     ];
+
+    private sealed record OfferBeforeV3(string Id, string SubjectId, CourseType Type, CourseVariant Variant,
+        OfferStatus Status, ImmutableArray<SemesterHours> Schedule, ImmutableArray<Requirement> Requirements)
+    {
+        public CourseOffer Upgrade() => new(Id, SubjectId, Type, Variant, Status, Schedule, Requirements);
+    }
+    private sealed record CatalogBeforeV3(int SchemaVersion, string Version, int GraduationYear, bool IsDemo,
+        ImmutableArray<Subject> Subjects, ImmutableArray<OfferBeforeV3> Offers)
+    {
+        public DateOnly? SubmissionDeadline { get; init; }
+        public OfferCatalog Upgrade() => new(SchemaVersions.Catalog, Version, GraduationYear, IsDemo, Subjects,
+            Offers.IsDefault ? default : [.. Offers.Select(o => o.Upgrade())]) { SubmissionDeadline = SubmissionDeadline };
+    }
 
     private sealed record ChoiceV1(int SchemaVersion, Guid DocumentId, string StudentId, int GraduationYear,
         string OfferVersion, string RuleVersion, int Revision, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,

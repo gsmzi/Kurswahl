@@ -8,10 +8,11 @@ public static class PlanningPresentation
     public static bool CanCancel(CourseOffer offer) => offer.SubjectId is not ("D" or "M" or "E")
         && !(offer.Type == CourseType.Bf && offer.SubjectId is "G" or "GK" or "GEO" or "SP" or "ETH" or "ER" or "KR" or "BK" or "MU");
 
-    public static string Choices(CourseChoice choice, bool lf) => string.Join(" · ", choice.Selections
+    public static string Choices(CourseChoice choice, bool lf, OfferCatalog? catalog = null) => string.Join(" · ", choice.Selections
         .Where(s => (s.Type == CourseType.Lf) == lf).Select(s => s.SubjectId
             + (s.Variant == CourseVariant.Bilingual ? " bili" : "")
-            + (s.Semesters.SequenceEqual(new[] { 1, 2, 3, 4 }) && s.SubjectId is not ("GK" or "GEO") ? "" : " (HJ " + string.Join(",", s.Semesters) + ")")));
+            + (s.Semesters.SequenceEqual(new[] { 1, 2, 3, 4 }) && s.SubjectId is not ("GK" or "GEO") ? "" : " (HJ " + string.Join(",", s.Semesters) + ")")
+            + (catalog?.Offers.FirstOrDefault(o => o.Id == s.OfferId) is { } offer && CourseAnnotations.Label(offer) is { Length: > 0 } label ? " [" + label + "]" : "")));
 
     public static string[][] DemandTable(PlanningDocument document)
     {

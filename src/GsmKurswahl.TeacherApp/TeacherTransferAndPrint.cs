@@ -66,7 +66,7 @@ public sealed partial class TeacherWindow
             SuggestedFileName = $"Wahlzahlen-{document.Catalog.GraduationYear}-{DateTime.Now:yyyyMMdd-HHmmss}.pdf" });
         var path = file?.TryGetLocalPath(); if (path is null) return;
         var filter = document.IncludeExpectedDepartures ? "Mit voraussichtlichen Abgängern" : "Ohne voraussichtliche Abgänger";
-        WriteNew(path, PlanningPrint.Demand(document.Catalog.GraduationYear, document.Name + $" | Stand {document.CreatedAt.LocalDateTime:g}" + (document.IsScenario ? " | Szenario" : ""), filter + "; bestätigte Abgänger ausgeschlossen", PlanningPresentation.DemandTable(document)));
+        WriteNew(path, PlanningPrint.Demand(document.Catalog.GraduationYear, document.Name + $" | Stand {document.CreatedAt.LocalDateTime:g}" + (document.IsScenario ? " | Szenario" : ""), filter + "; bestätigte Abgänger ausgeschlossen", PlanningPresentation.DemandTable(document), document.Catalog));
         status.Text = "PDF gespeichert: " + path + ". Im PDF-Programm auf Papier drucken (Strg+P).";
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
         catch (Exception ex) { status.Text += " Automatisches Öffnen nicht möglich: " + ex.Message; }

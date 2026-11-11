@@ -65,3 +65,11 @@ Keine neuen Pakete oder Paketversionsänderungen. XLSX-Export nutzt .NET ZIP/XML
 M5-Abschluss: separate `packages.win-x64.lock.json` für die acht ausgelieferten Projekte ergänzt; bisherige `packages.lock.json` unverändert. Windows-Publish nutzt diese Runtime-Lockdateien im Locked-Modus und pinnt die selbstenthaltende .NET-Runtime auf 10.0.14. Beide Anwendungen erfolgreich für win-x64 publiziert. NuGet-Audit (`dotnet list GSM-Kurswahl.sln package --vulnerable --include-transitive --no-restore`) am 28.10.2026 erfolgreich: alle 14 Projekte laut NuGet.org ohne bekannte anfällige Pakete. Keine umfassende Sicherheits-/Produktivfreigabe.
 
 28.10.2026 – Korrektur Schüler-Jahresbelegung und LF-Umwahl: keine neuen Pakete, unveränderte Paketversionen und Lockdateien. Der vorhandene Lizenz-/Auditstand bleibt bestehen; keine erneute Sicherheitsfreigabe behauptet. Die Desktopanwendungen erhalten keine Onlinezugriffe.
+
+## Testpaket-Aktualisierung 11.11.2026
+
+Keine neuen Pakete oder Änderungen an Paketversionen/Lockdateien. Beide Programme selbstenthaltend für Windows x64 mit .NET-Runtime 10.0.14 publiziert. NuGet-Audit vor Bereitstellung (`dotnet list GSM-Kurswahl.sln package --vulnerable --include-transitive --no-restore`) erfolgreich: alle 14 Projekte einschließlich transitiver Abhängigkeiten laut abgefragtem NuGet.org-Feed ohne bekannte anfällige Pakete. Das ist keine umfassende Sicherheits- oder Produktivfreigabe; Lizenzgrenzen und Betriebsgrenzen bleiben wie dokumentiert.
+
+## Kursmarkierungen und Schulvorlage (11.11.2026)
+
+Keine neuen NuGet-Pakete, keine Paketversions- oder Lockdateiänderungen. Gemeinsame PDF-Gestaltung verwendet weiterhin SkiaSharp 2.88.9; Word-Erstellung verwendet .NET ZIP/XML. Das mit dem Nutzerauftrag bereitgestellte Schullogo und eine um Dokumenteigenschaften/customXml bereinigte Schulvorlage werden lokal als Ressourcen eingebettet; keine Fonts oder Office-Komponenten mitgeliefert. Arial/Arial Narrow werden lokal aufgelöst. Word diente ausschließlich der Layoutprüfung und ist keine Laufzeitvoraussetzung. Herkunft, Anpassungen und Prüfsummen: SCHULVORLAGE.md. Der zuletzt dokumentierte Auditstand bleibt bestehen; keine neue Sicherheitsfreigabe behauptet.

@@ -76,7 +76,7 @@ public sealed class StudentSession
                 new("BILI", "Durchgängig bilingualer Bildungsgang", Value(p.ContinuousBilingual), Offers(Requirement.ContinuousBilingual, "Im Angebot nicht vorhanden."), verified),
                 new("REL", "Religion/Ethik in Klasse 10",
                     verified && p.ReligionEthicsGrade10 is { } subject ? $"{SubjectName(subject)} (Belegung/Prüfung: {Value(p.ReligionEthicsPermission)} / {Value(p.ReligionEthicsExamPermission)})" : "ungeprüft",
-                    "Betrifft vor allem die mündliche Prüfung in Religion/Ethik (bei Wechsel Feststellungsprüfung nötig); die Basisfachwahl wird nicht pauschal gesperrt.", verified),
+                    "Bestimmt die angebotene Religion (ER: evangelisch, KR: katholisch). Bei unbekannten oder ungeprüften Angaben sind beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; bei Wechsel kann für die mündliche Prüfung eine Feststellungsprüfung nötig sein.", verified),
                 new("SP", "Sportbefreiung",
                     verified && p.SportExemptSemesters is { } semesters ? (semesters.IsEmpty ? "keine" : "HJ " + string.Join(", ", semesters)) + $" (dauerhaft: {Value(p.PermanentSportExemption)})" : "ungeprüft",
                     "Bei Befreiung sind Ersatzkurse nötig und Sport entfällt als LF/mündliches Prüfungsfach; Prüfung durch die Oberstufenberatung.", verified)

@@ -41,6 +41,7 @@ public static class ModelGuard
         {
             Require(value.Subjects.Any(s => s.Id == offer.SubjectId), "Unbekannte Fachkennung im Angebot.");
             Require(Enum.IsDefined(offer.Type) && Enum.IsDefined(offer.Variant) && Enum.IsDefined(offer.Status), "Unbekannte Angebotsoption.");
+            Require(Enum.IsDefined(offer.CooperationSchool), "Unbekannter Koopkurs-Standort.");
             Require(!offer.Schedule.IsDefaultOrEmpty && offer.Schedule.All(s => s is not null && s.Semester is >= 1 and <= 4 && s.WeeklyHours is > 0 and <= 10)
                 && offer.Schedule.Select(s => s.Semester).Distinct().Count() == offer.Schedule.Length, "Ungültiger Halbjahresplan.");
             Require(!offer.Requirements.IsDefault && offer.Requirements.All(Enum.IsDefined), "Unbekannte Voraussetzung.");

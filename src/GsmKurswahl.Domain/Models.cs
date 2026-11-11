@@ -4,6 +4,7 @@ namespace GsmKurswahl.Domain;
 
 public enum CourseType { Lf, Bf, Elective, Seminar }
 public enum CourseVariant { Normal, Bilingual }
+public enum CooperationSchool { None, Ewg, Gsm }
 public enum OfferStatus { Planned, Offered, Cancelled, Established }
 public enum ReviewStatus { Valid, Invalid, NeedsReview }
 public enum Knowledge { Unknown, Yes, No }
@@ -26,7 +27,14 @@ public sealed record Subject(string Id, string Name)
 }
 public sealed record SemesterHours(int Semester, int WeeklyHours);
 public sealed record CourseOffer(string Id, string SubjectId, CourseType Type, CourseVariant Variant,
-    OfferStatus Status, ImmutableArray<SemesterHours> Schedule, ImmutableArray<Requirement> Requirements);
+    OfferStatus Status, ImmutableArray<SemesterHours> Schedule, ImmutableArray<Requirement> Requirements)
+{
+    // Catalog v3: descriptive school annotations only; never eligibility, hours or assignment.
+    [System.Text.Json.Serialization.JsonRequired]
+    public CooperationSchool CooperationSchool { get; init; }
+    [System.Text.Json.Serialization.JsonRequired]
+    public bool IsTopUpCourse { get; init; }
+}
 public sealed record OfferCatalog(int SchemaVersion, string Version, int GraduationYear, bool IsDemo,
     ImmutableArray<Subject> Subjects, ImmutableArray<CourseOffer> Offers)
 {

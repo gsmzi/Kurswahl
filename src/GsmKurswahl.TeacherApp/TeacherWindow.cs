@@ -245,8 +245,8 @@ public sealed partial class TeacherWindow : Window
         masterTab.Children.Add(Labeled("Informatik-Brückenkurs Klasse 10", bridgeBox, "Brückenkurs oder IMP schaltet BF Informatik frei. Beide Wege werden getrennt erfasst."));
         masterTab.Children.Add(Labeled("IMP-Profil besucht", impBox, "Profil Informatik-Mathematik-Physik. Brückenkurs oder IMP schaltet BF Informatik frei."));
         masterTab.Children.Add(Labeled("Durchgängig bilingual", biliBox, "Durchgängiger bilingualer Bildungsgang. Voraussetzung für Biologie bilingual (LF und BF)."));
-        masterTab.Children.Add(Labeled("Religion/Ethik in Klasse 10", relGrade10Box, "In Klasse 10 besuchtes Fach. Ein Wechsel in der Kursstufe sperrt die Basisfachwahl nicht, schränkt aber die mündliche Prüfung ein."));
-        masterTab.Children.Add(Labeled("Religion/Ethik: Belegung freigegeben", relPermBox, "Liegt eine ggf. nötige Zustimmung zur Belegung vor (z. B. Religionsunterricht einer anderen Konfession)?"));
+        masterTab.Children.Add(Labeled("Religion/Ethik in Klasse 10", relGrade10Box, "Bestimmt die angebotene Religion: ER erlaubt evangelische, KR katholische Religion; bei ETH ist keine Religion wählbar. Bei unbekanntem Fach bleiben beide Religionsfächer vorläufig wählbar und werden als Klärfall gemeldet. Ethik bleibt wählbar. Wechsel können die mündliche Prüfung einschränken."));
+        masterTab.Children.Add(Labeled("Religion/Ethik: Belegung freigegeben", relPermBox, "Dokumentiert eine ggf. nötige Zustimmung. Gibt keine Religion außerhalb des bestätigten Klasse-10-Fachs frei."));
         masterTab.Children.Add(Labeled("Religion/Ethik: Prüfung freigegeben", relExamPermBox, "Ist die mündliche Prüfung im gewählten Fach trotz Wechsel zugelassen, z. B. nach bestandener Feststellungsprüfung?"));
         masterTab.Children.Add(Labeled("Sportbefreiung", sportBox, "Halbjahre mit Sportbefreiung. Für jedes befreite Halbjahr ist ein zusätzlicher Basis- oder Wahlfachkurs nötig; der Seminarkurs zählt nicht. Keine Diagnosen eintragen."));
         masterTab.Children.Add(Labeled("Dauerhafte Sportbefreiung", permSportBox, "Dauerhafte, auch teilweise Befreiung zum Wahlzeitpunkt. Schließt LF Sport als normale Wahl aus."));
@@ -307,23 +307,40 @@ public sealed partial class TeacherWindow : Window
         choiceTab.Children.Add(Heading("Kurswahl durch die Beratung ändern"));
         choiceTab.Children.Add(new TextBlock { Text = "Haken je Halbjahr setzen oder entfernen. Die ursprüngliche Schülerwahl bleibt in der Historie erhalten.", Foreground = Muted, TextWrapping = TextWrapping.Wrap, FontSize = 12 });
         var selections = new List<(CourseOffer Offer, int Semester, CheckBox Box)>();
+        var profile = new ProfileContext(ProfileStatus.Verified, record.Student.Prerequisites);
+        GsmKurswahl.Rules.Availability? ReligionAvailability(CourseOffer offer) => offer.SubjectId is "ER" or "KR"
+            ? new GsmKurswahl.Rules.ChoiceValidator().GetAvailability(offer, profile) : null;
         foreach (var offer in session!.Catalog.Offers)
         {
             var isOffered = offer.Status is OfferStatus.Offered or OfferStatus.Established;
             var alreadyChosen = choice.Selections.Any(s => s.OfferId == offer.Id);
-            if (!isOffered && !alreadyChosen) continue;
+            var religion = ReligionAvailability(offer);
+            if ((!isOffered || religion?.CanSelect == false) && !alreadyChosen) continue;
             var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             line.Children.Add(new TextBlock { Text = OfferLabel(offer.Id) + (isOffered ? "" : $" ({FormatOfferStatus(offer.Status)})"), Width = 240, VerticalAlignment = VerticalAlignment.Center, Foreground = isOffered ? Ink : Brush.Parse("#8C1D1D") });
+            if (religion is not null) ToolTip.SetTip(line, religion.Explanation);
             foreach (var semester in offer.Schedule)
             {
-                var box = new CheckBox { Content = "HJ " + semester.Semester, IsChecked = choice.Selections.Any(s => s.OfferId == offer.Id && s.Semesters.Contains(semester.Semester)) };
+                var box = new CheckBox { Name = $"TeacherChoice_{offer.Id.Replace('-', '_')}_{semester.Semester}", Content = "HJ " + semester.Semester, IsChecked = choice.Selections.Any(s => s.OfferId == offer.Id && s.Semesters.Contains(semester.Semester)) };
+                if (religion?.CanSelect == false)
+                {
+                    box.IsEnabled = box.IsChecked == true;
+                    box.IsCheckedChanged += (_, _) => { if (box.IsChecked != true) box.IsEnabled = false; };
+                }
                 line.Children.Add(box); selections.Add((offer, semester.Semester, box));
             }
             choiceTab.Children.Add(line);
         }
         var oralItems = new[] { new SubjectItem(null, "— nicht geplant —") }.Concat(session.Catalog.Offers.Where(o => o.Type == CourseType.Bf).Select(o => o.SubjectId).Distinct()
             .Select(s => new SubjectItem(s, SubjectName(s)))).ToArray();
-        ComboBox OralBox(string name, string? current) => new() { Name = name, ItemsSource = oralItems, SelectedItem = oralItems.FirstOrDefault(i => i.Id == current) ?? oralItems[0], Width = 220, Margin = new Thickness(0, 0, 10, 0) };
+        ComboBox OralBox(string name, string? current)
+        {
+            var items = oralItems.Select(i => (Item: i, Availability: session.Catalog.Offers.Where(o => o.SubjectId == i.Id && o.Type == CourseType.Bf)
+                    .Select(ReligionAvailability).FirstOrDefault()))
+                .Where(x => x.Availability?.CanSelect != false || x.Item.Id == current)
+                .Select(x => new ComboBoxItem { Content = x.Item.Label, Tag = x.Item, IsEnabled = x.Availability?.CanSelect != false }).ToArray();
+            return new() { Name = name, ItemsSource = items, SelectedItem = items.FirstOrDefault(i => ((SubjectItem)i.Tag!).Id == current) ?? items[0], Width = 220, Margin = new Thickness(0, 0, 10, 0) };
+        }
         var oral1 = OralBox("OralSubject1", choice.PlannedOralSubjects.ElementAtOrDefault(0));
         var oral2 = OralBox("OralSubject2", choice.PlannedOralSubjects.ElementAtOrDefault(1));
         var oralRow = new WrapPanel { Orientation = Orientation.Horizontal }; oralRow.Children.Add(oral1); oralRow.Children.Add(oral2);
@@ -331,7 +348,7 @@ public sealed partial class TeacherWindow : Window
         var saveChoice = Button("Änderung als neuen Stand speichern", () =>
         {
             var selected = selections.Where(s => s.Box.IsChecked == true).GroupBy(s => s.Offer).Select(g => new CourseSelection(g.Key.Id, g.Key.SubjectId, g.Key.Type, g.Key.Variant, [.. g.Select(v => v.Semester)])).ToImmutableArray();
-            var oral = new[] { ((SubjectItem)oral1.SelectedItem!).Id, ((SubjectItem)oral2.SelectedItem!).Id }.OfType<string>().Distinct().ToImmutableArray();
+            var oral = new[] { ((SubjectItem)((ComboBoxItem)oral1.SelectedItem!).Tag!).Id, ((SubjectItem)((ComboBoxItem)oral2.SelectedItem!).Tag!).Id }.OfType<string>().Distinct().ToImmutableArray();
             session.Save(choice with { OfferVersion = session.Catalog.Version, RuleVersion = GsmKurswahl.Rules.ChoiceValidator.Version, Revision = active is null ? 1 : active.Snapshot.Revision + 1, Selections = selected, PlannedOralSubjects = oral, UpdatedAt = DateTimeOffset.UtcNow }, active?.Id, RevisionSource.TeacherEdit, editReason.Text ?? "");
             Refresh(); status.Text = "Lehreränderung gespeichert und gegen die aktuellen Stammdaten geprüft.";
         }, "Speichert die geänderte Belegung als neuen Stand mit Begründung. Die Begründung oben ist Pflicht.");
@@ -562,6 +579,7 @@ public sealed partial class TeacherWindow : Window
         catalogPanel.Children.Clear(); if (session is null) return;
         Intro(catalogPanel, "Fachangebot Ihres Jahrgangs", "Diese Fächer, Kursarten und Halbjahre sieht das Schülerprogramm. Das Fachangebot wird beim Verteilen der Schülerdateien automatisch in jeden Wahlordner kopiert. Änderungen nach Eingang der ersten Wahlen nur über Kursplanung → Angebot ändern.");
         catalogPanel.Children.Add(Text($"Abitur {session.Catalog.GraduationYear} · Angebotsstand {session.Catalog.Version}"));
+        catalogPanel.Children.Add(CourseAnnotationEditor());
         const string columns = "220,110,90,160,*";
         catalogPanel.Children.Add(new Border { Background = SoftAccent, Child = CompactLine(columns, [Text("Fach"), Text("Kursart"), Text("Variante"), Text("Status"), Text("Halbjahre · Wochenstunden")]) });
         var index = 0;
@@ -569,7 +587,7 @@ public sealed partial class TeacherWindow : Window
         {
             var hours = string.Join(", ", offer.Schedule.Select(h => $"HJ {h.Semester}: {h.WeeklyHours} h"));
             catalogPanel.Children.Add(new Border { Background = index++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White,
-                Child = CompactLine(columns, [Text(SubjectName(offer.SubjectId)), Text(FormatCourseType(offer.Type)), Text(FormatVariant(offer.Variant)), Text(FormatOfferStatus(offer.Status)), Text(hours)]) });
+                Child = CompactLine(columns, [Text(SubjectName(offer.SubjectId) + CourseAnnotations.Suffix(offer)), Text(FormatCourseType(offer.Type)), Text(FormatVariant(offer.Variant)), Text(FormatOfferStatus(offer.Status)), Text(hours)]) });
         }
         catalogPanel.Children.Add(Button("Fachangebot als Datei speichern …", ExportCurrentCatalog, "Nur für Sonderfälle, z. B. eine zentrale Schülerinstallation. Beim normalen Verteilen wird das Fachangebot automatisch mitkopiert."));
     }

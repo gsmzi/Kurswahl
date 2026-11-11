@@ -5,6 +5,14 @@ namespace GsmKurswahl.Application;
 
 public static class CatalogConfiguration
 {
+    public static OfferCatalog Annotate(OfferCatalog basis, string offerId, CooperationSchool school, bool topUp)
+    {
+        if (!Enum.IsDefined(school) || !basis.Offers.Any(o => o.Id == offerId)) throw new ArgumentException("Unbekanntes Angebot oder Koopkurs-Standort.");
+        // Keep the offer version: annotations do not require pupils to reselect or invalidate their drafts.
+        var next = basis with { Offers = [.. basis.Offers.Select(o => o.Id == offerId ? o with { CooperationSchool = school, IsTopUpCourse = topUp } : o)] };
+        ModelGuard.Catalog(next);
+        return next;
+    }
     // Produces a separate version before distribution. Never changes an administrative choice.
     public static OfferCatalog Prepare(OfferCatalog basis, int year, string version, IReadOnlySet<string> enabledLf, IReadOnlySet<string>? enabledOptional = null)
     {

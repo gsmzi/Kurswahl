@@ -11,12 +11,13 @@ public sealed class ChoiceValidator
     public static readonly ImmutableArray<RuleDefinition> Definitions =
     [
         .. AcademicRules.Definitions,
+        new("GSM-RELIGION-CONFESSION", "Religionswahl nur passend zum bestätigten Klasse-10-Fach", "GSM-Nutzerfestlegung 11.11.2026", "ER/KR: Angebot, Belegung und Prüfungsplanung beider Programme", Version, ReviewStatus.Invalid),
         new("PROFILE-TRUST", "Vertrauenswürdiges Einzelprofil fehlt", "Pflichtenheft §5a", "Alle Schülerwahlen", Version, ReviewStatus.NeedsReview),
         new("OFFER-VERSION", "Jahrgang und Angebots-/Regelversion", "Pflichtenheft §§4,8", "Alle Wahlen", Version, ReviewStatus.Invalid),
         new("OFFER-SELECTION", "Angebot, Variante und Halbjahre", "Pflichtenheft §§4,8", "Jede Belegung", Version, ReviewStatus.Invalid),
         new("SUBJECT-DUPLICATE", "Keine doppelte Fachbelegung", "Pflichtenheft §6 Nr.1,7", "Alle Fächer/Varianten", Version, ReviewStatus.Invalid),
         new("PREREQUISITE-NO", "Persönliche Voraussetzung nicht erfüllt", "Pflichtenheft §§4,5; AGVO §13 Abs.1 Nr.3", "INF/I/bilingual/Sprachlaufbahn", Version, ReviewStatus.Invalid),
-        new("PREREQUISITE-UNKNOWN", "Persönliche Voraussetzung ungeklärt", "Pflichtenheft §§5,5a", "INF/I/bilingual", Version, ReviewStatus.NeedsReview),
+        new("PREREQUISITE-UNKNOWN", "Persönliche Voraussetzung ungeklärt", "Pflichtenheft §§5,5a; GSM-Nutzerfestlegung 11.11.2026", "INF/I/bilingual/Religionswahl", Version, ReviewStatus.NeedsReview),
         .. CatalogRules.Definitions,
         .. ChoiceWorkflow.Definitions
     ];
@@ -34,6 +35,13 @@ public sealed class ChoiceValidator
             return new(false, ReviewStatus.NeedsReview, "LF Sport erfordert bestätigte Auskunft ohne dauerhafte oder teilweise Befreiung; Sonderfall mit Oberstufenberatung klären.");
         if (AcademicRules.LanguageExcluded(offer.SubjectId, profile))
             return new(false, ReviewStatus.Invalid, $"Nicht in deiner bestätigten Sprachlaufbahn ({string.Join(", ", AcademicRules.Languages(profile))}). Kurse in einer Fremdsprache setzen Unterricht spätestens ab Klasse 8 voraus (AGVO § 13 Abs. 1 Nr. 3). Stimmt die Angabe nicht, bitte an die Oberstufenberatung wenden.");
+        if (offer.SubjectId is "ER" or "KR")
+        {
+            if (ReligionSubjectUnknown(profile))
+                return new(true, ReviewStatus.NeedsReview, "Religion/Ethik-Fach aus Klasse 10 ist unbekannt oder nicht bestätigt. Beide Religionsfächer und Ethik bleiben vorläufig wählbar; bitte mit der Oberstufenberatung klären.");
+            if (profile.Prerequisites.ReligionEthicsGrade10 != offer.SubjectId)
+                return new(false, ReviewStatus.Invalid, "Religion ist nur passend zum bestätigten Fach aus Klasse 10 wählbar (ER: evangelisch, KR: katholisch). Ethik bleibt wählbar. Stimmt die Profilangabe nicht, bitte an die Oberstufenberatung wenden.");
+        }
         if (offer.Requirements.IsEmpty) return new(true, ReviewStatus.NeedsReview, "Vorläufig wählbar; fachliche Freigabe für den Jahrgang steht aus.");
         if (profile.Status != ProfileStatus.Verified)
             return new(false, ReviewStatus.NeedsReview, "Persönliche Voraussetzung ungeprüft. Bitte an die Oberstufenberatung wenden.");
@@ -48,6 +56,9 @@ public sealed class ChoiceValidator
         if (states.Contains(Knowledge.Unknown)) return new(false, ReviewStatus.NeedsReview, "Voraussetzung fachlich zu klären; Oberstufenberatung kontaktieren.");
         return new(true, ReviewStatus.NeedsReview, "Vorbildung erfüllt; vollständige Rechtsprüfung steht aus.");
     }
+
+    private static bool ReligionSubjectUnknown(ProfileContext profile) => profile.Status != ProfileStatus.Verified
+        || profile.Prerequisites.ReligionEthicsGrade10 is not ("ER" or "KR" or "ETH");
 
     public ValidationResult Validate(CourseChoice choice, OfferCatalog catalog, ProfileContext profile)
     {
@@ -76,8 +87,12 @@ public sealed class ChoiceValidator
             }
             if (!catalogViolations.IsEmpty) continue;
             var availability = GetAvailability(offer, profile);
+            if (availability.CanSelect && offer.SubjectId is "ER" or "KR" && ReligionSubjectUnknown(profile))
+                Add("PREREQUISITE-UNKNOWN", availability.Explanation, "Klasse-10-Fach durch die Oberstufenberatung bestätigen lassen.", selection.SubjectId, selection.Semesters);
             if (!availability.CanSelect)
-                Add(offer.Status is not (OfferStatus.Offered or OfferStatus.Established) ? "OFFER-SELECTION" : availability.Status == ReviewStatus.Invalid ? "PREREQUISITE-NO" : "PREREQUISITE-UNKNOWN",
+                Add(offer.Status is not (OfferStatus.Offered or OfferStatus.Established) ? "OFFER-SELECTION"
+                    : availability.Status != ReviewStatus.Invalid ? "PREREQUISITE-UNKNOWN"
+                    : offer.SubjectId is "ER" or "KR" ? "GSM-RELIGION-CONFESSION" : "PREREQUISITE-NO",
                     availability.Explanation, "Angebot/Vorbildung mit der Oberstufenberatung klären.", selection.SubjectId, selection.Semesters);
         }
         var oralCandidates = ChoiceWorkflow.OralCandidates(choice, catalog, profile);

@@ -6,7 +6,7 @@
   "actor": "demo-beratung",
   "ruleVersion": "m2-2",
   "catalog": {
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "version": "demo-2029-compat",
     "graduationYear": 2029,
     "isDemo": true,
@@ -47,7 +47,9 @@
             "weeklyHours": 3
           }
         ],
-        "requirements": []
+        "requirements": [],
+        "cooperationSchool": "ewg",
+        "isTopUpCourse": true
       },
       {
         "id": "NEU-BF",
@@ -75,7 +77,9 @@
         ],
         "requirements": [
           "continuous_bilingual"
-        ]
+        ],
+        "cooperationSchool": "none",
+        "isTopUpCourse": false
       }
     ],
     "submissionDeadline": "2027-03-15"

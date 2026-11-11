@@ -122,12 +122,12 @@ public sealed partial class TeacherWindow
                         status.Text = "Abgängerstatus nicht gespeichert: " + ex.Message + " Kurswahlen erneut öffnen.";
                     }
                 };
-                var lf = choice is null ? "–" : PlanningPresentation.Choices(choice, true);
+                var lf = choice is null ? "–" : PlanningPresentation.Choices(choice, true, session!.Catalog);
                 var count = Text(choice is null ? "–" : choice.Selections.Sum(s => s.Semesters.Length).ToString());
                 if (choice is not null && choice.Selections.Sum(s => s.Semesters.Length) < ChoiceWorkflow.MinimumCourses) count.Foreground = Red;
                 Control[] cells = open
                     ? [name, Text(record.Student.ClassName), Text(lf), count, review, departure]
-                    : [name, Text(record.Student.ClassName), Text(lf), Text(choice is null ? "" : PlanningPresentation.Choices(choice, false).Replace(" · ", ", ")), count,
+                    : [name, Text(record.Student.ClassName), Text(lf), Text(choice is null ? "" : PlanningPresentation.Choices(choice, false, session!.Catalog).Replace(" · ", ", ")), count,
                         Text(choice is null ? "" : string.Join(", ", choice.PlannedOralSubjects)), review, departure];
                 rows.Children.Add(new Border { Background = id == choiceSelectedId ? Brush.Parse("#E2F1EE") : index++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White, Child = CompactLine(columns, cells) });
             }
@@ -350,7 +350,7 @@ public sealed partial class TeacherWindow
 
     internal byte[] OverviewPdf(IReadOnlyCollection<TeacherState> states) => PlanningPrint.Overview(session!.Catalog.GraduationYear, FilterDescription(),
         [.. states.Select(s => new[] { s.Record.Student.SyntheticDisplayName, s.Record.Student.ClassName,
-            s.Active is null ? "–" : PlanningPresentation.Choices(s.Active.Snapshot, true), s.Active is null ? "" : PlanningPresentation.Choices(s.Active.Snapshot, false).Replace(" · ", ", "),
+            s.Active is null ? "–" : PlanningPresentation.Choices(s.Active.Snapshot, true, session!.Catalog), s.Active is null ? "" : PlanningPresentation.Choices(s.Active.Snapshot, false, session!.Catalog).Replace(" · ", ", "),
             s.Active is null ? "" : string.Join(", ", s.Active.Snapshot.PlannedOralSubjects),
             FormatStatus(s.Validation?.Status) + (s.RequiresReselection ? ", Nachwahl" : "") })]);
 

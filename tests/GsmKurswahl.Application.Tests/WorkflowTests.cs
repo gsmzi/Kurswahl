@@ -5,6 +5,34 @@ namespace GsmKurswahl.Application.Tests;
 
 public class WorkflowTests
 {
+    [Theory]
+    [InlineData("ER", "KR")]
+    [InlineData("KR", "ER")]
+    public async Task ReligionFromLoadedDraftCannotBypassProfileAndCanBeReplaced(string grade10, string other)
+    {
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = [.. TestData.WorkflowCatalog.Subjects, new("ER", "Evangelische Religion"), new("KR", "Katholische Religion")],
+            Offers = [.. TestData.WorkflowCatalog.Offers, TestData.Offer("ER-BF", "ER"), TestData.Offer("KR-BF", "KR")]
+        };
+        var profile = new ProfileContext(ProfileStatus.Verified, PriorEducation.Unknown with { ReligionEthicsGrade10 = grade10 });
+        var store = new MemoryStore();
+        var choice = TestData.Choice with { Selections = [TestData.Select(catalog.Offers.Single(o => o.SubjectId == other))] };
+        await store.SaveAsync(choice, null);
+        var session = new StudentSession(catalog, choice.StudentId, store, profile);
+        await session.LoadAsync();
+        Assert.Equal(choice.Selections, session.Choice.Selections);
+        Assert.Contains(session.Validation.Messages, m => m.Rule.Id == "GSM-RELIGION-CONFESSION");
+        Assert.DoesNotContain(session.ExtraOffers, o => o.SubjectId == other);
+        Assert.Throws<InvalidOperationException>(() => session.SetSelection(other + "-BF", [1, 2, 3, 4]));
+        Assert.Throws<InvalidOperationException>(() => session.ChooseTaskOption("PLAN-AREA-RELIGION", other + "-BF", true));
+        session.ChooseTaskOption("PLAN-AREA-RELIGION", grade10 + "-BF", true);
+        Assert.DoesNotContain(session.Choice.Selections, s => s.SubjectId == other);
+        Assert.Contains(session.Choice.Selections, s => s.SubjectId == grade10);
+        session.ChooseTaskOption("PLAN-AREA-RELIGION", "ETH-BF", true);
+        Assert.Contains(session.Choice.Selections, s => s.SubjectId == "ETH");
+    }
+
     [Fact]
     public void ReligionSelectionCannotBeAddedAsExtraAndOralChangeReplacesPreviousCourse()
     {

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 3,
+  "version": "demo-2029-compat",
+  "graduationYear": 2029,
+  "isDemo": true,
+  "subjects": [
+    {
+      "id": "D",
+      "name": "Deutsch"
+    },
+    {
+      "id": "NEU",
+      "name": "Neues Fach",
+      "taskField": 3,
+      "isScience": true
+    }
+  ],
+  "offers": [
+    {
+      "id": "D-LF",
+      "subjectId": "D",
+      "type": "lf",
+      "variant": "normal",
+      "status": "offered",
+      "schedule": [
+        {
+          "semester": 1,
+          "weeklyHours": 3
+        },
+        {
+          "semester": 2,
+          "weeklyHours": 3
+        },
+        {
+          "semester": 3,
+          "weeklyHours": 3
+        },
+        {
+          "semester": 4,
+          "weeklyHours": 3
+        }
+      ],
+      "requirements": [],
+      "cooperationSchool": "ewg",
+      "isTopUpCourse": true
+    },
+    {
+      "id": "NEU-BF",
+      "subjectId": "NEU",
+      "type": "bf",
+      "variant": "bilingual",
+      "status": "planned",
+      "schedule": [
+        {
+          "semester": 1,
+          "weeklyHours": 3
+        },
+        {
+          "semester": 2,
+          "weeklyHours": 3
+        },
+        {
+          "semester": 3,
+          "weeklyHours": 3
+        },
+        {
+          "semester": 4,
+          "weeklyHours": 3
+        }
+      ],
+      "requirements": [
+        "continuous_bilingual"
+      ],
+      "cooperationSchool": "none",
+      "isTopUpCourse": false
+    }
+  ],
+  "submissionDeadline": "2027-03-15"
+}

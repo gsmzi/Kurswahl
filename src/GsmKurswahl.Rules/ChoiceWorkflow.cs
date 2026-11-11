@@ -144,10 +144,10 @@ public static class ChoiceWorkflow
             var chosen = matching.Select(s => s.OfferId).ToImmutableArray();
             var candidates = catalog.Offers.Where(o => o.Type != CourseType.Lf && subjects.Contains(o.SubjectId) && !lf.Contains(o.SubjectId)
                 && four.All(h => o.Schedule.Any(s => s.Semester == h))).ToArray();
-            var options = candidates.Where(o => chosen.Contains(o.Id) || validator.GetAvailability(o, profile).CanSelect).Select(o => o.Id).ToImmutableArray();
+            var options = candidates.Where(o => validator.GetAvailability(o, profile).CanSelect).Select(o => o.Id).ToImmutableArray();
             var restricted = candidates.Where(o => !options.Contains(o.Id))
                 .Select(o => new RestrictedOffer(o.Id, validator.GetAvailability(o, profile).Explanation)).ToImmutableArray();
-            var have = lf.Concat(matching.Select(s => s.SubjectId)).ToArray();
+            var have = lf.Concat(matching.Where(s => options.Contains(s.OfferId)).Select(s => s.SubjectId)).ToArray();
             return new(ruleId, Definitions.Single(d => d.Id == ruleId), title, hint, four, choose,
                 Math.Max(0, needed - fulfilled(have)), options, chosen, lf, restricted);
         }
@@ -155,7 +155,7 @@ public static class ChoiceWorkflow
         var tasks = new List<ChoiceTask>
         {
             Area("PLAN-AREA-ART", "Kunst oder Musik", "Wähle eines der beiden Fächer für HJ 1–4.", ["BK", "MU"], 1, have => have.Length),
-            Area("PLAN-AREA-RELIGION", "Religion oder Ethik", "Wähle ein Fach für HJ 1–4. Ob du es belegen darfst (Konfession, Vorbildung), klärt die Oberstufenberatung – needs_review.",
+            Area("PLAN-AREA-RELIGION", "Religion oder Ethik", "Wähle ein Fach für HJ 1–4. Religion wird passend zum bestätigten Klasse-10-Fach angeboten (ER: evangelisch, KR: katholisch). Bei unbekannten oder ungeprüften Angaben bleiben beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; Wechsel und mündliche Prüfung ggf. klären.",
                 ["ER", "KR", "ETH"], 1, have => have.Length),
             Area("PLAN-AREA-LANGUAGE", "Mindestens eine Fremdsprache", "Englisch, Französisch oder Latein für HJ 1–4. Eine passende LF-Belegung erfüllt die Pflicht bereits. Italienisch nur mit bestätigter geeigneter Sprachlaufbahn.",
                 AcademicRules.Languages(profile, catalog), 1, have => have.Length),
