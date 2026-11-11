@@ -124,7 +124,7 @@ public sealed partial class TeacherWindow
         {
             navigation.Children.Add(Button("Übersicht", () => ShowPage("start"), "Startseite mit dem nächsten empfohlenen Arbeitsschritt und den wichtigsten Zahlen des Jahrgangs."));
             navigation.Children.Add(Button("Wahl", ShowElection, "Wahl vorbereiten und durchführen: Fächer, Schülerliste, Schülerbestand, Schülerdateien verteilen, Kurswahlen einsammeln."));
-            navigation.Children.Add(Button("Wahlergebnisse", ShowResults, "Alle eingelesenen Kurswahlen in einer Tabelle; Abgänger markieren, per Klick zur Person springen."));
+            navigation.Children.Add(Button("Kurswahlen", ShowResults, "Alle Kurswahlen filtern, einzeln ansehen und ändern, Abgänger markieren, Kontrollbögen, Kurslisten und Nachwahlbögen drucken."));
             navigation.Children.Add(Button("Kursplanung", ShowPlanning, "Wahlzahlen je Fach und Halbjahr, Planungsstände sichern, Kursstreichungen simulieren und Nachwahlbögen erstellen."));
             navigation.Children.Add(Button("Abgleich / Abschluss", ShowReconciliation, "Tabellen exportieren, externe Kurswahllisten vergleichen, manuelle ASV-Eingabe vermerken, Jahrgang sichern."));
         }
@@ -336,14 +336,14 @@ public sealed partial class TeacherWindow
         dashboardPanel.Children.Add(new TextBlock { Text = "Ihr aktueller Jahrgang", FontSize = 23, FontWeight = FontWeight.SemiBold, Foreground = Ink });
         string next; string action; string target;
         if (collections.Length > 0) { next = $"{collections.Length} Wahlkonflikte benötigen eine Entscheidung."; action = "Konflikte prüfen"; target = "collection"; }
-        else if (summary.Students > 0 && summary.Choices == summary.Students) { next = "Die Kurswahlen liegen vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot."; action = "Wahlergebnisse ansehen"; target = "results"; }
+        else if (summary.Students > 0 && summary.Choices == summary.Students) { next = "Die Kurswahlen liegen vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot."; action = "Kurswahlen prüfen und ändern"; target = "results"; }
         else if (summary.Students == 0) { next = "Für diesen Jahrgang fehlen noch Schüler."; action = "Schülerliste importieren"; target = "import"; }
         else if (summary.UnconfirmedMappings > 0) { next = $"{summary.UnconfirmedMappings} Ordnerzuordnungen müssen noch geprüft werden."; action = "Schülerdateien verteilen"; target = "profiles"; }
         else if (summary.ProfilesToIssue > 0) { next = $"Für {summary.ProfilesToIssue} Personen fehlen aktuelle Profile."; action = "Schülerprofile bereitstellen"; target = "profiles"; }
         else if (summary.ProfilesToDeliver > 0) { next = $"{summary.ProfilesToDeliver} Profile sind noch zuzustellen oder erneut zu verteilen."; action = "Zustellung bearbeiten"; target = "profiles"; }
         else if (collections.Length > 0) { next = $"Für {collections.Length} Personen liegen offene Wahlkonflikte zur Entscheidung vor."; action = "Konflikte prüfen"; target = "collection"; }
         else if (summary.Choices < summary.Students) { next = $"Für {summary.Students - summary.Choices} Personen wurde noch keine Kurswahl eingelesen."; action = "Kurswahlen einsammeln"; target = "collection"; }
-        else { next = "Die Kurswahlen liegen vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot."; action = "Wahlergebnisse ansehen"; target = "results"; }
+        else { next = "Die Kurswahlen liegen vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot."; action = "Kurswahlen prüfen und ändern"; target = "results"; }
         var primary = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         var guidance = new StackPanel { Spacing = 6, Margin = new Thickness(0, 0, 20, 0), VerticalAlignment = VerticalAlignment.Center };
         guidance.Children.Add(new TextBlock { Text = "Als Nächstes", FontSize = 17, FontWeight = FontWeight.SemiBold, Foreground = Accent });
@@ -358,7 +358,7 @@ public sealed partial class TeacherWindow
         foreach (var task in new[] {
             Button("Wahl organisieren", ShowElection, "Schülerliste, Schülerdateien und Wahleingang verwalten."),
             Button("Schülerbestand und Sonderfälle", () => ShowPage("people"), "Einzelne Personen öffnen: Vorbildung, Nachwahl, Lehreränderung und Historie."),
-            Button("Wahlergebnisse ansehen", ShowResults, "Alle eingelesenen Wahlen kompakt prüfen und Abgänger markieren."),
+            Button("Kurswahlen prüfen und ändern", ShowResults, "Alle Wahlen filtern, einzeln ändern und drucken."),
             Button("Kursplanung öffnen", ShowPlanning, "Wahlzahlen auswerten und Kursstreichungen simulieren."),
             Button("Abgleich / Abschluss öffnen", ShowReconciliation, "Exporte, externer Abgleich und Vermerke zur ASV-Eingabe.") })
         { task.Margin = new Thickness(0, 0, 10, 10); tasks.Children.Add(task); }

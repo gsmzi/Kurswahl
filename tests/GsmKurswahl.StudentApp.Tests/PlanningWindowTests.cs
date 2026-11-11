@@ -81,7 +81,7 @@ public sealed class PlanningWindowTests
             window = new TeacherWindow(root); window.Show(); Click("Kursplanung");
             Assert.Equal(OfferStatus.Cancelled, new TeacherWorkspace(root).Active!.Catalog.Offers.Single(o => o.Id == "BIO-LF").Status);
             Control<TabControl>("PlanningTabs").SelectedIndex = 2; Assert.DoesNotContain(window.GetLogicalDescendants().OfType<CheckBox>(), c => c.Name == "PlanningCancel_BIO_LF");
-            Click("Wahlergebnisse"); Click("Kursplanung"); Click("Hilfe"); Click("Kursplanung");
+            Click("Kurswahlen"); Click("Kursplanung"); Click("Hilfe"); Click("Kursplanung");
         }
         finally { window.Close(); Directory.Delete(root, true); }
     }

@@ -134,3 +134,11 @@ Schülertexte am 28.10.2026 berichtigt: Die automatische Regelprüfung ist vorha
 - Religion/Ethik: Wechsel gegenüber Klasse 10 ist Hinweis; Lehrerprogramm filtert „Religion/Ethik: Wechsel“ und „Feststellungsprüfung nötig“ und exportiert die Liste. Nach bestandener Feststellungsprüfung „Prüfung freigegeben“ auf Ja setzen, dann entfällt der Hinweis auf die offene Prüfung.
 - Erledigt (Nutzerentscheidung 10.11.2026): Die allgemeinen Hinweise `M2-RELEASE`, `AGVO-CREDIT` und `AGVO-ELECTION` sind entfernt. „Fachlich zu klären“ zählt nur noch personenbezogene Klärfälle; „formal gültig“ ist jetzt erreichbar und bedeutet nur: automatische Prüfung ohne Befund. Damit wird auch „Nachwahl abschließen“ (nur bei formal gültig) nutzbar. Ältere Aussagen in dieser Datei, wonach jede Wahl `needs_review` bleibt, sind damit überholt.
 - Offen: Das Schülerprogramm ist weiterhin auf Demo-Katalog und `demo-`-IDs beschränkt; keine verbindliche Abgabe.
+
+## Kurswahlen im Lehrerprogramm (11.11.2026)
+
+- Umgesetzt nach Nutzerauftrag: Seite „Kurswahlen“ mit Filtern, Bearbeitung im Halbjahresraster (rot/gelb), Kursstreichung direkt aus den Wahlzahlen, PDF-Ausgaben. Sammeländerungen mehrerer Personen (außer Streichung) sind bewusst nicht vorgesehen.
+- „Nachwahl abschließen“ ist jetzt ohne Regelverletzung möglich (bisher nur bei „formal gültig“); gelbe Hinweise entscheidet die Beratung.
+- Offen: Die ältere Bearbeitung im Schülerbestand (Reiter „Kurswahl und Nachwahl“) besteht parallel weiter; sie kann entfallen, sobald die neue Seite erprobt ist.
+- Offen: Kontrollbogen aus dem Lehrerprogramm ist ein eigenes Layout (nicht identisch mit dem des Schülerprogramms); Abgleich mit dem ASV-Formular steht aus.
+- Offen: Ein nach dem abschließenden Einsammeln neu hinzugekommener Schüler ohne archivierte Dateien würde weiter automatisch gelesen; das ist gewollt (Neuzugang), aber im Pilot zu prüfen.

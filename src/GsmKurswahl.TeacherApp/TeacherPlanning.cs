@@ -12,6 +12,8 @@ public sealed partial class TeacherWindow
 {
     private bool planningIncludeExpected = true;
     private PlanningDocument? renderedPlanningDocument;
+    private Action<string>? planningCancelRequest;
+    private Func<bool> planningIsLive = () => false;
     private void ShowPlanning()
     {
         Ready(); visiblePage = "planning";
@@ -185,9 +187,9 @@ public sealed partial class TeacherWindow
         };
         var followUpStack = new StackPanel { Spacing = 6 };
         followUpStack.Children.Add(new TextBlock { Text = "📋 Nächste Schritte nach einer Angebotsstreichung:", FontWeight = FontWeight.SemiBold });
-        followUpStack.Children.Add(Text("1. Nachwahlbögen ausdrucken und den betroffenen Schülern aushändigen."));
-        followUpStack.Children.Add(Text("2. Aktualisiertes Fachangebot bereitstellen (unter „Profile & Verteilung“ als Angebot exportieren)."));
-        followUpStack.Children.Add(Text("3. Sobald Schüler neu gewählt haben, die Nachwahlen im Personen-Editor eintragen."));
+        followUpStack.Children.Add(Text("1. Unter „Kurswahlen“ den Filter „Nachwahl offen“ wählen."));
+        followUpStack.Children.Add(Text("2. Nachwahlbögen für alle Betroffenen als eine PDF drucken und aushändigen."));
+        followUpStack.Children.Add(Text("3. Die Nachwahl dort direkt bei der Person eintragen und speichern."));
         var followUpButtons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
         followUpButtons.Children.Add(Button("Nachwahlbögen-Ordner öffnen", OpenReselectionFolder));
         followUpButtons.Children.Add(Button("Nachwahlbögen jetzt erstellen", () => { var folder = CreateReselectionSheets(); status.Text = "Nachwahlbögen erstellt: " + folder; }));
@@ -196,6 +198,49 @@ public sealed partial class TeacherWindow
         followUpCard.Child = followUpStack;
         changesPanel.Children.Add(followUpCard);
 
+        var cancelHost = new StackPanel { Name = "CancelCard", Spacing = 6 };
+        planningIsLive = () => displayed is null;
+        planningCancelRequest = offerId =>
+        {
+            var offer = session!.Catalog.Offers.Single(o => o.Id == offerId);
+            var title = ChoiceOverview.OfferTitle(session.Catalog, offer);
+            var cancelPreview = CoursePlanning.PreviewCancellation(Current(), [offerId]);
+            var affected = cancelPreview.Changes.Where(c => !c.RemovedOffers.IsEmpty)
+                .Select(c => (Change: c, Student: cancelPreview.Basis.Students.Single(s => s.Student.ExternalStudentId == c.StudentId)))
+                .OrderBy(x => x.Student.Student.ClassName, StringComparer.CurrentCulture).ThenBy(x => x.Student.Student.SortName().Last, StringComparer.CurrentCulture).ToArray();
+            cancelHost.Children.Clear();
+            var card = new StackPanel { Spacing = 6 };
+            card.Children.Add(new TextBlock { Text = $"{title} kommt nicht zustande?", FontSize = 17, FontWeight = FontWeight.SemiBold, Foreground = Ink });
+            card.Children.Add(Text($"{affected.Length} Personen haben diesen Kurs gewählt. Beim Streichen wird er bei allen entfernt und das Angebot gesperrt. Die bisherigen Wahlen bleiben in der Historie; vorher wird automatisch ein Planungsstand gesichert, mit dem sich die Streichung zurücknehmen lässt."));
+            var cancelReason = new TextBox { Name = "CancelReason", Watermark = "Begründung (optional), z. B. zu wenige Wahlen" };
+            card.Children.Add(cancelReason);
+            var cancelButtons = new WrapPanel { Orientation = Orientation.Horizontal };
+            var confirm = Primary(Button($"Kurs streichen und bei {affected.Length} Personen entfernen", () =>
+            {
+                planning.SavePlanningDocument(cancelPreview.Basis with { Name = "Vor Streichung " + title + " · " + DateTime.Now.ToString("g") });
+                CoursePlanning.Confirm(planning, cancelPreview, Actor, string.IsNullOrWhiteSpace(cancelReason.Text) ? "Kurs kommt nicht zustande: " + title : cancelReason.Text!, true);
+                session = new TeacherSession(store!, cancelPreview.Catalog, Actor);
+                workspace!.Update(workspace.Active! with { Catalog = cancelPreview.Catalog });
+                var open = cancelPreview.Changes.Count(c => !c.RemovedOffers.IsEmpty && c.Validation.Status == ReviewStatus.Invalid);
+                Refresh(preserveEditor: true); ShowPlanning();
+                status.Text = $"{title} gestrichen und bei {affected.Length} Personen entfernt. {open} brauchen eine Nachwahl: unter „Kurswahlen“ den Filter „Nachwahl offen“ wählen, dort direkt eintragen oder Nachwahlbögen drucken.";
+            }));
+            confirm.Name = "CancelConfirm"; confirm.Margin = new Thickness(0, 0, 8, 0); cancelButtons.Children.Add(confirm);
+            var abort = Button("Abbrechen", () => cancelHost.Children.Clear()); abort.Name = "CancelAbort"; cancelButtons.Children.Add(abort);
+            card.Children.Add(cancelButtons);
+            const string cancelColumns = "190,55,*";
+            if (affected.Length > 0) card.Children.Add(CompactLine(cancelColumns, [Text("Schüler"), Text("Klasse"), Text("Folge für die Kurswahl")]));
+            foreach (var (change, student) in affected)
+            {
+                var violations = ChoiceOverview.Violations(change.Validation);
+                var consequence = Text(violations.IsEmpty ? "weiterhin ohne Regelverletzung" : "Nachwahl nötig: " + string.Join(" · ", violations));
+                consequence.Foreground = violations.IsEmpty ? Green : Red;
+                card.Children.Add(CompactLine(cancelColumns, [Text(student.Student.SyntheticDisplayName), Text(student.Student.ClassName), consequence]));
+            }
+            cancelHost.Children.Add(new Border { Background = Brush.Parse("#FFF6E5"), BorderBrush = Brush.Parse("#E0B45A"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(14), Child = card });
+        };
+        analysisPanel.Children.Add(Text("Kommt ein Kurs nicht zustande? Das ✕ neben der Wahlzahl zeigt die Betroffenen und streicht den Kurs nach Bestätigung bei allen."));
+        analysisPanel.Children.Add(cancelHost);
         analysisPanel.Children.Add(report);
         RenderPlanningReport(report, Current(), 24);
         var wide = Width >= 1150;
@@ -277,7 +322,17 @@ public sealed partial class TeacherWindow
                         FontWeight = FontWeight.SemiBold, Foreground = scheduled.Any(n => n > 0) ? Accent : Muted };
                     ToolTip.SetTip(text, offer.Id + " · " + offer.Status + "\n" + string.Join("\n", analysis.Demand.Where(d => d.OfferId == offer.Id)
                         .Select(d => $"HJ {d.Semester}: {d.Relevant} verbleibend / {d.All} insgesamt")));
-                    content.Children.Add(text);
+                    if (planningCancelRequest is { } request && planningIsLive() && !document.IsScenario
+                        && offer.Status is OfferStatus.Offered or OfferStatus.Established && PlanningPresentation.CanCancel(offer))
+                    {
+                        var offerId = offer.Id;
+                        var cancel = new Button { Name = "CancelOffer_" + offer.Id.Replace('-', '_'), Content = "✕", FontSize = 10, Padding = new Thickness(5, 0), MinHeight = 20, MinWidth = 0, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                        ToolTip.SetTip(cancel, "Kurs kommt nicht zustande … (zeigt zuerst die betroffenen Personen)");
+                        cancel.Click += (_, _) => { try { request(offerId); } catch (Exception ex) { status.Text = "Vorgang nicht abgeschlossen: " + ex.Message; } };
+                        var line = new StackPanel { Orientation = Orientation.Horizontal }; line.Children.Add(text); line.Children.Add(cancel);
+                        content.Children.Add(line);
+                    }
+                    else content.Children.Add(text);
                 }
                 return content;
             }

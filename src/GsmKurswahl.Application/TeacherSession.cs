@@ -80,8 +80,8 @@ public sealed class TeacherSession(IAdministrationStore store, OfferCatalog cata
     {
         if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("Begründung erforderlich.");
         var state = Overview().Single(s => s.Record.Student.ExternalStudentId == studentId);
-        if (!required && (state.Active is null || state.Validation?.Status != ReviewStatus.Valid))
-            throw new InvalidOperationException("Abschluss erst nach gültiger Prüfung; offene Fachfreigaben bleiben needs_review.");
+        if (!required && (state.Active is null || state.Validation?.Status == ReviewStatus.Invalid))
+            throw new InvalidOperationException("Abschluss erst ohne Regelverletzung möglich; zuerst die Kurswahl korrigieren.");
         store.SetReselection(studentId, required, deadline, actor + ": " + reason);
     }
 }

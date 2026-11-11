@@ -223,6 +223,8 @@ public sealed partial class TeacherWindow
             busyPanel.IsVisible = false; navigation.IsEnabled = true; pageHost.IsEnabled = true; yearSwitchButton.IsEnabled = true;
         }
     }
+    public static bool FinallyCollected(IAdministrationStore store, string studentId) =>
+        store is SqliteAdministrationStore sql && !sql.CollectedFiles(studentId).IsEmpty;
     private async Task CollectAutomatically()
     {
         if (collecting || session is null || store is null) return;
@@ -235,6 +237,8 @@ public sealed partial class TeacherWindow
             {
                 try
                 {
+                    // Nutzerentscheidung 11.11.2026: after the final collection everything happens in the teacher program.
+                    if (FinallyCollected(activeStore, record.Student.ExternalStudentId)) continue;
                     var data = StudentFolderLayout.Data(record.HomeDirectory);
                     var path = Path.Combine(data, "aktuell.json");
                     var loaded = await Task.Run(async () => await new JsonChoiceStore(path, data).LoadAsync());

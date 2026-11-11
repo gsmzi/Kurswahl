@@ -155,7 +155,7 @@ public sealed partial class TeacherWindow
         {
             "offer" => "EINRICHTUNG  /  FACHANGEBOT", "import" => "SCHÜLERLISTE  /  IMPORT & ABGLEICH",
             "profiles" => "SCHÜLERDATEIEN  /  VERTEILUNG", "collection" => "KURSWAHLEN  /  EINGANG & KONFLIKTE",
-            "wahl" => "WAHL / VORBEREITEN & EINSAMMELN", "results" => "WAHLERGEBNISSE", "people" => "WAHL / SCHÜLERBESTAND", "settings" => "EINSTELLUNGEN", "help" => "HILFE & DATEIEN",
+            "wahl" => "WAHL / VORBEREITEN & EINSAMMELN", "results" => "KURSWAHLEN / PRÜFEN, ÄNDERN, DRUCKEN", "people" => "WAHL / SCHÜLERBESTAND", "settings" => "EINSTELLUNGEN", "help" => "HILFE & DATEIEN",
             "planning" => "KURSPLANUNG / SZENARIEN & ANALYSE", "manage" => "JAHRGANG VERWALTEN", "catalog" => "FACHANGEBOT", "new" => "WILLKOMMEN", "asv" => "ABGLEICH / ABSCHLUSS", _ => "JAHRGANGSÜBERSICHT"
         };
         foreach (var button in navigation.Children.OfType<Button>())
@@ -164,7 +164,7 @@ public sealed partial class TeacherWindow
             var selected = button.Content?.ToString() switch
             {
                 "Übersicht" => visiblePage == "start", "Wahl" => visiblePage is "wahl" or "offer" or "import" or "profiles" or "collection" or "people",
-                "Wahlergebnisse" => visiblePage == "results",
+                "Kurswahlen" => visiblePage == "results",
                 "Kursplanung" => visiblePage == "planning",
                 "Abgleich / Abschluss" => visiblePage == "asv",
                 "Jahrgang verwalten" => visiblePage is "manage" or "catalog", "Einstellungen" => visiblePage == "settings",

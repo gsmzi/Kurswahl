@@ -88,7 +88,7 @@ public sealed class DemoWorkspaceTests
                     using var frame = window.CaptureRenderedFrame(); Assert.NotNull(frame); frame.Save(Path.Combine(narrowScreenshots, "demo-80-analysis-narrow.png"));
                 }
                 window.Width = 1400; window.Height = 900; window.UpdateLayout();
-                Click("Wahlergebnisse"); Assert.False(Control<StackPanel>("WorkflowProgress").IsVisible);
+                Click("Kurswahlen"); Assert.False(Control<StackPanel>("WorkflowProgress").IsVisible);
                 Assert.Equal(80, Control<StackPanel>("ResultRows").Children.Count);
                 Assert.DoesNotContain(window.GetLogicalDescendants().OfType<ComboBox>(), c => c.Name == "PrereqImp");
                 Control<ComboBox>("ResultDeparture_demo-002").SelectedIndex = 2;

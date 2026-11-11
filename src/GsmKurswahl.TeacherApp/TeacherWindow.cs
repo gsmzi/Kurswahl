@@ -97,8 +97,8 @@ public sealed partial class TeacherWindow : Window
             "3 · Schülerliste (Excel/CSV aus Klasse 10) einlesen: Namen, Klassen und Vorbildung.\n" +
             "4 · Schülerdateien verteilen: Das Programm legt jedem Schüler sein persönliches Profil und das Fachangebot in den Wahlordner.\n" +
             "5 · Schüler wählen im Schülerprogramm. Das Lehrerprogramm sammelt die Wahlen bei geöffneter App automatisch ein.\n" +
-            "6 · Wahlergebnisse prüfen, Sonderfälle im Schülerbestand klären, Abgänger markieren.\n" +
-            "7 · Kursplanung: Wahlzahlen ansehen, Kurse ggf. streichen. Das Programm erstellt Nachwahlbögen; danach Schülerdateien erneut verteilen.\n" +
+            "6 · Abschließend einsammeln. Ab dann läuft alles im Lehrerprogramm: unter „Kurswahlen“ prüfen, filtern, ändern, Abgänger markieren und drucken.\n" +
+            "7 · Kursplanung: Wahlzahlen ansehen; kommt ein Kurs nicht zustande, über das ✕ neben der Wahlzahl streichen. Nachwahl unter „Kurswahlen“ direkt eintragen oder Nachwahlbögen drucken.\n" +
             "8 · Abgleich / Abschluss: Listen exportieren, ASV-Eingabe pro Person vermerken, Jahrgang sichern."));
         panel.Children.Add(Help("Was bedeuten die Fachbegriffe?",
             "LF – Leistungsfach (5-stündig, alle vier Halbjahre).\nBF – Basisfach (meist 2- oder 3-stündig).\nHJ 1–4 – die vier Halbjahre der Kursstufe; KS1 = HJ 1+2, KS2 = HJ 3+4.\n\n" +
@@ -297,7 +297,7 @@ public sealed partial class TeacherWindow : Window
         {
             session!.FollowUp(id, true, deadline.SelectedDate is { } d ? new DateTimeOffset(d.Date) : null, editReason.Text ?? "");
             Refresh(); status.Text = "Nachwahl vorgemerkt und protokolliert.";
-        }, "Markiert die Person als „Nachwahl offen“. Erscheint im Filter, auf der Übersicht und in den Wahlergebnissen.");
+        }, "Markiert die Person als „Nachwahl offen“. Erscheint im Filter, auf der Übersicht und unter „Kurswahlen“.");
         mark.Margin = new Thickness(0, 0, 10, 0); followRow.Children.Add(mark);
         followRow.Children.Add(Button("Nachwahl abschließen", () => { session!.FollowUp(id, false, null, editReason.Text ?? ""); Refresh(); status.Text = "Nachwahl abgeschlossen."; }, "Beendet die offene Nachwahl; der Vorgang bleibt im Protokoll."));
         choiceTab.Children.Add(followRow);
@@ -522,7 +522,7 @@ public sealed partial class TeacherWindow : Window
             foreach (var r in results.OrderBy(r => r.Status == "geräumt"))
                 collectionResults.Children.Add(TableLine(names.GetValueOrDefault(r.StudentId, r.StudentId), r.StudentId, r.Status, r.Detail));
             status.Text = $"Abschließendes Einsammeln: {results.Count(r => r.Status == "geräumt")} von {results.Count} Wahlordnern geräumt; übrige siehe Liste.";
-        }, "Liest zuerst alle neuen Wahlen ein. Danach werden je Person aktuell.json, Sicherung, Profil, Fachangebot und das verteilte Schülerprogramm entfernt – erst nachdem alle Dateien byte-genau im Lehrerbestand archiviert sind. Ordner mit offenem Konflikt oder nicht eingesammelter Wahl bleiben unverändert.");
+        }, "Liest zuerst alle neuen Wahlen ein; vorher können Sie jederzeit den Zwischenstand unter „Kurswahlen“ ansehen. Nach dem abschließenden Einsammeln liest das Programm die Ordner dieser Personen nicht mehr ein – Änderungen erfolgen dann nur noch im Lehrerprogramm. Danach werden je Person aktuell.json, Sicherung, Profil, Fachangebot und das verteilte Schülerprogramm entfernt – erst nachdem alle Dateien byte-genau im Lehrerbestand archiviert sind. Ordner mit offenem Konflikt oder nicht eingesammelter Wahl bleiben unverändert.");
         finalCollection.Name = "FinalCollection";
         collectionPanel.Children.Add(Help("Was passiert beim abschließenden Einsammeln?", "Nach dem Abgabetermin räumt das Programm die Wahlordner: Jede Datei wird vorher vollständig mit Prüfsumme im Lehrerbestand archiviert, erst dann gelöscht. Entfernt wird nur, was nachweislich eingesammelt ist; bei offenem Konflikt zuerst übernehmen oder verwerfen. Programmdateien werden nur gelöscht, wenn sie unverändert aus der eigenen Verteilung stammen. Startet eine Person das Programm danach erneut, entsteht eine neue Datei, die wie gewohnt eingesammelt wird."));
         collectionPanel.Children.Add(finalConfirm); collectionPanel.Children.Add(finalCollection);

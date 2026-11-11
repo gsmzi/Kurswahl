@@ -4,7 +4,11 @@ using GsmKurswahl.Domain;
 
 namespace GsmKurswahl.ImportExport;
 
-public sealed record ReselectionPrintItem(StudentRecord Student, CourseChoice Remaining, string[] Removed);
+public sealed record ReselectionPrintItem(StudentRecord Student, CourseChoice Remaining, string[] Removed)
+{
+    // Open points of the current choice in plain words; printed when the re-election has other reasons than a cancelled course.
+    public string[] Notes { get; init; } = [];
+}
 
 /// <summary>Minimal editable OOXML document, produced offline without Office automation.</summary>
 public static class ReselectionWord
