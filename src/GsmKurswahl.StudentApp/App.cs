@@ -41,7 +41,7 @@ public sealed class App : Avalonia.Application
                 {
                     Title = "GSM-Kurswahl – Konfiguration prüfen", Width = 700, Height = 300,
                     Content = new TextBlock { Margin = new Thickness(24), TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                        Text = "Der persönliche Wahlordner konnte nicht geladen werden. Starten Sie mit --wahlordner und dem von der Schule zugeordneten Ordner oder setzen Sie GSM_KURSWAHL_HOME. Dort müssen profil.json und fachangebot.json liegen. Es wurden keine Wahldateien verändert.\n\n" + ex.Message }
+                        Text = "Der persönliche Wahlordner konnte nicht geladen werden. Bitte starte das Programm über die Startdatei in deinem Kurswahl-Ordner. Klappt das nicht, wende dich an die Oberstufenberatung. Es wurden keine Wahldateien verändert.\n\nTechnischer Hinweis: Start mit --wahlordner und dem zugeordneten Ordner oder GSM_KURSWAHL_HOME; dort müssen profil.json und fachangebot.json liegen.\n\n" + ex.Message }
                 };
             }
         }

@@ -26,6 +26,7 @@ public sealed class StudentSession
     public bool IsDirty { get; private set; }
     public bool IsBusy { get; private set; }
     public bool LoadFailed { get; private set; }
+    public bool HasSavedFile => contentToken is not null;
     public string Message { get; private set; } = "Neuer vorläufiger Entwurf – noch nicht gespeichert.";
     public ValidationResult Validation => validator.Validate(Choice, Catalog, Profile);
     public ImmutableArray<SemesterSummary> Summary => ChoiceValidator.Summarize(Choice, Catalog);

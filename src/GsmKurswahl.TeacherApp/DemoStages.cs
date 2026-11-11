@@ -15,7 +15,7 @@ public sealed record DemoStage(string Id, string Title, string Description);
 /// <summary>
 /// Named synthetic states for the test package. Each is generated on the tester's computer, because the teacher
 /// database stores absolute pupil folders. The teacher stages go through the same import and distribution services
-/// as the real workflow. Reopening never resets a stage; only deleting its folder does.
+/// as the real workflow. Reopening the same folder preserves it; package launchers use a new folder per click.
 /// </summary>
 public static class DemoStages
 {
@@ -39,7 +39,9 @@ public static class DemoStages
         new("schueler-2-angefangen", "Schüler 2 · Wahl angefangen", "Drei Leistungsfächer sind gewählt, der Rest fehlt noch."),
         new("schueler-3-fertig", "Schüler 3 · Wahl fertig", "Eine vollständige Kurswahl ist gespeichert."),
         new("schueler-4-alle-voraussetzungen", "Schüler 4 · Blanko mit Bili, Informatik und Italienisch", "Keine Wahl, aber alle besonderen Voraussetzungen sind bestätigt."),
-        new("schueler-5-sportbefreit", "Schüler 5 · Blanko mit Sportbefreiung", "Keine Wahl, Sportbefreiung in Halbjahr 3 und 4 (Verwaltungsmerkmal ohne Gesundheitsangaben).")
+        new("schueler-5-sportbefreit", "Schüler 5 · Blanko mit Sportbefreiung", "Keine Wahl, Sportbefreiung in Halbjahr 3 und 4 (Verwaltungsmerkmal ohne Gesundheitsangaben)."),
+        new("schueler-6-ohne-zusatzrechte", "Schüler 6 · Ohne besondere Voraussetzungen", "Keine Wahl, Italienisch-Profil, Bili-Bildungsgang und beide Informatik-Zugangswege ausdrücklich nicht vorhanden."),
+        new("schueler-7-vorbildung-unbekannt", "Schüler 7 · Vorbildung unbekannt", "Keine Wahl, Vorbildung ungeklärt. Unbekannt bedeutet fachlich zu klären, keine bestätigte Berechtigung.")
     ];
 
     public static DemoStage Find(string id) => All.SingleOrDefault(s => s.Id == id)
@@ -54,11 +56,11 @@ public static class DemoStages
         if (File.Exists(marker))
         {
             if (File.ReadAllText(marker) != expected)
-                throw new InvalidDataException("Dieser Teststand stammt aus einem anderen Testpaket. Bitte „Alles zuruecksetzen“ ausführen.");
+                throw new InvalidDataException("Dieser Teststand stammt aus einem anderen Testpaket. Bitte die Teststand-CMD für einen frischen Lauf starten.");
             return; // Reopening never resets a tester's experiments.
         }
         if (Directory.Exists(root) && Directory.EnumerateFileSystemEntries(root).Any())
-            throw new IOException("Teststand ist unvollständig oder der Ordner wird anders genutzt. Bitte „Alles zuruecksetzen“ ausführen.");
+            throw new IOException("Teststand ist unvollständig oder der Ordner wird anders genutzt. Bitte die Teststand-CMD für einen frischen Lauf starten.");
         var students = DemoCohort.Create(catalog);
         Directory.CreateDirectory(root);
         if (id.StartsWith("lehrer-", StringComparison.Ordinal)) PrepareTeacher(All.IndexOf(stage) + 1, root, catalog, students);
@@ -135,6 +137,9 @@ public static class DemoStages
         if (id == "schueler-4-alle-voraussetzungen")
             prerequisites = prerequisites with { ItalianProfile = Knowledge.Yes, InformaticsBridge = Knowledge.Yes, InformaticsImp = Knowledge.Yes, ContinuousBilingual = Knowledge.Yes };
         if (id == "schueler-5-sportbefreit") prerequisites = prerequisites with { SportExemptSemesters = [3, 4] };
+        if (id == "schueler-6-ohne-zusatzrechte")
+            prerequisites = prerequisites with { ItalianProfile = Knowledge.No, InformaticsBridge = Knowledge.No, InformaticsImp = Knowledge.No, ContinuousBilingual = Knowledge.No };
+        if (id == "schueler-7-vorbildung-unbekannt") prerequisites = PriorEducation.Unknown;
         var data = Directory.CreateDirectory(StudentFolderLayout.Data(root)).FullName;
         var profile = new StudentProfile(SchemaVersions.Profile, 1, row.Choice.StudentId, "", catalog.GraduationYear, DateTimeOffset.UtcNow, prerequisites)
         { DisplayName = row.Record.Student.SyntheticDisplayName, ClassName = row.Record.Student.ClassName };

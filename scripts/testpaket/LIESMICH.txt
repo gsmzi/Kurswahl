@@ -1,67 +1,85 @@
-GSM-Kurswahl – Testpaket
-========================
+GSM-Kurswahl – Testpaket für das Verwaltungsnetz
+==============================================
 
 Nur zum Ausprobieren. Alle Personen sind erfunden. Bitte keine echten
 Schülerdaten eintragen. Dieses Paket ist keine Produktivfreigabe.
 
-
 So geht's
 ---------
 
-1. ZIP-Datei vollständig entpacken, am besten auf die lokale Festplatte
-   (nicht direkt aus dem ZIP starten, nicht auf ein Netzlaufwerk).
-2. Eine der .cmd-Dateien doppelklicken. Windows braucht kein .NET und keine
-   Installation.
+1. Das gesamte ZIP in einen eigenen Ordner auf dem Netzlaufwerk entpacken.
+   Alle Unterordner, insbesondere _system, zusammenlassen.
+   Für Kollegen reichen Leserechte auf diesen Paketordner.
+2. Eine der .cmd-Dateien doppelklicken. Jeder Klick startet mit frischen
+   Ausgangsdaten, auch wenn derselbe Stand bereits geöffnet ist.
+   Windows x64; keine Installation, keine .NET-Installation erforderlich.
+3. Ausprobieren, speichern, schließen. Zum erneuten Testen dieselbe .cmd-Datei
+   noch einmal starten. Eigene Änderungen erscheinen im neuen Lauf nicht.
 
-Meldet Windows „Der Computer wurde durch Windows geschützt“, auf
-„Weitere Informationen“ und dann „Trotzdem ausführen“ klicken. Ist das nicht
-möglich, bitte kurz bei der Person melden, von der du das Paket hast.
+Beim ersten Start werden beide Programme vom Netzlaufwerk in den lokalen
+Benutzerordner kopiert. Das kann je nach Netzwerk einige Minuten dauern.
+Weitere Starts desselben Pakets verwenden diese lokale Programmkopie.
+Ein neuer Teststand braucht zusätzlich Zeit zum Erzeugen der Daten.
+Keine Internetverbindung erforderlich. Es wird nichts auf die Freigabe
+zurückgeschrieben. Mehrere Kollegen können unabhängig testen.
 
-Der allererste Start kann ein bis zwei Minuten dauern, jeder neue Stand danach
-rund 15 Sekunden. Ein schon vorbereiteter Stand öffnet sich nach wenigen Sekunden.
-
+Die Starter verwenden Windows PowerShell 5.1. Verhindern Schulrichtlinien
+PowerShell oder die Programmausführung, bitte die zuständige IT kontaktieren.
+Ausführung von einer echten Schulfreigabe und auf einem Zielrechner ohne
+.NET muss im Verwaltungsnetz noch erprobt werden.
 
 Die Stände
 ----------
 
-Lehrerprogramm:
+Lehrerprogramm (je 80 synthetische Personen):
 
-  Lehrer 1   Ganz am Anfang: Der Einrichtungsassistent startet. Der Ordner mit
-             der Schülerliste schuelerliste-80.csv öffnet sich automatisch.
+  Lehrer 1   Ganz am Anfang: Einrichtungsassistent. Der Ordner mit der
+             Schülerliste schuelerliste-80.csv öffnet sich automatisch.
              Beim Import diese Datei wählen.
-  Lehrer 2   80 Schüler importiert, Dateien noch nicht verteilt.
-  Lehrer 3   Ausgeteilt, noch keine Wahl da.
-  Lehrer 4   60 von 80 Schülern haben gewählt. Das Lehrerprogramm liest die
-             Wahlen beim Öffnen selbst ein.
-  Lehrer 5   Alle 80 Wahlen eingesammelt, Kursplanung vorbereitet.
+  Lehrer 2   Schüler importiert, Dateien noch nicht verteilt.
+  Lehrer 3   Profile und Angebot ausgeteilt, keine Wahl da.
+  Lehrer 4   60 von 80 Wahlen liegen zum Einsammeln bereit. Das Programm
+             liest sie beim Öffnen selbst ein.
+  Lehrer 5   Alle 80 Wahlen eingesammelt; Kursplanung und Szenarien vorhanden.
   Lehrer 6   BIO LF bilingual gestrichen, Nachwahl offen.
 
 Schülerprogramm:
 
   Schueler 1   Blanko: noch keine Wahl.
   Schueler 2   Wahl angefangen: drei Leistungsfächer stehen.
-  Schueler 3   Wahl fertig.
+  Schueler 3   Vollständige Wahl gespeichert, einschließlich Prüfungsplanung.
   Schueler 4   Blanko mit Bili, Informatik und Italienisch.
   Schueler 5   Blanko mit Sportbefreiung in Halbjahr 3 und 4.
+  Schueler 6   Bili, Italienisch und beide INF-Zugangswege fehlen ausdrücklich.
+  Schueler 7   Vorbildung unbekannt: fachlich zu klären.
+
+Vollständige Wahlen sind Vorwahlentwürfe. Fachliche Freigabegrenzen bleiben
+sichtbar (needs_review); eine verbindliche Abgabe wird nicht vorgetäuscht.
 
 Lehrer und Schüler zusammen:
 
-  Durchlauf - Schueler zu Lehrer 3
-             Öffnet das Schülerprogramm von Testperson 001 aus Stand Lehrer 3.
-             Dort wählen und speichern, dann „Lehrer 3“ starten: Die Wahl kommt
-             im Lehrerprogramm an (beim Öffnen oder spätestens nach einer Minute).
+  Durchlauf - Schueler und Lehrer gemeinsam
+             Öffnet beide Programme mit demselben frischen Stand Lehrer 3.
+             Im Schülerfenster für Testperson 001 wählen und speichern.
+             Bei geöffneter Lehrerapp kommt die Wahl spätestens nach dem
+             nächsten automatischen Einsammeln (etwa eine Minute) an.
+             Beide Fenster für diesen Durchlauf geöffnet lassen.
+             Ein separater Klick auf Lehrer 3 erzeugt einen anderen Testlauf!
 
+Dateien, Speicherbedarf und Aufräumen
+------------------------------------
 
-Änderungen und Neustart
------------------------
+Testdaten-Ordner oeffnen.cmd zeigt den lokalen Testbereich:
+%LOCALAPPDATA%\GSM-Kurswahl-Testpaket\<Paketkennung>
 
-Jeder Stand ist getrennt. Änderungen bleiben erhalten, auch nach dem Schließen.
-Um wieder bei null zu beginnen: alle Programmfenster schließen und
-„Alles zuruecksetzen.cmd“ starten. Das löscht alle Testdaten dieses Pakets.
+Programm enthält die lokale Programmkopie, Laeufe die getrennten Testläufe.
+Alte Läufe bleiben zur Fehleranalyse erhalten. Bei Bedarf alle Testfenster
+schließen und alte Laufordner dort im Explorer löschen. Keine automatische
+Löschung und kein manuelles Zurücksetzen vor dem nächsten Start nötig.
+Programmordner nicht verändern. Aktualisierte Pakete immer in einen neuen
+Freigabeordner entpacken; jedes Paket besitzt eine eigene Kennung.
 
-„Testdaten-Ordner oeffnen.cmd“ zeigt, wo die Dateien liegen. Die normale
-Lehrerverwaltung und das Laufwerk M: werden von diesem Paket nicht berührt.
-
-Beim Verteilen im Testpaket wird das Schülerprogramm nicht in jeden Ordner
-kopiert, sonst wären es rund 8 GB. Den Einstieg für Schüler bilden hier die
-Schueler-Dateien.
+Die normale Lehrerverwaltung wird durch die Starter nicht geöffnet. Jeder
+Teststand bringt eigene Verteilungspfade mit. Beim Testen bitte innerhalb
+dieser lokalen Pfade bleiben. Schülerprogramme werden nicht in jeden der
+80 Schülerordner kopiert; die Schülerstarter verwenden die gemeinsame Kopie.

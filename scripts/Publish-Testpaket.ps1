@@ -5,7 +5,8 @@ $ErrorActionPreference = 'Stop'
 $env:AVALONIA_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $repo = Split-Path $PSScriptRoot -Parent
-$name = 'GSM-Kurswahl-Testpaket-' + (Get-Date -Format 'yyyy-MM-dd-HHmm')
+$packageId = [guid]::NewGuid().ToString('N')
+$name = 'GSM-Kurswahl-Testpaket-' + (Get-Date -Format 'yyyy-MM-dd-HHmmss') + '-' + $packageId.Substring(0, 8)
 $output = Join-Path $repo "artifacts/testpaket/$name"
 $system = Join-Path $output '_system'
 New-Item -ItemType Directory -Path $system | Out-Null
@@ -27,29 +28,18 @@ function Write-Batch([string]$path, [string[]]$lines) {
     [IO.File]::WriteAllText($path, (($lines + '') -join "`r`n"), [Text.Encoding]::ASCII)
 }
 
-# Paths may contain brackets (e.g. "Testpaket (1)"), so this script uses goto instead of if-blocks.
+# Each click starts a new local run; the share is only read. No tester data is deleted.
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'testpaket/Start-Teststand.ps1') -Destination $system
+[IO.File]::WriteAllText((Join-Path $system 'paket-id.txt'), $packageId, [Text.Encoding]::ASCII)
 Write-Batch (Join-Path $system 'stand.cmd') @(
     '@echo off'
-    'rem Aufruf: stand.cmd lehrer ^<stand^>   oder   stand.cmd schueler ^<stand^> ^<Datenordner im Stand^>'
+    'rem Aufruf: stand.cmd lehrer/schueler/durchlauf ^<stand^>'
     'setlocal'
-    'set "STAND=%LOCALAPPDATA%\GSM-Kurswahl-Testpaket\%~2"'
-    'set "LEHRER=%~dp0TeacherApp\GsmKurswahl.TeacherApp.exe"'
-    'set "SCHUELER=%~dp0StudentApp\GsmKurswahl.StudentApp.exe"'
-    'echo Teststand wird vorbereitet. Beim ersten Mal kann das ein bis zwei Minuten dauern ...'
-    'start "" /wait "%LEHRER%" --prepare-test-stage "%~2" "%STAND%"'
+    'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start-Teststand.ps1" -Mode "%~1" -Stage "%~2"'
     'if errorlevel 1 goto fehler'
-    'if /i "%~1"=="schueler" goto schueler'
-    'if /i "%~2"=="lehrer-1-anfang" start "" explorer.exe "%STAND%"'
-    'start "" "%LEHRER%" --test-stage "%~2" "%STAND%"'
-    'exit /b 0'
-    ':schueler'
-    'start "" "%SCHUELER%" --wahlordner "%STAND%\%~3"'
     'exit /b 0'
     ':fehler'
-    'echo.'
-    'type "%STAND%-fehler.txt"'
-    'echo.'
-    'echo.'
+    'echo Teststart fehlgeschlagen. Bitte die Meldung oben an die Betreuung weitergeben.'
     'pause'
     'exit /b 1'
 )
@@ -61,12 +51,14 @@ $starters = [ordered]@{
     'Lehrer 4 - Wahlen zum Einsammeln bereit'     = 'lehrer lehrer-4-wahlen-abgegeben'
     'Lehrer 5 - Wahlen eingesammelt'              = 'lehrer lehrer-5-eingesammelt'
     'Lehrer 6 - Kurs gestrichen, Nachwahl offen'  = 'lehrer lehrer-6-nachwahl'
-    'Schueler 1 - Blanko'                         = 'schueler schueler-1-blanko "Kurswahl\Daten"'
-    'Schueler 2 - Wahl angefangen'                = 'schueler schueler-2-angefangen "Kurswahl\Daten"'
-    'Schueler 3 - Wahl fertig'                    = 'schueler schueler-3-fertig "Kurswahl\Daten"'
-    'Schueler 4 - Blanko mit Bili, INF, Italienisch' = 'schueler schueler-4-alle-voraussetzungen "Kurswahl\Daten"'
-    'Schueler 5 - Blanko mit Sportbefreiung'      = 'schueler schueler-5-sportbefreit "Kurswahl\Daten"'
-    'Durchlauf - Schueler zu Lehrer 3'            = 'schueler lehrer-3-ausgeteilt "Austeilordner\10a\Testperson001.Demo\Kurswahl\Daten"'
+    'Schueler 1 - Blanko'                         = 'schueler schueler-1-blanko'
+    'Schueler 2 - Wahl angefangen'                = 'schueler schueler-2-angefangen'
+    'Schueler 3 - Wahl fertig'                    = 'schueler schueler-3-fertig'
+    'Schueler 4 - Blanko mit Bili, INF, Italienisch' = 'schueler schueler-4-alle-voraussetzungen'
+    'Schueler 5 - Blanko mit Sportbefreiung'      = 'schueler schueler-5-sportbefreit'
+    'Schueler 6 - Ohne besondere Voraussetzungen' = 'schueler schueler-6-ohne-zusatzrechte'
+    'Schueler 7 - Vorbildung unbekannt'          = 'schueler schueler-7-vorbildung-unbekannt'
+    'Durchlauf - Schueler und Lehrer gemeinsam'  = 'durchlauf lehrer-3-ausgeteilt'
 }
 foreach ($starter in $starters.GetEnumerator()) {
     Write-Batch (Join-Path $output ($starter.Key + '.cmd')) @('@echo off', ('call "%~dp0_system\stand.cmd" ' + $starter.Value))
@@ -77,24 +69,6 @@ Write-Batch (Join-Path $output 'Testdaten-Ordner oeffnen.cmd') @(
     'if not exist "%LOCALAPPDATA%\GSM-Kurswahl-Testpaket" mkdir "%LOCALAPPDATA%\GSM-Kurswahl-Testpaket"'
     'start "" explorer.exe "%LOCALAPPDATA%\GSM-Kurswahl-Testpaket"'
 )
-Write-Batch (Join-Path $output 'Alles zuruecksetzen.cmd') @(
-    '@echo off'
-    'echo Alle Testdaten dieses Pakets werden geloescht, auch eigene Aenderungen in den Staenden.'
-    'echo Vorher bitte alle Programmfenster der Kurswahl schliessen.'
-    'echo.'
-    'choice /c JN /m "Wirklich loeschen"'
-    'if errorlevel 2 exit /b 0'
-    'rmdir /s /q "%LOCALAPPDATA%\GSM-Kurswahl-Testpaket"'
-    'if exist "%LOCALAPPDATA%\GSM-Kurswahl-Testpaket" goto offen'
-    'echo Alle Staende sind zurueckgesetzt.'
-    'pause'
-    'exit /b 0'
-    ':offen'
-    'echo Nicht alles konnte geloescht werden. Ist noch ein Programmfenster offen?'
-    'pause'
-    'exit /b 1'
-)
-
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'testpaket/LIESMICH.txt') -Destination $output
 Compress-Archive -LiteralPath $output -DestinationPath ($output + '.zip') -CompressionLevel Optimal
 Write-Output "Testpaket: $output.zip"

@@ -135,3 +135,11 @@ Bestände vor dieser Änderung (Dateien direkt im persönlichen Ordner, Programm
 ## Fortschrittsanzeige bei langen Dateivorgängen (02.11.2026)
 
 Gemeinsame Verteilung, Einzelzustellung („An Wahlordner zustellen“) und abschließendes Einsammeln mit Räumen laufen je Person im Hintergrund. Über der Statuszeile zeigen ein Fortschrittsbalken und ein Text „x von n: Name“ samt geschätzter Restzeit den Stand. Währenddessen sind Navigation und Seite gesperrt, das automatische Einsammeln pausiert und das Fenster lässt sich nicht schließen, damit nichts anderes gleichzeitig auf den Lehrerbestand zugreift. Läuft gerade ein automatisches Einsammeln, wird der Start mit Hinweis abgelehnt. Das Schülerprogramm (ca. 100 MB) wird je Lauf nur einmal eingelesen und geprüft; die Dauer bestimmt danach vor allem das Kopieren ins Netz (Größenordnung: ein Jahrgang mit 85 Personen ≈ 8,5 GB). Das minütliche automatische Einsammeln liest nur kleine Dateien und zeigt keinen Balken.
+
+## Religion/Ethik-Wechsel und Feststellungsprüfungen (10.11.2026)
+
+Im Schülerbestand bietet der Prüfstand-Filter zusätzlich „Religion/Ethik: Wechsel“ (anderes Fach als in Klasse 10 belegt) und „Feststellungsprüfung nötig“ (gewechseltes Fach ist mündlich geplant, Prüfungsfreigabe im Bestand noch unbekannt). Die Spalte „Hinweise“ nennt den Fall je Person. Die Schaltfläche „Liste Religion/Ethik-Wechsel und Feststellungsprüfungen (XLSX) …“ exportiert Name, Klasse, Schüler-ID, Fach in Klasse 10, Belegung, mündliche Planung und Feststellungsprüfung ja/nein. Grundlage sind ausschließlich Lehrerbestand und aktive Wahl; die Liste ist eine Planungshilfe, keine Zulassung. Enthält Angaben zum Religionsunterricht: nur intern verwenden.
+
+## Wahlergebnisse mit Prüfstand (10.11.2026)
+
+Die Tabelle „Wahlergebnisse“ zeigt zusätzlich die mündliche Planung und den Prüfstand je Person (farbig; „· Nachwahl“, „· FP ETH“ für eine nötige Feststellungsprüfung). Der Mauszeiger auf dem Prüfstand zeigt alle Hinweise im Klartext. Neben der Suche filtert eine Auswahlliste nach Regelverstoß, fachlich zu klären, formal gültig, Nachwahl offen und Feststellungsprüfung nötig; die Kopfzeile nennt die Anzahl je Prüfstand.

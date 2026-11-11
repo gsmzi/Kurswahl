@@ -127,6 +127,8 @@ public sealed class DemoStagesTests
     [InlineData("schueler-3-fertig", true, 10)]
     [InlineData("schueler-4-alle-voraussetzungen", false, 0)]
     [InlineData("schueler-5-sportbefreit", false, 0)]
+    [InlineData("schueler-6-ohne-zusatzrechte", false, 0)]
+    [InlineData("schueler-7-vorbildung-unbekannt", false, 0)]
     public void PupilStagesLoadThroughTheProductiveReaders(string id, bool hasChoice, int minimumSelections) => InStage(id, root =>
     {
         var data = StudentFolderLayout.Data(root);
@@ -138,6 +140,20 @@ public sealed class DemoStagesTests
         if (loaded is not null) Assert.True(loaded.Choice.Selections.Length >= minimumSelections);
         if (id == "schueler-4-alle-voraussetzungen") Assert.Equal(Knowledge.Yes, profile.Prerequisites!.ContinuousBilingual);
         if (id == "schueler-5-sportbefreit") Assert.Equal([3, 4], profile.Prerequisites!.SportExemptSemesters!.Value.ToArray());
+        if (id == "schueler-6-ohne-zusatzrechte")
+        {
+            Assert.Equal(Knowledge.No, profile.Prerequisites.ItalianProfile);
+            Assert.Equal(Knowledge.No, profile.Prerequisites.InformaticsBridge);
+            Assert.Equal(Knowledge.No, profile.Prerequisites.InformaticsImp);
+            Assert.Equal(Knowledge.No, profile.Prerequisites.ContinuousBilingual);
+        }
+        if (id == "schueler-7-vorbildung-unbekannt")
+        {
+            Assert.Equal(Knowledge.Unknown, profile.Prerequisites.ItalianProfile);
+            Assert.Equal(Knowledge.Unknown, profile.Prerequisites.InformaticsBridge);
+            Assert.Equal(Knowledge.Unknown, profile.Prerequisites.InformaticsImp);
+            Assert.Equal(Knowledge.Unknown, profile.Prerequisites.ContinuousBilingual);
+        }
     });
 
     [Fact]

@@ -29,7 +29,7 @@ public sealed partial class TeacherWindow : Window
     private readonly StackPanel catalogPanel = new() { Spacing = 8 };
     private readonly TextBox filter = new() { Watermark = "Name, Klasse oder Schüler-ID" };
     private readonly CheckBox followupFilter = new() { Content = "Nur offene Nachwahlen" };
-    private readonly ComboBox statusFilter = new() { ItemsSource = new[] { "Alle Prüfstände", "Ohne Wahl", "Regelverstoß", "Fachlich zu klären", "Formal gültig" }, SelectedIndex = 0 };
+    private readonly ComboBox statusFilter = new() { ItemsSource = new[] { "Alle Prüfstände", "Ohne Wahl", "Regelverstoß", "Fachlich zu klären", "Formal gültig", "Religion/Ethik: Wechsel", "Feststellungsprüfung nötig" }, SelectedIndex = 0 };
     private readonly TextBox actor = new() { Text = "demo-beratung", Watermark = "Bearbeiterkennung" };
     private string Actor => actor.Text?.Trim() is { Length: > 0 } value ? value : throw new ArgumentException("Bearbeiterkennung fehlt. Unter Einstellungen eintragen.");
     private readonly ImportColumnPicker mapping = new();
@@ -142,7 +142,9 @@ public sealed partial class TeacherWindow : Window
             if (!label.Contains(filter.Text ?? "", StringComparison.OrdinalIgnoreCase) || followupFilter.IsChecked == true && !state.RequiresReselection) continue;
             if (statusFilter.SelectedIndex == 1 && state.Active is not null || statusFilter.SelectedIndex == 2 && state.Validation?.Status != ReviewStatus.Invalid
                 || statusFilter.SelectedIndex == 3 && state.Validation?.Status != ReviewStatus.NeedsReview || statusFilter.SelectedIndex == 4 && state.Validation?.Status != ReviewStatus.Valid) continue;
-            var notes = string.Join(" · ", new[] { state.RequiresReselection ? "Nachwahl offen" : "", state.Record.Student.Departure == DepartureStatus.Active ? "" : "Abgänger: " + FormatDeparture(state.Record.Student.Departure), state.Record.MappingConfirmed ? "" : "Ordner nicht bestätigt" }.Where(s => s.Length > 0));
+            var religion = ReligionCases.For(state);
+            if (statusFilter.SelectedIndex == 5 && religion is null || statusFilter.SelectedIndex == 6 && religion?.AssessmentSubject is null) continue;
+            var notes = string.Join(" · ", new[] { state.RequiresReselection ? "Nachwahl offen" : "", religion?.Note ?? "", state.Record.Student.Departure == DepartureStatus.Active ? "" : "Abgänger: " + FormatDeparture(state.Record.Student.Departure), state.Record.MappingConfirmed ? "" : "Ordner nicht bestätigt" }.Where(s => s.Length > 0));
             var open = Button("Öffnen", () => ShowStudent(state), "Stammdaten, Vorbildung, Kurswahl und Historie dieser Person rechts anzeigen.");
             var selected = state.Record.Student.ExternalStudentId == selectedStudentId && personEditor.IsExpanded;
             roster.Children.Add(new Border { Background = selected ? Brush.Parse("#F0F8F6") : Brushes.Transparent, BorderBrush = selected ? Accent : Brushes.Transparent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6),

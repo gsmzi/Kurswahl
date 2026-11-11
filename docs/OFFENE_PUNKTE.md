@@ -127,3 +127,10 @@ Schülertexte am 28.10.2026 berichtigt: Die automatische Regelprüfung ist vorha
 - Fachkennungen der AGVO-Fächer sind fest und werden nie umbenannt (bestätigt).
 - Altlasten der Signatur entfernt, soweit risikoarm: Profil v2 ohne `keyId`/`accountId`, Arbeitsstand/Transport v2 ohne Zertifikatsfelder, `profile-trust.json` und Signaturschema gelöscht. Bewusst belassen: leeres `signatureBytes` in unveränderlichen Profilzeilen der Lehrerdatenbank sowie das optionale Konto-Feld `accountId` der Stammdaten (wird für die Eindeutigkeitsprüfung verwendet).
 - Weiterhin offen und für den Produktivbetrieb Voraussetzung: Entfernen der `demo-`/`isDemo`-Sperren, fachliche Freigabe 2029, Schulnetz-Pilot (Dateirechte, AppLocker für das verteilte Schülerprogramm), Test auf Zielgerät ohne SDK, Backup-/Aufbewahrungskonzept.
+
+## Prüfung und Korrekturen (10.11.2026)
+
+- Sprachlaufbahn: Für den Produktivbetrieb muss die Schülerliste die Spalte `languages` für alle enthalten (z. B. `E,F` oder `E,L`). Ohne Angabe bleiben Französisch und Latein wählbar und erscheinen nur als Klärfall.
+- Religion/Ethik: Wechsel gegenüber Klasse 10 ist Hinweis; Lehrerprogramm filtert „Religion/Ethik: Wechsel“ und „Feststellungsprüfung nötig“ und exportiert die Liste. Nach bestandener Feststellungsprüfung „Prüfung freigegeben“ auf Ja setzen, dann entfällt der Hinweis auf die offene Prüfung.
+- Erledigt (Nutzerentscheidung 10.11.2026): Die allgemeinen Hinweise `M2-RELEASE`, `AGVO-CREDIT` und `AGVO-ELECTION` sind entfernt. „Fachlich zu klären“ zählt nur noch personenbezogene Klärfälle; „formal gültig“ ist jetzt erreichbar und bedeutet nur: automatische Prüfung ohne Befund. Damit wird auch „Nachwahl abschließen“ (nur bei formal gültig) nutzbar. Ältere Aussagen in dieser Datei, wonach jede Wahl `needs_review` bleibt, sind damit überholt.
+- Offen: Das Schülerprogramm ist weiterhin auf Demo-Katalog und `demo-`-IDs beschränkt; keine verbindliche Abgabe.

@@ -178,5 +178,35 @@ public sealed class AdministrationTests : IDisposable
         var path = Path.Combine(StudentFolderLayout.Data(record.HomeDirectory), "profil.json"); File.WriteAllText(path, "broken");
         Assert.Equal("Profil_abweichend", distribution.Distribute(record, issued).Status); Assert.Equal("broken", File.ReadAllText(path));
     }
+    [Fact]
+    public void ReligionCasesListChangesAndRequiredAssessmentsFromTeacherStock()
+    {
+        // AGVO §21 Abs.2 Nr.4/5; Nutzerentscheidung 10.11.2026: Oberstufenberatung plant Feststellungsprüfungen aus dem Lehrerbestand.
+        TeacherState State(int number, string? grade10, Knowledge exam, string[] oral, params (string Subject, int[] Semesters)[] religion)
+        {
+            var record = Record(number);
+            record = record with { Student = record.Student with { Prerequisites = PriorEducation.Unknown with { ReligionEthicsGrade10 = grade10, ReligionEthicsExamPermission = exam } } };
+            var choice = TestData.Choice with { StudentId = record.Student.ExternalStudentId, PlannedOralSubjects = [.. oral],
+                Selections = [.. religion.Select(r => new CourseSelection(r.Subject + "-BF", r.Subject, CourseType.Bf, CourseVariant.Normal, [.. r.Semesters]))] };
+            var revision = new ChoiceRevision(Guid.NewGuid(), null, choice.StudentId, DateTimeOffset.UtcNow, "demo-beratung", ActorRole.Teacher,
+                RevisionSource.TeacherEdit, "Demo", choice.OfferVersion, choice.RuleVersion, choice, [], null);
+            return new(record, revision, null, false, null, "");
+        }
+        int[] four = [1, 2, 3, 4];
+        var cases = ReligionCases.All([
+            State(1, "KR", Knowledge.Unknown, ["BIO", "G"], ("KR", four)),                 // continues: no case
+            State(2, "KR", Knowledge.Unknown, ["BIO", "G"], ("ETH", four)),                // change, no oral plan
+            State(3, "KR", Knowledge.Unknown, ["ETH", "M"], ("ETH", four)),                // change with oral plan: assessment
+            State(4, "ER", Knowledge.Yes, ["ETH", "M"], ("ETH", four)),                    // already confirmed
+            State(5, "KR", Knowledge.Unknown, ["BIO", "G"], ("KR", [1, 2]), ("ETH", [3, 4])), // change during the course
+            State(6, null, Knowledge.Unknown, ["ETH", "M"], ("ETH", four)),                // class 10 unknown: other review rule
+            new TeacherState(Record(7), null, null, false, null, "")]);                    // no choice yet
+        Assert.Equal(new[] { "demo-002", "demo-003", "demo-004", "demo-005" }, cases.Select(c => c.State.Record.Student.ExternalStudentId));
+        Assert.Equal("ETH", Assert.Single(cases.Where(c => c.AssessmentSubject is not null)).AssessmentSubject);
+        Assert.Equal("demo-003", cases.Single(c => c.AssessmentSubject is not null).State.Record.Student.ExternalStudentId);
+        Assert.Contains("Feststellungsprüfung ETH", cases.Single(c => c.AssessmentSubject is not null).Note);
+        var during = cases.Single(c => c.ChangeDuringCourse);
+        Assert.Equal(new[] { "KR", "ETH" }, during.Chosen);
+    }
     public void Dispose() => Directory.Delete(root, true);
 }

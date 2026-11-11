@@ -30,6 +30,8 @@ public sealed class MainWindow : Window
     private readonly StackPanel plan = new() { Spacing = 10 };
     private readonly TextBlock fileStatus = Text("", 13);
     private readonly TextBlock error = Text("", 14);
+    private readonly Border errorNotice = new() { Name = "ErrorNotice", Background = Brush("#FCEBEB"), CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 6), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
+    private readonly Border stateBadge = Pill("", WarnSoft, Warn);
     private readonly Border hoursWarning = Notice("", WarnSoft, Warn);
     private readonly Button previous = new() { Content = "_Zurück", Name = "PreviousStep" };
     private readonly Button next = new() { Content = "_Weiter", Name = "NextStep", Background = Accent, Foreground = Brushes.White };
@@ -54,7 +56,7 @@ public sealed class MainWindow : Window
         var title = new StackPanel { Spacing = 2 };
         var titleLine = new WrapPanel();
         titleLine.Children.Add(Text("GSM-Kurswahl", 26, FontWeight.Bold));
-        var badge = Pill("Vorläufig · nicht eingereicht", WarnSoft, Warn);
+        var badge = stateBadge; badge.Name = "StateBadge";
         badge.VerticalAlignment = VerticalAlignment.Center;
         badge.Margin = new Thickness(12, 4, 0, 4);
         ToolTip.SetTip(badge, "Die automatische Prüfung unterstützt deine Planung. Die Oberstufenberatung muss den Regelstand für deinen Abiturjahrgang fachlich freigeben und offene Einzelfragen klären. In dieser Demo ist keine verbindliche Abgabe möglich.");
@@ -81,7 +83,7 @@ public sealed class MainWindow : Window
         root.Children.Add(header);
         void AdaptHeader()
         {
-            var compact = ClientSize.Width < 1450;
+            var compact = ClientSize.Width < 1150;
             Grid.SetColumnSpan(title, compact ? 2 : 1);
             Grid.SetRow(toolbar, compact ? 1 : 0);
             Grid.SetColumn(toolbar, compact ? 0 : 1);
@@ -99,6 +101,8 @@ public sealed class MainWindow : Window
         navigation.Children.Add(previous);
         Grid.SetColumn(next, 2); navigation.Children.Add(next);
         DockPanel.SetDock(navigation, Dock.Bottom); left.Children.Add(navigation);
+        error.Foreground = Danger; error.Name = "ErrorText"; errorNotice.Child = error;
+        DockPanel.SetDock(errorNotice, Dock.Top); left.Children.Add(errorNotice);
         left.Children.Add(Panel(new ScrollViewer { Content = content }));
         left.Margin = new Thickness(0, 0, 16, 0);
         body.Children.Add(left);
@@ -109,14 +113,9 @@ public sealed class MainWindow : Window
         var footer = new StackPanel { Spacing = 3, Margin = new Thickness(0, 10, 0, 0) };
         hoursWarning.Name = "HoursWarning";
         footer.Children.Add(hoursWarning);
-        error.Foreground = Danger;
-        footer.Children.Add(error); footer.Children.Add(fileStatus);
-        footer.Children.Add(PrerequisitePanel());
-        var fileDetails = Text($"Datei: {filePath} · Betriebssystemkonto: {account} (keine bestätigte Schulzuordnung)", 11, color: Muted);
-        fileDetails.TextWrapping = TextWrapping.NoWrap;
-        fileDetails.TextTrimming = TextTrimming.CharacterEllipsis;
-        ToolTip.SetTip(fileDetails, fileDetails.Text);
-        footer.Children.Add(fileDetails);
+        fileStatus.Name = "FileStatus";
+        footer.Children.Add(fileStatus);
+        footer.Children.Add(PrerequisitePanel($"Datei: {filePath} · Betriebssystemkonto: {account} (keine bestätigte Schulzuordnung)"));
         Grid.SetRow(footer, 3); root.Children.Add(footer);
         Content = root;
 
@@ -185,10 +184,18 @@ public sealed class MainWindow : Window
         previous.IsEnabled = !session.IsBusy && session.Step > 1;
         next.IsVisible = session.Step < StudentSession.LastStep;
         next.IsEnabled = !session.IsBusy && session.StepError is null;
-        next.Content = session.Step switch { 2 => "Pflichtfächer _eintragen", 3 when session.Tasks.Any(t => !t.IsSatisfied) => "Später entscheiden, _weiter", _ => "_Weiter" };
+        next.Content = session.Step switch { 3 when session.Tasks.Any(t => !t.IsSatisfied) => "Später entscheiden, _weiter", _ => "_Weiter" };
         save.IsEnabled = !session.IsBusy && !session.LoadFailed;
         load.IsEnabled = !session.IsBusy;
         fileStatus.Text = session.IsBusy ? "Dateivorgang läuft …" : session.Message;
+        // The badge next to the title already shows saved/unsaved; the line stays for everything else (loading, errors).
+        fileStatus.IsVisible = session.IsBusy || !(session.Message.StartsWith("Ungespeicherte Änderungen", StringComparison.Ordinal)
+            || session.Message.StartsWith("Entwurf gespeichert", StringComparison.Ordinal));
+        errorNotice.IsVisible = !string.IsNullOrEmpty(error.Text);
+        var saved = !session.IsDirty && !session.LoadFailed && session.HasSavedFile;
+        ((TextBlock)stateBadge.Child!).Text = session.LoadFailed ? "Datei nicht lesbar · bitte melden"
+            : session.IsDirty ? "Noch nicht gespeichert" : saved ? "Gespeichert · wird von der Oberstufenberatung eingesammelt" : "Vorläufig · noch nichts gespeichert";
+        stateBadge.Background = saved ? DoneSoft : WarnSoft; ((TextBlock)stateBadge.Child!).Foreground = saved ? Done : Warn;
         if (focused is not null && content.GetLogicalDescendants().OfType<Control>()
             .Concat(plan.GetLogicalDescendants().OfType<Control>())
             .Concat(stepper.Children).FirstOrDefault(c => c.Name == focused) is { } target)
@@ -253,17 +260,24 @@ public sealed class MainWindow : Window
             panel.Children.Add(Notice($"✓ {session.SubjectName(subject)} ist gesetzt, weil du es nicht als Leistungsfach hast.", DoneSoft, Done));
         var planned = session.Choice.PlannedOralSubjects;
         var free = 2 - planned.Length;
-        panel.Children.Add(Text(free > 0 ? $"Noch {free} Fach {(free == 1 ? "" : "bzw. 2 Fächer ")}wählen" : "Beide Prüfungsfächer geplant", 15, FontWeight.SemiBold));
+        panel.Children.Add(Text(free > 0 ? (free == 1 ? "Noch 1 Fach wählen" : "Noch 2 Fächer wählen") : "Beide Prüfungsfächer geplant", 15, FontWeight.SemiBold));
         if (planned.Length == 2 && session.StepError is { } stepError) panel.Children.Add(Notice(stepError, WarnSoft, Warn));
         foreach (var subject in planned.Where(s => !session.ForcedOral.Contains(s)).Concat(session.UsefulOralCandidates).Distinct())
         {
-            var box = new CheckBox { Name = "Oral_" + subject, Content = session.SubjectName(subject), IsChecked = planned.Contains(subject), IsEnabled = !session.IsBusy };
+            var p = session.Profile.Prerequisites;
+            var assessment = session.Profile.Status == ProfileStatus.Verified && subject is "ETH" or "ER" or "KR" && p.ReligionEthicsGrade10 is { } grade10
+                && grade10 != subject && p.ReligionEthicsExamPermission == Knowledge.Unknown;
+            var box = new CheckBox { Name = "Oral_" + subject, Content = session.SubjectName(subject) + (assessment ? " · nicht in Klasse 10 besucht: Feststellungsprüfung zu Beginn von HJ 1 nötig" : ""), IsChecked = planned.Contains(subject), IsEnabled = !session.IsBusy };
             box.IsCheckedChanged += (_, _) => Edit(() => session.SetOral(subject, box.IsChecked == true));
             panel.Children.Add(Option(box, box.IsChecked == true));
         }
-        var hidden = session.OralCandidates.Except(session.UsefulOralCandidates).Except(planned).Count();
-        if (hidden > 0 && free > 0)
-            panel.Children.Add(Text($"{hidden} weitere Fächer passen mit deiner bisherigen Planung nicht zu einer vollständigen Kombination und sind ausgeblendet.", 12, color: Muted));
+        var hidden = session.OralCandidates.Except(session.UsefulOralCandidates).Except(planned).Select(session.SubjectName).ToArray();
+        if (hidden.Length > 0 && free > 0)
+            panel.Children.Add(new Expander
+            {
+                Name = "HiddenOral", Header = $"{hidden.Length} weitere Fächer passen nicht zu einer vollständigen Kombination", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Stretch,
+                Content = Text(string.Join(", ", hidden) + ". Mit diesen Fächern wären zusammen mit deinen Leistungsfächern Deutsch, Mathematik oder eines der drei Aufgabenfelder nicht abgedeckt. Wenn du eines davon mündlich möchtest, ändere zuerst das andere Prüfungsfach oder deine Leistungsfächer.", 12, color: Muted)
+            });
         return panel;
     }
 
@@ -352,7 +366,7 @@ public sealed class MainWindow : Window
             panel.Children.Add(Text("Kurs hinzufügen", 15, FontWeight.SemiBold));
             foreach (var offer in extras)
             {
-                var box = new CheckBox { Name = ControlName("Offer", offer.Id), Content = OfferLabel(offer), IsEnabled = !session.IsBusy };
+                var box = new CheckBox { Name = ControlName("Offer", offer.Id), Content = OfferLabel(offer) + $" · +{offer.Schedule.Length} Kurse", IsEnabled = !session.IsBusy };
                 box.IsCheckedChanged += (_, _) => Edit(() => session.SetSelection(offer.Id, offer.Schedule.Select(h => h.Semester)));
                 panel.Children.Add(Option(box, false));
             }
@@ -391,21 +405,44 @@ public sealed class MainWindow : Window
         return Option(row, true);
     }
 
+    private static readonly string[] GeneralRuleIds = ["PROFILE-TRUST"];
+
+    private string PlainText(string text)
+    {
+        // Rule ids are for the advisers; pupils read subject names.
+        var colon = text.IndexOf(": ", StringComparison.Ordinal);
+        if (colon > 0 && colon < 28 && text[..colon].All(c => char.IsUpper(c) || char.IsDigit(c) || c == '-')) text = text[(colon + 2)..];
+        foreach (var subject in session.Catalog.Subjects.OrderByDescending(x => x.Id.Length))
+            if (text.StartsWith(subject.Id + " ", StringComparison.Ordinal) || text.StartsWith(subject.Id + ":", StringComparison.Ordinal))
+            { text = subject.Name + text[subject.Id.Length..]; break; }
+        return text;
+    }
+
     private Control ReviewStep()
     {
-        var panel = Step("Überblick und offene Punkte", "Deine Wahl wird automatisch geprüft. Du kannst den Entwurf speichern und den Kontrollbogen exportieren. In dieser Demo ist keine verbindliche Abgabe möglich; die fachliche Freigabe für deinen Abiturjahrgang steht noch aus.");
-        panel.Children.Add(Text("Wer klärt offene Punkte? Die Oberstufenberatung prüft unklare persönliche Voraussetzungen und Sonderfälle sowie die Anrechnung. Du ergänzt fehlende Kurse und besprichst die hier aufgeführten Rückfragen mit ihr. Ein Prüfhinweis bedeutet noch nicht, dass deine Wahl falsch ist.", 14, color: Muted));
-        foreach (var message in session.Validation.Messages.Where(m => m.Rule.Id == "AGVO-RELIGION"))
-            panel.Children.Add(Notice(message.Explanation, WarnSoft, Warn));
-        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold));
-        var table = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto"), Margin = new Thickness(0, 4) };
-        var summary = session.Summary;
-        for (var i = 0; i < summary.Length; i++)
+        var panel = Step("Überblick", "Hier siehst du, was noch fehlt und was die Oberstufenberatung mit dir klärt. Gespeicherte Wahlen sammelt die Oberstufenberatung ein; eine eigene Abgabe ist nicht nötig.");
+        var messages = session.Validation.Messages;
+        var onlyCountMissing = session.CountedCourses < ChoiceWorkflow.MinimumCourses && session.Choice.Selections.Count(x => x.Type == CourseType.Lf) == 3;
+        var todo = messages.Where(m => m.Rule.Severity == ReviewStatus.Invalid && !(onlyCountMissing && m.Rule.Id == "AGVO-COURSES")).Select(m => PlainText(m.Explanation))
+            .Concat(session.Tasks.Where(t => !t.IsSatisfied).Select(t => t.Title + " ist noch offen (Schritt 3)."))
+            .Concat(session.CountedCourses < ChoiceWorkflow.MinimumCourses ? [$"Es fehlen noch {ChoiceWorkflow.MinimumCourses - session.CountedCourses} Halbjahreskurse bis zur Mindestzahl von {ChoiceWorkflow.MinimumCourses} (Schritt 4)."] : Array.Empty<string>())
+            .Distinct().ToArray();
+        var todoPanel = new StackPanel { Name = "TodoList", Spacing = 4 };
+        todoPanel.Children.Add(Text(todo.Length == 0 ? "✓ Nichts mehr zu tun" : $"Das musst du noch tun ({todo.Length})", 16, FontWeight.SemiBold, todo.Length == 0 ? Done : Danger));
+        foreach (var item in todo) todoPanel.Children.Add(Text("• " + item, 13));
+        if (todo.Length == 0) todoPanel.Children.Add(Text("Deine Wahl ist aus Sicht der automatischen Prüfung vollständig. Speichere sie und exportiere den Kontrollbogen.", 13, color: Muted));
+        panel.Children.Add(new Border { Child = todoPanel, Padding = new Thickness(12, 8), CornerRadius = new CornerRadius(8), Background = todo.Length == 0 ? DoneSoft : Brush("#FCEBEB") });
+
+        var clarify = messages.Where(m => m.Rule.Severity != ReviewStatus.Invalid && !GeneralRuleIds.Contains(m.Rule.Id)).Select(m => PlainText(m.Explanation)).Distinct().ToArray();
+        if (clarify.Length > 0)
         {
-            table.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            Cell(table, $"HJ {summary[i].Semester}", i, 0); Cell(table, $"{summary[i].CourseCount} Kurse", i, 1); Cell(table, $"{summary[i].WeeklyHours} Wochenstunden", i, 2);
+            var clarifyPanel = new StackPanel { Name = "ClarifyList", Spacing = 4 };
+            clarifyPanel.Children.Add(Text($"Das klärt die Oberstufenberatung mit dir ({clarify.Length})", 16, FontWeight.SemiBold, Warn));
+            foreach (var item in clarify) clarifyPanel.Children.Add(Text("• " + item, 13));
+            clarifyPanel.Children.Add(Text("Ein solcher Hinweis bedeutet nicht, dass deine Wahl falsch ist.", 12, color: Muted));
+            panel.Children.Add(new Border { Child = clarifyPanel, Padding = new Thickness(12, 8), CornerRadius = new CornerRadius(8), Background = WarnSoft });
         }
-        panel.Children.Add(table);
+
         var export = new Button { Content = "Kontrollbogen als _PDF exportieren", Name = "ControlSheetButton" };
         export.Click += async (_, _) => await RunFileAction(async () =>
         {
@@ -424,18 +461,28 @@ public sealed class MainWindow : Window
             await stream.WriteAsync(pdf);
         });
         panel.Children.Add(export);
-        panel.Children.Add(Text("PDF-Export mit dem aktuellen Entwurf und allen Prüfhinweisen.", 12, color: Muted));
-        panel.Children.Add(Text("Mögliche mündliche Kombinationen aus deiner Belegung", 15, FontWeight.SemiBold));
+
+        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold));
+        var table = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto"), Margin = new Thickness(0, 4) };
+        var summary = session.Summary;
+        for (var i = 0; i < summary.Length; i++)
+        {
+            table.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            Cell(table, $"HJ {summary[i].Semester}", i, 0); Cell(table, $"{summary[i].CourseCount} Kurse", i, 1); Cell(table, $"{summary[i].WeeklyHours} Wochenstunden", i, 2);
+        }
+        panel.Children.Add(table);
+
+        var exams = new StackPanel { Spacing = 4 };
         foreach (var exam in session.ExamOptions)
-            panel.Children.Add(Text($"{session.SubjectName(exam.First)} + {session.SubjectName(exam.Second)} · vorläufige Mindestanrechnung {exam.MinimumCredits}", 13));
-        panel.Children.Add(Text("Die Oberstufenberatung bestätigt die persönlichen Prüfungsvoraussetzungen und die endgültige Anrechnung. Diese Kombinationen sind Planungsvorschläge.", 12, color: Muted));
-        if (session.ExamOptions.IsEmpty) panel.Children.Add(Text("Noch keine passende Kombination aus den belegten Kursen. Pflichtbelegung und offene Punkte prüfen.", 13));
-        panel.Children.Add(Text("Noch zu erledigen oder zu klären", 15, FontWeight.SemiBold));
-        foreach (var note in session.PlanningNotes) panel.Children.Add(Text("• " + note, 13));
-        var messages = session.Validation.Messages;
+            exams.Children.Add(Text($"{session.SubjectName(exam.First)} + {session.SubjectName(exam.Second)} · vorläufige Mindestanrechnung {exam.MinimumCredits}", 13));
+        if (session.ExamOptions.IsEmpty) exams.Children.Add(Text("Noch keine passende Kombination aus den belegten Kursen. Pflichtbelegung und offene Punkte prüfen.", 13));
+        exams.Children.Add(Text("Die mündlichen Prüfungsfächer legst du erst in der Kursstufe verbindlich fest. Die Oberstufenberatung bestätigt die persönlichen Prüfungsvoraussetzungen und die endgültige Anrechnung.", 12, color: Muted));
+        panel.Children.Add(new Expander { Name = "ExamOptions", Header = Text($"Mögliche mündliche Kombinationen aus deiner Belegung ({session.ExamOptions.Length})", 14), Content = exams, HorizontalAlignment = HorizontalAlignment.Stretch });
+
         var details = new StackPanel { Spacing = 6 };
+        foreach (var note in session.PlanningNotes) details.Children.Add(Text("• " + note, 12, color: Muted));
         foreach (var m in messages) details.Children.Add(Text($"{m.Rule.Id}: {m.Explanation}\n{m.Remedy}", 12, color: m.Rule.Severity == ReviewStatus.Invalid ? Danger : Muted));
-        panel.Children.Add(new Expander { Header = $"Prüfhinweise ({messages.Length}) – {(session.Validation.Status == ReviewStatus.Invalid ? "Wahl bitte korrigieren" : "Klärung durch die Oberstufenberatung erforderlich")}", Content = details, HorizontalAlignment = HorizontalAlignment.Stretch });
+        panel.Children.Add(new Expander { Name = "RuleDetails", Header = Text($"Alle Prüfhinweise mit Regelkennung ({messages.Length}) – für die Oberstufenberatung", 14), Content = details, HorizontalAlignment = HorizontalAlignment.Stretch });
         return panel;
     }
 
@@ -447,7 +494,7 @@ public sealed class MainWindow : Window
         if (rows.IsEmpty) { plan.Children.Add(Text("Noch nichts gewählt. Beginne mit deinen Leistungsfächern.", 13, color: Muted)); }
         else
         {
-            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,40,40,40,40") };
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,40,40,40,40"), Margin = new Thickness(0, 0, 16, 0) };
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             for (var h = 1; h <= 4; h++) Cell(grid, $"HJ {h}", 0, h, center: true);
             for (var i = 0; i < rows.Length; i++)
@@ -514,7 +561,7 @@ public sealed class MainWindow : Window
     }
 
     // Shown read-only: students cannot declare prerequisites themselves (Pflichtenheft §5, §5a).
-    private Control PrerequisitePanel()
+    private Control PrerequisitePanel(string technicalDetails)
     {
         var list = new StackPanel { Spacing = 3 };
         list.Children.Add(Text(session.ProfileStatusText, 11, color: Muted));
@@ -523,12 +570,13 @@ public sealed class MainWindow : Window
             list.Children.Add(Text($"{item.Label}: {item.Value}.", 11, color: Muted));
         }
         list.Children.Add(Text("Änderungen und Rückfragen: Oberstufenberatung.", 11, color: Muted));
+        list.Children.Add(Text(technicalDetails, 11, color: Muted));
         var expander = new Expander
         {
             Name = "Prerequisites",
             Header = Text(session.Profile.Status switch
             {
-                ProfileStatus.Verified => "Voraussetzungen · Profil geprüft · Details",
+                ProfileStatus.Verified => "Deine Voraussetzungen und technische Details",
                 ProfileStatus.ProfileInvalid => "Voraussetzungen · Profil ungültig · Oberstufenberatung kontaktieren",
                 _ => "Voraussetzungen ungeprüft · Details bei Bedarf"
             }, 11, color: Muted),

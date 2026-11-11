@@ -78,12 +78,14 @@ public class AcademicRulesTests
     private static CourseChoice Complete => Choice("D-LF", "M-LF", "E-LF", "BIO-BF", "CH-BF", "G-BF", "BK-BF", "ETH-BF", "SP-BF", "GK-BF", "GEO-BF")
         with { PlannedOralSubjects = ["BIO", "G"] };
 
-    [Fact] public void CompleteStructuralChoiceRemainsReviewWithoutYearRelease()
+    // Nutzerentscheidung 10.11.2026: keine pauschalen Freigabehinweise mehr; eine vollständige Wahl mit geklärtem Profil ist formal gültig.
+    [Fact] public void CompleteStructuralChoiceWithClarifiedProfileHasNoViolation()
     {
         var result = Check(Complete);
-        Assert.Equal(ReviewStatus.NeedsReview, result.Status);
         Assert.DoesNotContain(result.Messages, m => m.Rule.Severity == ReviewStatus.Invalid);
-        Assert.Contains(result.Messages, m => m.Rule.Id == "M2-RELEASE");
+        Assert.DoesNotContain(result.Messages, m => m.Rule.Id is "M2-RELEASE" or "AGVO-CREDIT" or "AGVO-ELECTION");
+        Assert.Equal(result.Messages.IsEmpty ? ReviewStatus.Valid : ReviewStatus.NeedsReview, result.Status);
+        Assert.Equal(ReviewStatus.NeedsReview, Check(Complete, ProfileContext.Missing).Status);
         Assert.NotEmpty(AcademicRules.ExamOptions(Complete, TestData.WorkflowCatalog, Profile));
     }
     [Fact] public void MissingOralSelectionIsReportedAsInvalidPlanOral() =>
@@ -218,29 +220,98 @@ public class AcademicRulesTests
         var mu = TestData.WorkflowCatalog.Offers.Single(o => o.Id == "MU-BF");
         Assert.Equal(new[] { "1,2", "3,4" }, AcademicRules.SemesterSelectionUnits(sportReduced, mu, p).Select(u => string.Join(",", u)));
     }
-    [Fact] public void ReligionEthicsSwitchBlocksOralChoiceAndReportsFeststellungspruefungHint()
+    private static OfferCatalog ReligionCatalog => TestData.WorkflowCatalog with
     {
-        var catalog = TestData.WorkflowCatalog with
-        {
-            Subjects = [.. TestData.WorkflowCatalog.Subjects, new("KR", "Katholische Religion"), new("ER", "Evangelische Religion")],
-            Offers = [.. TestData.WorkflowCatalog.Offers, TestData.Offer("KR-BF", "KR"), TestData.Offer("ER-BF", "ER")]
-        };
+        Subjects = [.. TestData.WorkflowCatalog.Subjects, new("KR", "Katholische Religion"), new("ER", "Evangelische Religion")],
+        Offers = [.. TestData.WorkflowCatalog.Offers, TestData.Offer("KR-BF", "KR"), TestData.Offer("ER-BF", "ER")]
+    };
+
+    [Fact] public void ReligionEthicsSwitchIsAHintAndOralPlanNeedsAssessment()
+    {
+        // AGVO §21 Abs.2 Nr.4/5; Nutzerfestlegung 10.11.2026: Wechsel gegenüber Klasse 10 ist ein Hinweis, kein Fehler.
+        var catalog = ReligionCatalog;
         var p = Profile with { Prerequisites = Profile.Prerequisites with { ReligionEthicsGrade10 = "KR", ReligionEthicsExamPermission = Knowledge.Unknown } };
-        // Only the subject attended in Grade 10 (KR) is a regular oral candidate without explicit exam permission.
         var candidates = ChoiceWorkflow.OralCandidates(Complete, catalog, p);
         Assert.Contains("KR", candidates);
-        Assert.DoesNotContain("ETH", candidates);
-        Assert.DoesNotContain("ER", candidates);
-        // Complete has ETH-BF selected while Grade 10 was KR -> switch warning with Feststellungsprüfung hint.
+        Assert.Contains("ETH", candidates);
         var result = Check(Complete, p, catalog);
         var relMsg = Assert.Single(result.Messages.Where(m => m.Rule.Id == "AGVO-RELIGION"));
-        Assert.Contains("Feststellungsprüfung", relMsg.Explanation);
+        Assert.Equal(ReviewStatus.NeedsReview, relMsg.Rule.Severity);
         Assert.Contains("Austritt aus Religionsunterricht muss beantragt werden.", relMsg.Explanation);
         Assert.Contains("Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig.", relMsg.Explanation);
-        // Planning ETH as oral subject without exam permission triggers PLAN-ORAL with Feststellungsprüfung explanation.
+        Assert.Null(AcademicRules.AssessmentSubject(Complete, p));
+        Assert.Equal(new[] { "ETH" }, AcademicRules.ReligionChange(Complete, p));
+        // Planning ETH orally is no rule violation; the assessment is reported for planning.
         var withEthOral = Complete with { PlannedOralSubjects = ["ETH", "BIO"] };
-        var oralMsg = Assert.Single(Check(withEthOral, p, catalog).Messages.Where(m => m.Rule.Id == "PLAN-ORAL"));
-        Assert.Contains("Feststellungsprüfung", oralMsg.Explanation);
+        var oralResult = Check(withEthOral, p, catalog);
+        Assert.DoesNotContain(oralResult.Messages, m => m.Rule.Id == "PLAN-ORAL");
+        Assert.Equal(ReviewStatus.NeedsReview, oralResult.Status);
+        Assert.Equal("ETH", AcademicRules.AssessmentSubject(withEthOral, p));
+        Assert.Contains("Feststellungsprüfung findet zu Beginn des 1. Halbjahres", oralResult.Messages.Single(m => m.Rule.Id == "AGVO-RELIGION").Explanation);
+        // An explicit refusal in the teacher stock still blocks the oral plan; a confirmation needs no assessment.
+        var refused = p with { Prerequisites = p.Prerequisites with { ReligionEthicsExamPermission = Knowledge.No } };
+        Assert.Contains(Check(withEthOral, refused, catalog).Messages, m => m.Rule.Id == "PLAN-ORAL" && m.Rule.Severity == ReviewStatus.Invalid);
+        Assert.Null(AcademicRules.AssessmentSubject(withEthOral, refused));
+        Assert.Null(AcademicRules.AssessmentSubject(withEthOral, p with { Prerequisites = p.Prerequisites with { ReligionEthicsExamPermission = Knowledge.Yes } }));
+    }
+
+    [Fact] public void ChangeFromReligionToEthicsDuringCourseFulfilsObligationWithHint()
+    {
+        // AGVO §13 Abs.1 Nr.7, Abs.4; KOE 2026 Kap. 3.3: Abmeldung zum Schuljahr ist zulässig, aber ohne mündliche Prüfung.
+        var catalog = ReligionCatalog;
+        var p = Profile with { Prerequisites = Profile.Prerequisites with { ReligionEthicsGrade10 = "KR", ReligionEthicsExamPermission = Knowledge.Unknown } };
+        var c = Complete with { Selections = [.. Complete.Selections.Where(s => s.SubjectId != "ETH"),
+            new("KR-BF", "KR", CourseType.Bf, CourseVariant.Normal, [1, 2]), new("ETH-BF", "ETH", CourseType.Bf, CourseVariant.Normal, [3, 4])] };
+        var result = Check(c, p, catalog);
+        Assert.DoesNotContain(result.Messages, m => m.Rule.Id == "AGVO-REQUIRED");
+        var hint = Assert.Single(result.Messages.Where(m => m.Rule.Id == "AGVO-RELIGION"));
+        Assert.Contains("weder Religion noch Ethik", hint.Explanation);
+        Assert.DoesNotContain(AcademicRules.ExamOptions(c, catalog, p), o => o.First is "KR" or "ETH" || o.Second is "KR" or "ETH");
+        // A gap stays a violation.
+        var gap = c with { Selections = [.. c.Selections.Where(s => s.SubjectId != "ETH")] };
+        Assert.Contains(Check(gap, p, catalog).Messages, m => m.Rule.Id == "AGVO-REQUIRED" && m.SubjectIds.Contains("ETH") && m.Semesters.SequenceEqual(new[] { 3, 4 }));
+    }
+
+    [Fact] public void PlannedOralEnglishMustBeAttendedForFourSemesters()
+    {
+        // AGVO §21 Abs.2 Nr.2: Prüfungsfächer werden vier Halbjahre durchgängig besucht (Befund 10.11.2026: E war ausgenommen).
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = [.. TestData.WorkflowCatalog.Subjects, new("F", "Französisch")],
+            Offers = [.. TestData.WorkflowCatalog.Offers, TestData.Offer("F-BF", "F"), TestData.Offer("F-LF", "F", CourseType.Lf)]
+        };
+
+        var c = Complete with { Selections = [.. Complete.Selections.Where(s => s.SubjectId != "E"), TestData.Select(catalog.Offers.Single(o => o.Id == "F-LF")),
+            new("MU-BF", "MU", CourseType.Bf, CourseVariant.Normal, [1, 2])], PlannedOralSubjects = ["E", "G"] };
+        Assert.Contains(Check(c, catalog: catalog).Messages, m => m.Rule.Id == "AGVO-REQUIRED" && m.SubjectIds.Contains("E"));
+        var attended = c with { Selections = [.. c.Selections, TestData.Select(catalog.Offers.Single(o => o.Id == "E-BF"))] };
+        Assert.DoesNotContain(Check(attended, catalog: catalog).Messages, m => m.Rule.Id == "AGVO-REQUIRED");
+    }
+
+    [Fact] public void ConfirmedLanguageCareerDecidesFrenchAndLatin()
+    {
+        // AGVO §13 Abs.1 Nr.3; KOE 2026 Kap. 3.1: Fremdsprachenkurse setzen Unterricht spätestens ab Klasse 8 voraus.
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = [.. TestData.WorkflowCatalog.Subjects, new("F", "Französisch"), new("L", "Latein")],
+            Offers = [.. TestData.WorkflowCatalog.Offers, TestData.Offer("F-BF", "F"), TestData.Offer("L-BF", "L")]
+        };
+        var french = catalog.Offers.Single(o => o.Id == "F-BF");
+        var c = Complete with { Selections = [.. Complete.Selections.Where(s => s.SubjectId != "CH"), TestData.Select(french)] };
+        var latin = Profile with { Prerequisites = Profile.Prerequisites with { ContinuedLanguages = ["E", "L"] } };
+        Assert.Equal(new[] { "E", "L" }, AcademicRules.Languages(latin, catalog));
+        Assert.False(new ChoiceValidator().GetAvailability(french, latin).CanSelect);
+        var result = Check(c, latin, catalog);
+        Assert.Contains(result.Messages, m => m.Rule.Id == "PREREQUISITE-NO" && m.SubjectIds.Contains("F"));
+        Assert.Contains(result.Messages, m => m.Rule.Id == "AGVO-LANGUAGE-SCIENCE");
+        var frenchCareer = Profile with { Prerequisites = Profile.Prerequisites with { ContinuedLanguages = ["E", "F"] } };
+        var ok = Check(c, frenchCareer, catalog);
+        Assert.DoesNotContain(ok.Messages, m => m.Rule.Id is "PREREQUISITE-NO" or "AGVO-LANGUAGE-SCIENCE" or "AGVO-LANGUAGE-REVIEW");
+        // Without a confirmed career French stays selectable, but is reported for clarification instead of silently accepted.
+        var unknown = Check(c, Profile, catalog);
+        Assert.True(new ChoiceValidator().GetAvailability(french, Profile).CanSelect);
+        Assert.DoesNotContain(unknown.Messages, m => m.Rule.Id is "PREREQUISITE-NO" or "AGVO-LANGUAGE-SCIENCE");
+        Assert.Contains(unknown.Messages, m => m.Rule.Id == "AGVO-LANGUAGE-REVIEW" && m.SubjectIds.Contains("F"));
     }
 
     [Theory]
@@ -298,7 +369,7 @@ public class AcademicRulesTests
     [Fact] public void MissingExamCombinationAndPlanningHintsAreReported()
     {
         var result = Check(Choice("D-LF", "M-LF", "E-LF"));
-        foreach (var id in new[] { "AGVO-EXAM", "AGVO-CREDIT", "AGVO-ELECTION", "PLAN-HOURS" })
+        foreach (var id in new[] { "AGVO-EXAM", "PLAN-HOURS" })
             Assert.Contains(result.Messages, m => m.Rule.Id == id);
     }
     [Fact] public void ExistingOralPlanDoesNotDistortAlternativeMinimumCredits()

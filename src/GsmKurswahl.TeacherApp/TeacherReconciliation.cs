@@ -12,6 +12,24 @@ namespace GsmKurswahl.TeacherApp;
 
 public sealed partial class TeacherWindow
 {
+    internal ExportTable ReligionCaseTable()
+    {
+        Ready();
+        var cases = ReligionCases.All(session!.Overview().Where(s => s.Record.Student.GraduationYear == session.Catalog.GraduationYear));
+        return new(["Name", "Klasse", "Schüler-ID", "Klasse 10", "Belegung Kursstufe", "Mündlich geplant", "Feststellungsprüfung", "Hinweis"],
+            [.. cases.Select(c => new[] { c.State.Record.Student.SyntheticDisplayName, c.State.Record.Student.ClassName, c.State.Record.Student.ExternalStudentId,
+                c.Grade10, string.Join(c.ChangeDuringCourse ? " → " : "/", c.Chosen),
+                string.Join(", ", c.State.Active!.Snapshot.PlannedOralSubjects.Where(o => o is "ETH" or "ER" or "KR")),
+                c.AssessmentSubject is null ? "nein" : "ja, " + c.AssessmentSubject,
+                c.ChangeDuringCourse ? "Abmeldung beantragen; weder Religion noch Ethik mündlich (KOE 3.3)"
+                    : c.Grade10 is "KR" or "ER" && c.Chosen.Contains("ETH") ? "Austritt aus dem Religionsunterricht beantragen" : "" })]);
+    }
+    private async Task ExportReligionCases()
+    {
+        var table = ReligionCaseTable();
+        if (table.Rows.Length == 0) { status.Text = "Keine Person mit Religion/Ethik-Wechsel gegenüber Klasse 10 in den eingelesenen Wahlen."; return; }
+        await ExportTableFile(table, true, "Religion-Ethik-Feststellungspruefungen");
+    }
     private async Task ExportTableFile(ExportTable table, bool xlsx, string name)
     {
         var extension = xlsx ? "xlsx" : "csv";

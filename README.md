@@ -119,7 +119,7 @@ Alle 80 Wahlen werden beim Erzeugen mit dem produktiven Regelkern auf Invalid-Me
 
 ## Testpaket für Kolleginnen und Kollegen
 
-`Testpaket-bauen.cmd` doppelklicken (benötigt das .NET-10-SDK). Es entsteht `artifacts/testpaket/GSM-Kurswahl-Testpaket-<Datum>.zip` mit beiden Programmen (selbstenthaltend, keine Installation nötig) und einer `.cmd`-Datei je Stand. Auf dem Testrechner entpacken und den gewünschten Stand doppelklicken; `LIESMICH.txt` im Paket erklärt die Bedienung.
+`Testpaket-bauen.cmd` doppelklicken (benötigt das .NET-10-SDK). Es entsteht `artifacts/testpaket/GSM-Kurswahl-Testpaket-<Datum>-<Kennung>.zip` mit beiden Programmen (Windows x64, selbstenthaltend, keine Installation nötig) und einer `.cmd`-Datei je Stand. Das gesamte ZIP in einen eigenen Ordner auf dem Netzlaufwerk im Verwaltungsnetz entpacken und Kollegen dort Leserechte geben. Den gewünschten Stand doppelklicken; `LIESMICH.txt` im Paket erklärt die Bedienung.
 
 | Stand | Inhalt |
 | --- | --- |
@@ -130,10 +130,14 @@ Alle 80 Wahlen werden beim Erzeugen mit dem produktiven Regelkern auf Invalid-Me
 | Lehrer 5 | Alle 80 Wahlen eingesammelt, Kursplanung vorbereitet |
 | Lehrer 6 | BIO LF bilingual gestrichen, Nachwahl offen |
 | Schüler 1–3 | Blanko, Wahl angefangen, Wahl fertig |
-| Schüler 4–5 | Blanko mit Bili/INF/Italienisch, Blanko mit Sportbefreiung |
-| Durchlauf | Schüler aus Stand Lehrer 3: wählen, danach kommt die Wahl in Lehrer 3 an |
+| Schüler 4–7 | Bili/INF/Italienisch, Sportbefreiung, fehlende Zusatzvoraussetzungen, unbekannte Vorbildung |
+| Durchlauf | Öffnet Schüler und Lehrer gemeinsam mit demselben frischen Stand; wählen und automatisch einsammeln |
 
-Die Stände entstehen erst beim ersten Start auf dem Testrechner, weil der Lehrerbestand absolute Ordnerpfade speichert; das Paket enthält daher keine Datenbank. Die Lehrerstände nutzen dieselben Import-, Verteil- und Sammeldienste wie der echte Ablauf (`DemoStages.cs`). Daten liegen unter `%LOCALAPPDATA%\GSM-Kurswahl-Testpaket`, je Stand ein eigener Ordner. Änderungen bleiben erhalten, bis `Alles zuruecksetzen.cmd` läuft. Der normale Verwaltungsort wird nicht berührt, und das Paket enthält keine `schulvorgaben.json`: Jeder Stand bringt eigene Vorgaben mit, damit nie das Schullaufwerk vorbelegt ist. Das Schülerprogramm wird in den Ständen nicht in die 80 Ordner kopiert (rund 8 GB). Neue Stände: Eintrag in `DemoStages.All` und in der Tabelle in `scripts/Publish-Testpaket.ps1`.
+**Jeder Klick beginnt von vorn:** Die Starter erzeugen einen neuen lokalen Lauf unter `%LOCALAPPDATA%\GSM-Kurswahl-Testpaket\<Paketkennung>\Laeufe`. Bereits geöffnete Läufe und andere Kollegen bleiben unabhängig. Alte Laufordner bleiben zur Fehleranalyse erhalten und können nach Schließen der Testfenster über `Testdaten-Ordner oeffnen.cmd` im Explorer aufgeräumt werden. Ein Zurücksetzen durch Löschen ist vor dem nächsten Test nicht nötig.
+
+Die Programme werden einmal pro Paket und Benutzer nach `Programm` kopiert und ausschließlich lokal gestartet; die Freigabe wird nur gelesen. Gleichzeitige Erststarts stimmen die Programmkopie über eine lokale Dateisperre ab. SQLite und absolute Schülerpfade entstehen erst im jeweiligen lokalen Lauf. Lehrerstände nutzen dieselben Import-, Verteil- und Sammeldienste wie der echte Ablauf (`DemoStages.cs`). Beim gemeinsamen Durchlauf beide Fenster verwenden: Ein zusätzlicher Klick auf Lehrer 3 startet einen anderen, leeren Lauf. Vollständige Wahlen bleiben Vorwahlentwürfe mit den dokumentierten fachlichen Freigabegrenzen.
+
+Der normale Verwaltungsort wird von den Startern nicht geöffnet. Das Paket enthält keine GSM-`schulvorgaben.json`; jeder Stand erzeugt eigene lokale Verteilungsvorgaben. Das Schülerprogramm wird nicht in die 80 Ordner kopiert. Neue Pakete in neue Freigabeordner entpacken; bestehende Pakete nicht überschreiben. Benötigt Windows PowerShell 5.1 und lokale Programmausführung; tatsächlicher Schulnetz-/Richtlinientest bleibt offen. Neue Stände: Eintrag in `DemoStages.All` und in `scripts/Publish-Testpaket.ps1`.
 
 ## Arbeitsphasen und kompakte Kursplanung (28.10.2026)
 

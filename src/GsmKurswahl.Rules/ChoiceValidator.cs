@@ -15,7 +15,7 @@ public sealed class ChoiceValidator
         new("OFFER-VERSION", "Jahrgang und Angebots-/Regelversion", "Pflichtenheft §§4,8", "Alle Wahlen", Version, ReviewStatus.Invalid),
         new("OFFER-SELECTION", "Angebot, Variante und Halbjahre", "Pflichtenheft §§4,8", "Jede Belegung", Version, ReviewStatus.Invalid),
         new("SUBJECT-DUPLICATE", "Keine doppelte Fachbelegung", "Pflichtenheft §6 Nr.1,7", "Alle Fächer/Varianten", Version, ReviewStatus.Invalid),
-        new("PREREQUISITE-NO", "Persönliche Voraussetzung nicht erfüllt", "Pflichtenheft §§4,5", "INF/I/bilingual", Version, ReviewStatus.Invalid),
+        new("PREREQUISITE-NO", "Persönliche Voraussetzung nicht erfüllt", "Pflichtenheft §§4,5; AGVO §13 Abs.1 Nr.3", "INF/I/bilingual/Sprachlaufbahn", Version, ReviewStatus.Invalid),
         new("PREREQUISITE-UNKNOWN", "Persönliche Voraussetzung ungeklärt", "Pflichtenheft §§5,5a", "INF/I/bilingual", Version, ReviewStatus.NeedsReview),
         .. CatalogRules.Definitions,
         .. ChoiceWorkflow.Definitions
@@ -32,6 +32,8 @@ public sealed class ChoiceValidator
             && (profile.Status != ProfileStatus.Verified || profile.Prerequisites.PermanentSportExemption != Knowledge.No
                 || profile.Prerequisites.SportExemptSemesters is not { Length: 0 }))
             return new(false, ReviewStatus.NeedsReview, "LF Sport erfordert bestätigte Auskunft ohne dauerhafte oder teilweise Befreiung; Sonderfall mit Oberstufenberatung klären.");
+        if (AcademicRules.LanguageExcluded(offer.SubjectId, profile))
+            return new(false, ReviewStatus.Invalid, $"Nicht in deiner bestätigten Sprachlaufbahn ({string.Join(", ", AcademicRules.Languages(profile))}). Kurse in einer Fremdsprache setzen Unterricht spätestens ab Klasse 8 voraus (AGVO § 13 Abs. 1 Nr. 3). Stimmt die Angabe nicht, bitte an die Oberstufenberatung wenden.");
         if (offer.Requirements.IsEmpty) return new(true, ReviewStatus.NeedsReview, "Vorläufig wählbar; fachliche Freigabe für den Jahrgang steht aus.");
         if (profile.Status != ProfileStatus.Verified)
             return new(false, ReviewStatus.NeedsReview, "Persönliche Voraussetzung ungeprüft. Bitte an die Oberstufenberatung wenden.");
@@ -84,16 +86,18 @@ public sealed class ChoiceValidator
         {
             var switchedRelOral = choice.PlannedOralSubjects.FirstOrDefault(s => s is "ETH" or "ER" or "KR"
                 && profile.Status == ProfileStatus.Verified && profile.Prerequisites.ReligionEthicsGrade10 is { } g10 && g10 != s
-                && profile.Prerequisites.ReligionEthicsExamPermission != Knowledge.Yes);
+                && profile.Prerequisites.ReligionEthicsExamPermission == Knowledge.No);
             var explanation = switchedRelOral is not null
-                ? $"{switchedRelOral} wurde in Klasse 10 nicht besucht ({profile.Prerequisites.ReligionEthicsGrade10}): Mündliche Prüfung erfordert eine Überprüfung/Feststellungsprüfung zu Beginn des 1. Schulhalbjahres (AGVO § 21 Abs. 2 Nr. 4/5; bei Abmeldung Rel -> Ethik nach KOE Kap. 3.3 keine mündliche Prüfung möglich)."
+                ? $"{switchedRelOral} wurde in Klasse 10 nicht besucht ({profile.Prerequisites.ReligionEthicsGrade10}): Laut Oberstufenberatung ist es nicht als mündliches Prüfungsfach möglich (AGVO § 21 Abs. 2 Nr. 4/5)."
                 : ChoiceWorkflow.OralError(choice, catalog, profile) ?? "Mündliche Prüfungsplanung passt nicht zu LF, Angebot oder persönlichen Voraussetzungen.";
             messages.Add(new(Definitions.Single(d => d.Id == "PLAN-ORAL"), choice.PlannedOralSubjects, [],
-                explanation, "Zwei zulässige Basisfächer für die mündliche Prüfung planen oder Feststellungsprüfung mit der Oberstufenberatung klären."));
+                explanation, "Zwei zulässige Basisfächer für die mündliche Prüfung planen."));
         }
         foreach (var duplicate in choice.Selections.GroupBy(s => s.SubjectId).Where(g => g.Count() > 1))
             Add("SUBJECT-DUPLICATE", "Dasselbe Fach wurde mehrfach als Kursart oder Variante gewählt.", "Eine eindeutige Fachbelegung wählen; Sonderfälle administrativ klären.", duplicate.Key);
-        return new(messages.Any(m => m.Rule.Severity == ReviewStatus.Invalid) ? ReviewStatus.Invalid : ReviewStatus.NeedsReview, messages.ToImmutable());
+        // Valid means: no rule objects and nothing is left to clarify. It is a formal check, not a release by the school.
+        return new(messages.Any(m => m.Rule.Severity == ReviewStatus.Invalid) ? ReviewStatus.Invalid
+            : messages.Count > 0 ? ReviewStatus.NeedsReview : ReviewStatus.Valid, messages.ToImmutable());
     }
 
     public static ImmutableArray<SemesterSummary> Summarize(CourseChoice choice, OfferCatalog catalog) =>

@@ -124,7 +124,7 @@ public class ChoiceValidatorTests
         Assert.Equal(ReviewStatus.Invalid, result.Status);
         Assert.Contains(result.Messages, m => m.Rule.Id == "PREREQUISITE-NO");
         Assert.DoesNotContain(result.Messages, m => m.Rule.Id == "PROFILE-TRUST");
-        Assert.Contains(result.Messages, m => m.Rule.Id == "M2-RELEASE");
+        Assert.DoesNotContain(result.Messages, m => m.Rule.Id == "M2-RELEASE");
     }
     [Fact] public void ValidateReportsCancelledOfferAsInvalid()
     {

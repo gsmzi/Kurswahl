@@ -27,7 +27,7 @@ public sealed class DemoWorkspaceTests
             {
                 var session = new TeacherSession(store, catalog, "demo-test");
                 var states = session.Overview(); Assert.Equal(80, states.Length);
-                Assert.All(states, s => { Assert.NotNull(s.Active); Assert.Equal(ReviewStatus.NeedsReview, s.Validation!.Status);
+                Assert.All(states, s => { Assert.NotNull(s.Active); Assert.NotEqual(ReviewStatus.Invalid, s.Validation!.Status);
                     Assert.DoesNotContain(s.Validation.Messages, m => m.Rule.Severity == ReviewStatus.Invalid);
                     Assert.False(s.RequiresReselection); Assert.Equal(3, s.Active!.Snapshot.Selections.Count(c => c.Type == CourseType.Lf));
                     Assert.Equal(SubmissionStatus.Draft, s.Active.Snapshot.SubmissionStatus);

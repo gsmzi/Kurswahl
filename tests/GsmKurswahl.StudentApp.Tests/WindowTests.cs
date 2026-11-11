@@ -144,8 +144,8 @@ public class WindowTests
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), b => b.Text?.Contains("Mögliche mündliche Kombinationen") == true);
             var visibleTexts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text ?? "").ToArray();
             Assert.DoesNotContain(visibleTexts, t => t.Contains("Ausbaustufen") || t.Contains("needs_review"));
-            Assert.Contains(visibleTexts, t => t.Contains("Wer klärt offene Punkte? Die Oberstufenberatung"));
-            Assert.Contains(visibleTexts, t => t.Contains("Deine Wahl wird automatisch geprüft."));
+            Assert.Contains(visibleTexts, t => t.Contains("Das klärt die Oberstufenberatung mit dir"));
+            Assert.Contains(visibleTexts, t => t.Contains("Das musst du noch tun") || t.Contains("Nichts mehr zu tun"));
             var sportRow = session.Plan.Single(r => r.OfferId == "SP-BF");
             Assert.Equal(ReviewStatus.NeedsReview, sportRow.Issue);
             Assert.Contains("AGVO-SPORT", sportRow.IssueText);

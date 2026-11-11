@@ -54,8 +54,8 @@ public static class ChoiceWorkflow
             && !(o.SubjectId == "SP" && profile?.Status == ProfileStatus.Verified
                 && (profile.Prerequisites.PermanentSportExemption == Knowledge.Yes || profile.Prerequisites.SportExemptSemesters is { Length: > 0 }))
             && !(o.SubjectId is "ETH" or "ER" or "KR" && profile?.Status == ProfileStatus.Verified
-                && (profile.Prerequisites.ReligionEthicsExamPermission == Knowledge.No
-                    || (profile.Prerequisites.ReligionEthicsGrade10 is { } grade10 && grade10 != o.SubjectId && profile.Prerequisites.ReligionEthicsExamPermission != Knowledge.Yes)))
+                // A change against class 10 stays possible with an assessment (AGVO §21 Abs.2 Nr.4/5); reported as AGVO-RELIGION.
+                && profile.Prerequisites.ReligionEthicsExamPermission == Knowledge.No)
             && OralSemesters(choice, o.SubjectId).All(h => o.Schedule.Any(s => s.Semester == h)))
             .Select(o => o.SubjectId).Distinct()];
 

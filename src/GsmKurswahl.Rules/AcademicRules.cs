@@ -9,31 +9,56 @@ public static class AcademicRules
     public static readonly string[] Sciences = ["BIO", "CH", "PH"];
     public static readonly ImmutableArray<RuleDefinition> Definitions =
     [
-        Rule("M2-RELEASE", "Jahrgangsbezogene fachliche Freigabe", "Pflichtenheft §§6,18", ReviewStatus.NeedsReview),
         Rule("AGVO-LF", "Drei LF, davon zwei Kernfächer", "AGVO §12; Pflichtenheft §6 Nr.1"),
         Rule("AGVO-COURSES", "12 LF und mindestens 30 weitere Kurse", "AGVO §§12,13; Pflichtenheft §6 Nr.2"),
         Rule("AGVO-REQUIRED", "Pflichtfächer und GSM-Halbjahresplan", "AGVO §13; Pflichtenheft §§4,6 Nr.3,8"),
         Rule("AGVO-LANGUAGE-SCIENCE", "Sprach- und Naturwissenschaftsbelegung", "AGVO §13; Pflichtenheft §6 Nr.4–6"),
-        Rule("AGVO-LANGUAGE-REVIEW", "Sprachlaufbahn oder INF-Alternative ungeklärt", "AGVO §13; Pflichtenheft §6 Nr.4–6", ReviewStatus.NeedsReview),
-        Rule("AGVO-SEMESTERS", "Belegung je Jahrgangsstufe", "AGVO §10; Pflichtenheft §6 Nr.12; Nutzerfestlegung 29.10.2026: kein Einzelhalbjahres-Sportersatz bei der Kurswahl"),
-        Rule("AGVO-RELIGION", "Religion/Ethik: Zustimmung und Wechsel", "AGVO §§11,21; Pflichtenheft §6 Nr.9", ReviewStatus.NeedsReview),
+        Rule("AGVO-LANGUAGE-REVIEW", "Sprachlaufbahn oder INF-Alternative ungeklärt bzw. nicht bestätigt", "AGVO §13; Pflichtenheft §6 Nr.4–6", ReviewStatus.NeedsReview),
+        Rule("AGVO-SEMESTERS", "Belegung je Jahrgangsstufe", "AGVO §11 Abs.1 Satz 3; Pflichtenheft §6 Nr.12; Nutzerfestlegung 29.10.2026: kein Einzelhalbjahres-Sportersatz bei der Kurswahl"),
+        Rule("AGVO-RELIGION", "Religion/Ethik: Zustimmung, Wechsel und Feststellungsprüfung", "AGVO §§11,13 Abs.4,21 Abs.2 Nr.4/5; KOE 2026 Kap.3.3; Pflichtenheft §6 Nr.9", ReviewStatus.NeedsReview),
         Rule("GSM-RELIGION-EXCLUSIVE", "Religion und Ethik nicht gleichzeitig", "Nutzerfestlegung 29.10.2026; Pflichtenheft §6 Nr.9"),
         new("GSM-GK-CONTINUITY", "GK ohne Unterbrechung bei LF Wirtschaft", "GSM-Nutzerfestlegung 29.10.2026", "GSM; GK-BF bei LF Wirtschaft", "gsm-2026-10-29.1", ReviewStatus.Invalid),
         Rule("AGVO-SPORT", "Befreiung, LF-Eignung und Ersatzbedarf", "AGVO §13 Abs.5; Pflichtenheft §6 Nr.10", ReviewStatus.NeedsReview),
         Rule("AGVO-SPORT-REPLACEMENT", "Zusätzliche Kurse statt Sport; kein Seminarkurs", "AGVO §13 Abs.5; ZSL Ratgeber Schulsport"),
         Rule("AGVO-EXAM", "Mindestens eine mögliche Prüfungskombination", "AGVO §21; Pflichtenheft §6 Nr.11"),
-        Rule("AGVO-CREDIT", "Pflichtanrechnung höchstens 40", "AGVO §§17,21; Pflichtenheft §6 Nr.11", ReviewStatus.NeedsReview),
-        Rule("AGVO-ELECTION", "Vorwahl, Endwahl und Wahltermin", "AGVO §14; Pflichtenheft §6 Nr.13", ReviewStatus.NeedsReview),
         Rule("PLAN-HOURS", "32 Wochenstunden als Planungshinweis", "Pflichtenheft §6 letzter Absatz", ReviewStatus.NeedsReview),
         Rule("GSM-HOURS-UPPER", "Mehr als 37 Wochenstunden je Halbjahr", "Nutzerfestlegung 29.10.2026", ReviewStatus.NeedsReview)
     ];
     private static RuleDefinition Rule(string id, string description, string source, ReviewStatus severity = ReviewStatus.Invalid) =>
         new(id, description, source, "GSM-Kurswahl; Rechtsstand für Abiturjahrgang vor Freigabe bestätigen", ChoiceValidator.Version, severity);
 
+    // AGVO §13 Abs.1 Nr.3: a language counts only with compulsory lessons from class 8 at the latest.
+    // English is the first foreign language of every GSM pupil. French/Latin follow the confirmed
+    // language career once the teacher stock states one; without a statement they stay selectable (unknown).
+    public static bool IsLanguageSubject(string subject, OfferCatalog? catalog = null) =>
+        subject is "E" or "F" or "L" or "GR" or "I" or "SPA" or "RU" or "POR"
+        || catalog?.Subjects.FirstOrDefault(x => x.Id == subject)?.IsForeignLanguage == true;
+    public static bool LanguageCareerKnown(ProfileContext profile) =>
+        profile.Status == ProfileStatus.Verified && !profile.Prerequisites.ContinuedLanguages.IsDefaultOrEmpty;
     public static string[] Languages(ProfileContext profile, OfferCatalog? catalog = null) =>
-        ["E", "F", "L", .. (profile.Status == ProfileStatus.Verified ? profile.Prerequisites.ContinuedLanguages : [])
-            .Where(s => s is "GR" or "I" or "SPA" or "RU" or "POR"
-                || catalog?.Subjects.FirstOrDefault(x => x.Id == s)?.IsForeignLanguage == true)];
+        LanguageCareerKnown(profile)
+            ? ["E", .. profile.Prerequisites.ContinuedLanguages.Where(s => s != "E" && IsLanguageSubject(s, catalog))]
+            : ["E", "F", "L"];
+    // A language outside a confirmed career cannot be attended as LF/BF at all. Italian keeps its own profile check.
+    public static bool LanguageExcluded(string subject, ProfileContext profile, OfferCatalog? catalog = null) =>
+        subject is not ("E" or "I") && IsLanguageSubject(subject, catalog) && LanguageCareerKnown(profile)
+        && !Languages(profile, catalog).Contains(subject);
+
+    // Religion/ethics subject planned for the oral exam although another subject was attended in class 10:
+    // AGVO §21 Abs.2 Nr.4/5 requires an assessment at the start of HJ 1 unless the teacher stock already decided it.
+    public static string? AssessmentSubject(CourseChoice choice, ProfileContext profile)
+    {
+        if (profile.Status != ProfileStatus.Verified || profile.Prerequisites.ReligionEthicsGrade10 is not { } grade10) return null;
+        if (profile.Prerequisites.ReligionEthicsExamPermission != Knowledge.Unknown) return null;
+        return choice.PlannedOralSubjects.FirstOrDefault(s => s is "ETH" or "ER" or "KR" && s != grade10);
+    }
+    // Chosen ETH/ER/KR subjects that differ from class 10, in order of their first semester.
+    public static string[] ReligionChange(CourseChoice choice, ProfileContext profile)
+    {
+        if (profile.Status != ProfileStatus.Verified || profile.Prerequisites.ReligionEthicsGrade10 is not { } grade10) return [];
+        return [.. choice.Selections.Where(s => s.SubjectId is "ETH" or "ER" or "KR" && s.SubjectId != grade10 && !s.Semesters.IsEmpty)
+            .OrderBy(s => s.Semesters.Min()).Select(s => s.SubjectId).Distinct()];
+    }
     public static string[] ScienceSubjects(OfferCatalog? catalog = null) =>
         catalog is null ? Sciences : [.. Sciences.Union(catalog.Subjects.Where(s => s.IsScience).Select(s => s.Id))];
     public static bool Four(CourseSelection s) => Enumerable.Range(1, 4).All(s.Semesters.Contains);
@@ -84,7 +109,6 @@ public static class AcademicRules
         void Add(string id, string explanation, string[]? subjects = null, int[]? semesters = null) =>
             messages.Add(new(Definitions.Single(r => r.Id == id), [.. subjects ?? []], [.. semesters ?? []], explanation,
                 "Belegung prüfen; offene Voraussetzungen und Sonderfälle mit der Oberstufenberatung klären."));
-        Add("M2-RELEASE", "needs_review: Rechtsstand für diesen Jahrgang und interne KOE-Auslegung sind noch nicht freigegeben. Keine verbindliche Abgabe.");
         var lf = choice.Selections.Where(s => s.Type == CourseType.Lf).ToArray();
         if (HasGkContinuityGap(choice))
             Add("GSM-GK-CONTINUITY", GkContinuityExplanation, ["GK"], [2, 3, 4]);
@@ -95,12 +119,20 @@ public static class AcademicRules
             Add("AGVO-LF", "Genau drei verschiedene LF, darunter mindestens zwei aus Deutsch, Mathematik, geeigneten fortgeführten Sprachen oder BIO/CH/PH wählen.");
         if (lf.Sum(s => s.Semesters.Length) != 12 || choice.Selections.Where(s => s.Type != CourseType.Lf).Sum(s => s.Semesters.Length) < 30)
             Add("AGVO-COURSES", "Benötigt werden 12 LF-Halbjahreskurse und mindestens 30 weitere Kurse. SIA zählt nur seine zwei Halbjahre.");
-        foreach (var required in ChoiceWorkflow.Required(choice, profile).Where(r => r.SubjectId is not ("E" or "SP")))
+        foreach (var required in ChoiceWorkflow.Required(choice, profile).Where(r => r.SubjectId != "SP"))
             if (!choice.Selections.Any(s => s.SubjectId == required.SubjectId && required.Semesters.All(s.Semesters.Contains)))
                 Add("AGVO-REQUIRED", $"{required.SubjectId}: Pflichtbelegung fehlt.", [required.SubjectId], [.. required.Semesters]);
-        foreach (var group in new[] { new[] { "BK", "MU" }, new[] { "ETH", "ER", "KR" } })
-            if (!choice.Selections.Any(s => group.Contains(s.SubjectId) && Four(s)))
-                Add("AGVO-REQUIRED", $"Vier Kurse in einem der Fächer {string.Join(" / ", group)} fehlen.", group, [1, 2, 3, 4]);
+        if (!choice.Selections.Any(s => s.SubjectId is "BK" or "MU" && Four(s)))
+            Add("AGVO-REQUIRED", "Vier Kurse in einem der Fächer BK / MU fehlen.", ["BK", "MU"], [1, 2, 3, 4]);
+        // AGVO §13 Abs.1 Nr.7, Abs.4; KOE 3.3: a change between religion and ethics keeps the obligation fulfilled
+        // as long as every semester is covered. The change itself is reported as AGVO-RELIGION.
+        var religionSemesters = choice.Selections.Where(s => s.SubjectId is "ETH" or "ER" or "KR").SelectMany(s => s.Semesters).ToHashSet();
+        if (!Enumerable.Range(1, 4).All(religionSemesters.Contains))
+            Add("AGVO-REQUIRED", "Vier Kurse in einem der Fächer ETH / ER / KR fehlen: Religion oder Ethik muss in allen vier Halbjahren belegt sein.",
+                ["ETH", "ER", "KR"], [.. Enumerable.Range(1, 4).Except(religionSemesters)]);
+        if (profile.Status == ProfileStatus.Verified && !LanguageCareerKnown(profile) && choice.Selections.Any(s => s.SubjectId is "F" or "L"))
+            Add("AGVO-LANGUAGE-REVIEW", "Für Französisch/Latein ist im Lehrerbestand noch keine Sprachlaufbahn bestätigt (Unterricht spätestens ab Klasse 8 nötig).",
+                [.. choice.Selections.Where(s => s.SubjectId is "F" or "L").Select(s => s.SubjectId).Distinct()]);
         var full = choice.Selections.Where(Four).Select(s => s.SubjectId).Distinct().ToArray();
         var scienceCount = full.Count(sciences.Contains);
         var languageCount = full.Count(languages.Contains);
@@ -108,7 +140,7 @@ public static class AcademicRules
             && choice.Selections.Any(s => s.OfferId == o.Id) && new ChoiceValidator().GetAvailability(o, profile).CanSelect);
         if (scienceCount < 1 || languageCount < 1 || !(languageCount >= 2 || scienceCount + (inf ? 1 : 0) >= 2))
         {
-            var unknownAlternative = scienceCount > 0 && (full.Any(s => (s is "I" or "F" or "L" or "GR" or "SPA" or "RU" or "POR" || catalog.Subjects.FirstOrDefault(x => x.Id == s)?.IsForeignLanguage == true) && !languages.Contains(s))
+            var unknownAlternative = scienceCount > 0 && (full.Any(s => (s is "I" or "F" or "L" or "GR" or "SPA" or "RU" or "POR" || catalog.Subjects.FirstOrDefault(x => x.Id == s)?.IsForeignLanguage == true) && !languages.Contains(s) && !LanguageExcluded(s, profile, catalog))
                 || (full.Contains("INF") && (profile.Status != ProfileStatus.Verified
                     || profile.Prerequisites.InformaticsImp == Knowledge.Unknown || profile.Prerequisites.InformaticsBridge == Knowledge.Unknown)));
             Add(unknownAlternative ? "AGVO-LANGUAGE-REVIEW" : "AGVO-LANGUAGE-SCIENCE", "Eine geeignete Sprache und BIO/CH/PH sind nötig; zusätzlich zweite geeignete Sprache oder zweite Naturwissenschaft (berechtigtes INF als Alternative). Italienisch-Profil allein ist keine Sprachlaufbahnbestätigung.");
@@ -127,11 +159,19 @@ public static class AcademicRules
             .Select(s => s.SubjectId).Distinct().Count() > 1).ToArray();
         if (conflictingSemesters.Length > 0)
             Add("GSM-RELIGION-EXCLUSIVE", "Ethik und Religion sowie verschiedene Religionsfächer dürfen nicht gleichzeitig belegt werden. Im Pflichtbereich genau ein Fach wählen.", chosenRelEthics, conflictingSemesters);
+        var relSubjects = choice.Selections.Where(s => s.SubjectId is "ETH" or "ER" or "KR" && !s.Semesters.IsEmpty)
+            .OrderBy(s => s.Semesters.Min()).Select(s => s.SubjectId).Distinct().ToArray();
         var switchedRelEthics = p.ReligionEthicsGrade10 is { } grade10 && chosenRelEthics.Any(s => s != grade10);
-        if (p.ReligionEthicsGrade10 is "KR" or "ER" && chosenRelEthics.Contains("ETH"))
-            Add("AGVO-RELIGION", "Austritt aus Religionsunterricht muss beantragt werden. Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig. Bitte mit der Oberstufenberatung klären; daraus folgt noch keine Zulassung zur mündlichen Prüfung (jahrgangsbezogene Vorgaben und Sonderfall Religionsabmeldung prüfen).", ["ETH"]);
+        if (relSubjects.Length > 1 && conflictingSemesters.Length == 0)
+            Add("AGVO-RELIGION", relSubjects.Contains("ETH")
+                ? $"Wechsel während der Kursstufe ({string.Join(" -> ", relSubjects)}): Die Abmeldung vom Religionsunterricht muss beantragt werden. Danach kann weder Religion noch Ethik mündliches Prüfungsfach sein (KOE 2026 Kap. 3.3); eine Feststellungsprüfung ist dafür nicht vorgesehen."
+                : $"Wechsel des Religionsfachs während der Kursstufe ({string.Join(" -> ", relSubjects)}): höchstens zwei Kurse einer anderen Religionsgemeinschaft und nur mit Zustimmung beider Religionsgemeinschaften (AGVO § 11 Abs. 3). Religion kann dann nicht mündliches Prüfungsfach sein.", relSubjects);
+        else if (p.ReligionEthicsGrade10 is "KR" or "ER" && chosenRelEthics.Contains("ETH"))
+            Add("AGVO-RELIGION", "Austritt aus Religionsunterricht muss beantragt werden. Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig."
+                + (AssessmentSubject(choice, profile) == "ETH" ? " Du planst Ethik mündlich: Die Feststellungsprüfung findet zu Beginn des 1. Halbjahres statt (AGVO § 21 Abs. 2 Nr. 5)." : "")
+                + " Bitte mit der Oberstufenberatung klären.", ["ETH"]);
         else if (switchedRelEthics)
-            Add("AGVO-RELIGION", $"Wechsel der Belegung gegenüber Klasse 10 ({p.ReligionEthicsGrade10} -> {string.Join("/", chosenRelEthics)}): Für eine mögliche spätere mündliche Prüfung im gewechselten Fach ist eine Überprüfung/Feststellungsprüfung zu Beginn des 1. Schulhalbjahres erforderlich (AGVO § 21 Abs. 2 Nr. 4/5; bei Abmeldung Rel -> Ethik nach KOE Kap. 3.3 i. d. R. keine mündliche Prüfung möglich).", chosenRelEthics);
+            Add("AGVO-RELIGION", $"Wechsel der Belegung gegenüber Klasse 10 ({p.ReligionEthicsGrade10} -> {string.Join("/", chosenRelEthics)}): Für eine mündliche Prüfung im gewechselten Fach ist eine Feststellungsprüfung zu Beginn des 1. Schulhalbjahres erforderlich (AGVO § 21 Abs. 2 Nr. 4/5). Bitte mit der Oberstufenberatung klären.", chosenRelEthics);
         else if (chosenRelEthics.Length > 0 && (p.ReligionEthicsPermission == Knowledge.No
             || (p.ReligionEthicsPermission == Knowledge.Unknown
                 && !(p.ReligionEthicsGrade10 is "KR" or "ER" or "ETH" && chosenRelEthics.All(s => s == p.ReligionEthicsGrade10)))))
@@ -156,8 +196,6 @@ public static class AcademicRules
             Add("AGVO-SPORT", "LF Sport: dauerhafte auch teilweise Befreiung bzw. fehlende Auskunft erfordert Klärung.", ["SP"]);
         if (lf.Length == 3 && ExamOptions(choice, catalog, profile).IsEmpty)
             Add("AGVO-EXAM", "Die belegten Kurse ergeben keine mögliche mündliche Zweierkombination für Deutsch, Mathematik und alle Aufgabenfelder.");
-        Add("AGVO-CREDIT", "Belegungszahl und Pflichtanrechnung sind getrennt. Angezeigte Mindestanrechnung ist vorläufig; Sonderfälle/Schulversuch und BLL sind zu bestätigen.");
-        Add("AGVO-ELECTION", "Vorwahl: keine verbindliche Abgabe. Endwahltermin und Unterrichtsende der Einführungsphase sind noch nicht konfiguriert.");
         var summaries = ChoiceValidator.Summarize(choice, catalog);
         var overloaded = summaries.Where(s => s.WeeklyHours > 37).ToArray();
         if (overloaded.Length > 0)

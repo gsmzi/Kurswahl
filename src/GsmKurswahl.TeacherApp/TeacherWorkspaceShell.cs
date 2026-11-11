@@ -41,9 +41,12 @@ public sealed partial class TeacherWindow
         filter.Width = 240; filter.Margin = new Thickness(0, 0, 10, 6);
         followupFilter.Margin = new Thickness(0, 0, 10, 6); followupFilter.VerticalAlignment = VerticalAlignment.Center;
         statusFilter.MinWidth = 190; statusFilter.Margin = new Thickness(0, 0, 0, 6);
-        ToolTip.SetTip(statusFilter, "Formal gültig: keine offenen Punkte · Fachlich zu klären: Vorbildung oder Sonderfall offen · Regelverstoß: Belegung widerspricht einer Regel · Ohne Wahl: noch keine Kurswahl eingelesen.");
+        ToolTip.SetTip(statusFilter, "Formal gültig: keine offenen Punkte · Fachlich zu klären: Vorbildung oder Sonderfall offen · Regelverstoß: Belegung widerspricht einer Regel · Ohne Wahl: noch keine Kurswahl eingelesen · Religion/Ethik: Wechsel: anderes Fach als in Klasse 10 belegt · Feststellungsprüfung nötig: gewechseltes Fach ist mündlich geplant.");
         filterRow.Children.Add(filter); filterRow.Children.Add(followupFilter); filterRow.Children.Add(statusFilter);
-        left.Children.Add(filterRow); left.Children.Add(roster);
+        var religionExport = Button("Liste Religion/Ethik-Wechsel und Feststellungsprüfungen (XLSX) …", ExportReligionCases,
+            "Alle Personen, die ein anderes Fach als in Klasse 10 belegen, mit Kennzeichnung, wer es mündlich plant und deshalb zu Beginn von HJ 1 eine Feststellungsprüfung braucht.");
+        religionExport.Name = "ReligionCasesExport"; religionExport.Margin = new Thickness(0, 0, 0, 6);
+        left.Children.Add(filterRow); left.Children.Add(religionExport); left.Children.Add(roster);
         var leftScroll = Scroll(left); Grid.SetColumn(leftScroll, 0); people.Children.Add(leftScroll);
         personEditor.Content = Scroll(detail);
         Grid.SetColumn(personEditor, 2); people.Children.Add(personEditor);

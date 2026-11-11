@@ -307,7 +307,7 @@ public class WorkflowTests
         await loaded.LoadAsync();
         Assert.Equal(session.Choice, loaded.Choice);
         Assert.DoesNotContain(loaded.Validation.Messages, m => m.Rule.Id is "SUBJECT-DUPLICATE" or "AGVO-SEMESTERS");
-        Assert.Contains(loaded.Validation.Messages, m => m.Rule.Id == "M2-RELEASE");
+        Assert.DoesNotContain(loaded.Validation.Messages, m => m.Rule.Id is "M2-RELEASE" or "AGVO-CREDIT" or "AGVO-ELECTION");
     }
 
     private sealed class MemoryStore : IChoiceStore
