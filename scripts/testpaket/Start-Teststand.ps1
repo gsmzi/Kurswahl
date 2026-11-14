@@ -78,7 +78,8 @@ try {
     Write-Host "Testdaten: $run"
     if ($PrepareOnly) { Write-Output $run; return }
     if ($Mode -ne 'schueler') {
-        (Start-LocalApp $teacher ('--test-stage ' + $Stage + ' "' + $run + '"')).Dispose()
+        # All teacher windows from this package share the original marker, not the per-user local copy.
+        (Start-LocalApp $teacher ('--test-stage ' + $Stage + ' "' + $run + '" --startsperre "' + (Join-Path $PSScriptRoot 'TeacherApp') + '"')).Dispose()
     }
     if ($Mode -ne 'lehrer') {
         $data = if ($Mode -eq 'durchlauf') { 'Austeilordner\10a\Testperson001.Demo\Kurswahl\Daten' } else { 'Kurswahl\Daten' }

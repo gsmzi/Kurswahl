@@ -31,6 +31,13 @@ public static class StudentImportService
         if (System.Text.Json.JsonSerializer.Serialize(current.Student.Prerequisites, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(candidate.Student.Prerequisites, DocumentJson.Options)) differences.Add("Voraussetzungen");
         return string.Join(", ", differences);
     }
+    public static bool HasManualCorrections(IAdministrationStore store, StudentRecord current)
+    {
+        if (current.Origin is null) return true;
+        var history = store.StudentHistory(current.Student.ExternalStudentId);
+        var imported = history.FirstOrDefault(h => h.Origin == current.Origin);
+        return imported is not null && Differences(current, imported).Length > 0;
+    }
     public static bool Confirm(IAdministrationStore store, StudentRecord candidate, int? expectedVersion, bool confirmed)
     {
         if (!confirmed) throw new InvalidOperationException("Stammdatenimport benötigt bestätigte Vorschau.");

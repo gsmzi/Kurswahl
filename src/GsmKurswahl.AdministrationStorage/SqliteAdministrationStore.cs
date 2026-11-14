@@ -109,8 +109,10 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
     {
         if (record.SchemaVersion != SchemaVersions.StudentRecord || record.Version != (expectedVersion ?? 0) + 1 || string.IsNullOrWhiteSpace(record.Actor)
             || !record.Student.ExternalStudentId.StartsWith("demo-", StringComparison.Ordinal) || record.Student.Id == Guid.Empty
-            || record.Student.GraduationYear is < 2000 or > 2200 || string.IsNullOrWhiteSpace(record.Student.SyntheticDisplayName))
+            || record.Student.GraduationYear is < 2000 or > 2200 || string.IsNullOrWhiteSpace(record.Student.SyntheticDisplayName)
+            || !Enum.IsDefined(record.Student.Departure))
             throw new ArgumentException("Ungültige Stammdaten; dieser Entwicklungsstand erlaubt nur synthetische demo-IDs.");
+        ModelGuard.PriorEducation(record.Student.Prerequisites);
         if (Path.IsPathFullyQualified(record.HomeDirectory)) record = record with { HomeDirectory = Path.GetFullPath(record.HomeDirectory) };
         var all = Students();
         var existing = all.SingleOrDefault(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId);

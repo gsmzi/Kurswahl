@@ -21,7 +21,11 @@ Benutzerordner kopiert. Das kann je nach Netzwerk einige Minuten dauern.
 Weitere Starts desselben Pakets verwenden diese lokale Programmkopie.
 Ein neuer Teststand braucht zusätzlich Zeit zum Erzeugen der Daten.
 Keine Internetverbindung erforderlich. Es wird nichts auf die Freigabe
-zurückgeschrieben. Mehrere Kollegen können unabhängig testen.
+zurückgeschrieben. Pro gemeinsamem Paketordner kann nur ein Lehrerfenster
+geöffnet sein. Ein zweiter Lehrerstart meldet, dass das Programm bereits
+verwendet wird. Zuerst das andere Lehrerfenster schließen. Schülerfenster
+können weiterhin parallel geöffnet werden. Die mitgelieferte Datei
+_system\TeacherApp\lehrerprogramm.sperre im Paketordner belassen.
 
 Die Starter verwenden Windows PowerShell 5.1. Verhindern Schulrichtlinien
 PowerShell oder die Programmausführung, bitte die zuständige IT kontaktieren.

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -53,8 +54,11 @@ public sealed partial class TeacherWindow
             }
             var difference = current is null || candidate is null ? "" : StudentImportService.Differences(current, candidate);
             var identicalSource = current?.Origin is { } origin && candidate?.Origin is { } incoming && origin.ContentHash == incoming.ContentHash && origin.MappingVersion == incoming.MappingVersion;
-            var box = new CheckBox { IsChecked = error.Length == 0, IsEnabled = error.Length == 0 };
-            var line = TableLine(candidate?.Student.SyntheticDisplayName ?? $"Zeile {row.Row}", candidate?.Student.ClassName ?? "", error.Length > 0 ? "Fehler" : identicalSource || current is not null && difference.Length == 0 ? "Unverändert" : current is null ? "Neu" : "Abweichung", error.Length > 0 ? error : identicalSource ? "Bereits importiert; Korrekturen bleiben" : difference, box);
+            var manualCorrection = current is not null && !identicalSource && difference.Length > 0 && StudentImportService.HasManualCorrections(store!, current);
+            var box = new CheckBox { Name = candidate is null ? null : "ImportSelect_" + candidate.Student.ExternalStudentId, IsChecked = error.Length == 0 && !manualCorrection, IsEnabled = error.Length == 0 };
+            var statusText = error.Length > 0 ? "Fehler" : identicalSource || current is not null && difference.Length == 0 ? "Unverändert" : current is null ? "Neu" : manualCorrection ? "Korrektur behalten" : "Abweichung";
+            var detailText = error.Length > 0 ? error : identicalSource ? "Bereits importiert; Korrekturen bleiben" : manualCorrection ? $"Lehreränderung vorhanden ({difference}) · nur mit Häkchen überschreiben" : difference;
+            var line = TableLine(candidate?.Student.SyntheticDisplayName ?? $"Zeile {row.Row}", candidate?.Student.ClassName ?? "", statusText, detailText, box);
             ToolTip.SetTip(line, candidate is null ? error : (current is null ? "" : "Bisher:\n" + Describe(current) + "\n\n") + "Import:\n" + Describe(candidate));
             importResults.Children.Add(new Border { Background = error.Length > 0 ? Brushes.MistyRose : difference.Length > 0 && !identicalSource ? Brushes.LemonChiffon : Brushes.Transparent, Child = line });
             if (candidate is not null && error.Length == 0) selected.Add((box, candidate, current?.Version));
@@ -261,6 +265,8 @@ public sealed partial class TeacherWindow
             RenderCollectionStatus(count, messages);
             if (count > 0 || collections.Length > 0 || messages.Count > 0) status.Text = $"Automatische Sammlung: {count} neue Wahlen; {collections.Length + messages.Count} Hinweise unter Kurswahlen einsammeln.";
             Refresh(preserveEditor: true); UpdateDashboard();
+            if (count > 0 && visiblePage == "results" && pageHost.GetLogicalDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "ChoiceSave")?.IsEnabled != true)
+                ShowResults();
         }
         catch (Exception ex) { if (session == activeSession) status.Text = "Automatische Sammlung nicht abgeschlossen: " + ex.Message; }
         finally { collecting = false; }

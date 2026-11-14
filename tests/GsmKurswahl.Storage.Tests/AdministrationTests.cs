@@ -208,5 +208,25 @@ public sealed class AdministrationTests : IDisposable
         var during = cases.Single(c => c.ChangeDuringCourse);
         Assert.Equal(new[] { "KR", "ETH" }, during.Chosen);
     }
+    [Fact]
+    public void SaveStudentRejectsInvalidPrerequisitesAndUndefinedDeparture()
+    {
+        using var store = new SqliteAdministrationStore(DbPath);
+        var valid = Record();
+        Assert.Throws<ArgumentException>(() => store.SaveStudent(valid with { Student = valid.Student with { Departure = (DepartureStatus)99 } }, null));
+        Assert.Throws<ArgumentException>(() => store.SaveStudent(valid with { Student = valid.Student with { Prerequisites = PriorEducation.Unknown with { SportExemptSemesters = [0] } } }, null));
+        Assert.Throws<ArgumentException>(() => store.SaveStudent(valid with { Student = valid.Student with { Prerequisites = PriorEducation.Unknown with { SportExemptSemesters = [5] } } }, null));
+        Assert.Throws<ArgumentException>(() => store.SaveStudent(valid with { Student = valid.Student with { Prerequisites = PriorEducation.Unknown with { SportExemptSemesters = [1, 1] } } }, null));
+        Assert.Throws<ArgumentException>(() => store.SaveStudent(valid with { Student = valid.Student with { Prerequisites = PriorEducation.Unknown with { ReligionEthicsGrade10 = "FR" } } }, null));
+        Assert.Throws<ArgumentException>(() => store.SaveStudent(valid with { Student = valid.Student with { Prerequisites = PriorEducation.Unknown with { ContinuedLanguages = ["E", " "] } } }, null));
+        Assert.Throws<ArgumentException>(() => store.SaveStudent(valid with { Student = valid.Student with { Prerequisites = PriorEducation.Unknown with { ContinuedLanguages = ["E", "e"] } } }, null));
+
+        var imported = valid with { Origin = new("demo.csv", "hash1", "mapping1", DateTimeOffset.UtcNow, "demo-beratung") };
+        Assert.True(StudentImportService.Confirm(store, imported, null, true));
+        Assert.False(StudentImportService.HasManualCorrections(store, store.Students().Single()));
+        var current = store.Students().Single();
+        store.SaveStudent(current with { Version = 2, Student = current.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } }, 1);
+        Assert.True(StudentImportService.HasManualCorrections(store, store.Students().Single()));
+    }
     public void Dispose() => Directory.Delete(root, true);
 }

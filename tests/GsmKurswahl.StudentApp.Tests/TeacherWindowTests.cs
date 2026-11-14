@@ -353,4 +353,110 @@ public class TeacherWindowTests
         }
         finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
+
+    [AvaloniaFact]
+    public void ReimportPreviewDoesNotPreselectManuallyCorrectedStudent()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-reimport-ui-" + Guid.NewGuid());
+        var workspace = new TeacherWorkspace(root); workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
+        workspace.Update(workspace.Active! with { Step = YearSetupStep.Import });
+        var window = new TeacherWindow(root);
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            void PreviewCsv(string csv, string hash)
+            {
+                var table = StudentTableImport.Csv(csv);
+                var origin = new ImportOrigin("demo.csv", hash, "v1", DateTimeOffset.UtcNow, "demo-beratung");
+                var rows = StudentTableImport.Preview(table, table.Headers.ToDictionary(h => h, h => h), origin, "demo-beratung");
+                typeof(TeacherWindow).GetField("importRows", flags)!.SetValue(window, rows);
+                typeof(TeacherWindow).GetMethod("ShowImportPreview", flags)!.Invoke(window, null);
+                window.UpdateLayout();
+            }
+
+            PreviewCsv("studentId;firstName;lastName;class;year;username;imp\ndemo-001;Demo;Eins;10a;2029;DEMO\\test1;\ndemo-002;Demo;Zwei;10a;2029;DEMO\\test2;", "hash1");
+            window.GetLogicalDescendants().OfType<Button>().Single(b => b.Name == "AcceptStudentBatch").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
+
+            var store = (IAdministrationStore)typeof(TeacherWindow).GetField("store", flags)!.GetValue(window)!;
+            var d1 = store.Students().Single(s => s.Student.ExternalStudentId == "demo-001");
+            store.SaveStudent(d1 with { Version = 2, Student = d1.Student with { Prerequisites = d1.Student.Prerequisites with { InformaticsImp = Knowledge.Yes } } }, 1);
+
+            PreviewCsv("studentId;firstName;lastName;class;year;username;imp\ndemo-001;Demo;Eins;10a;2029;DEMO\\test1;\ndemo-002;Demo;Zwei;10b;2029;DEMO\\test2;\ndemo-003;Demo;Drei;10c;2029;DEMO\\test3;", "hash2");
+            var boxes = window.GetLogicalDescendants().OfType<CheckBox>().ToArray();
+            var box1 = boxes.Single(c => c.Name == "ImportSelect_demo-001");
+            var box2 = boxes.Single(c => c.Name == "ImportSelect_demo-002");
+            var box3 = boxes.Single(c => c.Name == "ImportSelect_demo-003");
+            Assert.False(box1.IsChecked);
+            Assert.True(box1.IsEnabled);
+            Assert.True(box2.IsChecked);
+            Assert.True(box3.IsChecked);
+
+            window.GetLogicalDescendants().OfType<Button>().Single(b => b.Name == "AcceptStudentBatch").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
+
+            var students = store.Students();
+            var kept = students.Single(s => s.Student.ExternalStudentId == "demo-001");
+            Assert.Equal(Knowledge.Yes, kept.Student.Prerequisites.InformaticsImp);
+            Assert.Equal(2, kept.Version);
+            Assert.Equal("10b", students.Single(s => s.Student.ExternalStudentId == "demo-002").Student.ClassName);
+            Assert.Equal("10c", students.Single(s => s.Student.ExternalStudentId == "demo-003").Student.ClassName);
+        }
+        finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [AvaloniaFact]
+    public void StudentDetailsPreserveUnknownSelectionsAndRejectInvalidSportSemesters()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-preserve-details-" + Guid.NewGuid());
+        var workspace = new TeacherWorkspace(root); workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
+        workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
+        using (var db = workspace.OpenActive())
+        {
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown),
+                "", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            new GsmKurswahl.Application.TeacherSession(db, TestData.WorkflowCatalog, "demo-beratung").Save(TestData.Choice with
+            {
+                Selections =
+                [
+                    new("ALT-WF", "ALT", CourseType.Elective, CourseVariant.Normal, [1, 2]),
+                    new("GEO-BF", "GEO", CourseType.Bf, CourseVariant.Normal, [1, 3, 4])
+                ],
+                PlannedOralSubjects = ["W", "D"]
+            }, null, RevisionSource.TeacherEdit, "Synthetischer Altbestand");
+        }
+        var window = new TeacherWindow(root);
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            void Click(string label)
+            {
+                window.GetLogicalDescendants().OfType<Button>().Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+            }
+            Click("Wahl"); Click("Schülerbestand"); Click("Öffnen");
+
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var store = (IAdministrationStore)typeof(TeacherWindow).GetField("store", flags)!.GetValue(window)!;
+            var sportBox = window.GetLogicalDescendants().OfType<TextBox>().Single(t => t.Name == "PrereqSportSemesters");
+            sportBox.Text = "1, 5";
+            window.GetLogicalDescendants().OfType<Button>().Single(b => b.Name == "SavePrerequisites").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
+            Assert.Equal(1, store.Students().Single().Version);
+            Assert.Null(store.Students().Single().Student.Prerequisites.SportExemptSemesters);
+
+            window.GetLogicalDescendants().OfType<TextBox>().Single(t => t.Name == "StudentEditReason").Text = "Reguläres Fach ergänzen";
+            window.GetLogicalDescendants().OfType<CheckBox>().Single(b => b.Name == "TeacherChoice_D_BF_1").IsChecked = true;
+            window.GetLogicalDescendants().OfType<Button>().Single(b => b.Name == "SaveTeacherChoice").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
+
+            var saved = store.History("demo-001").Last().Snapshot;
+            Assert.Equal([1, 2], saved.Selections.Single(s => s.OfferId == "ALT-WF").Semesters.ToArray());
+            Assert.Equal([1, 3, 4], saved.Selections.Single(s => s.OfferId == "GEO-BF").Semesters.ToArray());
+            Assert.Equal([1], saved.Selections.Single(s => s.OfferId == "D-BF").Semesters.ToArray());
+            Assert.Equal(["W", "D"], saved.PlannedOralSubjects.ToArray());
+        }
+        finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
 }

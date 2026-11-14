@@ -73,3 +73,7 @@ Keine neuen Pakete oder Änderungen an Paketversionen/Lockdateien. Beide Program
 ## Kursmarkierungen und Schulvorlage (11.11.2026)
 
 Keine neuen NuGet-Pakete, keine Paketversions- oder Lockdateiänderungen. Gemeinsame PDF-Gestaltung verwendet weiterhin SkiaSharp 2.88.9; Word-Erstellung verwendet .NET ZIP/XML. Das mit dem Nutzerauftrag bereitgestellte Schullogo und eine um Dokumenteigenschaften/customXml bereinigte Schulvorlage werden lokal als Ressourcen eingebettet; keine Fonts oder Office-Komponenten mitgeliefert. Arial/Arial Narrow werden lokal aufgelöst. Word diente ausschließlich der Layoutprüfung und ist keine Laufzeitvoraussetzung. Herkunft, Anpassungen und Prüfsummen: SCHULVORLAGE.md. Der zuletzt dokumentierte Auditstand bleibt bestehen; keine neue Sicherheitsfreigabe behauptet.
+
+## Startsperre (12.11.2026)
+
+Keine neuen Pakete, keine Änderungen an Paketversionen oder Lockdateien. Die Startsperre verwendet .NET-10-Dateihandles (`FileStream`, `FileShare.None`); die schreibgeschützt nutzbare Sperrdatei wird als Programmdatei mitgeliefert. Keine Onlinezugriffe oder neuen Dienste. Der zuletzt dokumentierte Lizenz-/Auditstand bleibt unverändert.

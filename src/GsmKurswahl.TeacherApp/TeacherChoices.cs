@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using GsmKurswahl.Application;
@@ -113,7 +114,11 @@ public sealed partial class TeacherWindow
                     {
                         var next = record with { Student = record.Student with { Departure = (DepartureStatus)departure.SelectedIndex }, Version = record.Version + 1, ChangedAt = DateTimeOffset.UtcNow, Actor = Actor };
                         store!.SaveStudent(next, record.Version); record = next;
+                        all = [.. all.Select(s => s.Record.Student.ExternalStudentId == id ? s with { Record = record } : s)];
+                        shown = [.. shown.Select(s => s.Record.Student.ExternalStudentId == id ? s with { Record = record } : s)];
                         Refresh(preserveEditor: true);
+                        if (detail.GetLogicalDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "ChoiceSave")?.IsEnabled != true)
+                            Render();
                         status.Text = record.Student.SyntheticDisplayName + ": Abgängerstatus gespeichert. Kursplanung berücksichtigt die Änderung.";
                     }
                     catch (Exception ex)

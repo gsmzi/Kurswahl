@@ -254,12 +254,27 @@ public sealed partial class TeacherWindow : Window
         var savePrereq = Button("Vorbildung und Abgängerstatus speichern", () =>
         {
             var sportText = (sportBox.Text ?? "").Trim().ToLowerInvariant();
-            ImmutableArray<int>? semesters = sportText is "" or "unknown" or "unbekannt" ? null
-                : sportText is "keine" or "none" ? []
-                : [.. sportText.Split(',', StringSplitOptions.TrimEntries).Select(int.Parse).Order()];
+            ImmutableArray<int>? semesters;
+            if (sportText is "" or "unknown" or "unbekannt")
+                semesters = null;
+            else if (sportText is "keine" or "none")
+                semesters = [];
+            else
+            {
+                var parsed = new List<int>();
+                foreach (var part in sportText.Split(',', StringSplitOptions.TrimEntries))
+                {
+                    if (!int.TryParse(part, System.Globalization.CultureInfo.InvariantCulture, out var sem) || sem is < 1 or > 4)
+                        throw new ArgumentException("Sportbefreiung muss Halbjahre 1 bis 4 (z. B. 1, 2), „keine“ oder leer enthalten.");
+                    parsed.Add(sem);
+                }
+                if (parsed.Distinct().Count() != parsed.Count)
+                    throw new ArgumentException("Sportbefreiung muss verschiedene Halbjahre 1 bis 4 als Zahlen enthalten.");
+                semesters = [.. parsed.Order()];
+            }
             var updatedPrior = new PriorEducation((Knowledge)italianBox.SelectedItem!, (Knowledge)bridgeBox.SelectedItem!, (Knowledge)impBox.SelectedItem!, (Knowledge)biliBox.SelectedItem!, ((SubjectItem)relGrade10Box.SelectedItem!).Id, semesters)
             {
-                ContinuedLanguages = [.. (langBox.Text ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct()],
+                ContinuedLanguages = [.. (langBox.Text ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase)],
                 ReligionEthicsPermission = (Knowledge)relPermBox.SelectedItem!,
                 ReligionEthicsExamPermission = (Knowledge)relExamPermBox.SelectedItem!,
                 PermanentSportExemption = (Knowledge)permSportBox.SelectedItem!
@@ -290,6 +305,7 @@ public sealed partial class TeacherWindow : Window
         choiceTab.Children.Add(Heading("Nachwahl"));
         if (!string.IsNullOrWhiteSpace(state.Note)) choiceTab.Children.Add(Text("Vermerk: " + state.Note));
         var editReason = new TextBox { Name = "StudentEditReason", Watermark = "Begründung für Nachwahl, Änderung oder Wiederherstellung (Pflicht für das Änderungsprotokoll)" };
+        choiceTab.Children.Add(editReason);
         var deadline = new CalendarDatePicker { Name = "ReselectionDeadline", SelectedDate = state.ReselectionDeadline?.LocalDateTime, Watermark = "Nachwahlfrist (optional)" };
         var followRow = new WrapPanel { Orientation = Orientation.Horizontal };
         deadline.Margin = new Thickness(0, 0, 10, 0); followRow.Children.Add(deadline);
@@ -310,24 +326,33 @@ public sealed partial class TeacherWindow : Window
         var profile = new ProfileContext(ProfileStatus.Verified, record.Student.Prerequisites);
         GsmKurswahl.Rules.Availability? ReligionAvailability(CourseOffer offer) => offer.SubjectId is "ER" or "KR"
             ? new GsmKurswahl.Rules.ChoiceValidator().GetAvailability(offer, profile) : null;
-        foreach (var offer in session!.Catalog.Offers)
+        var extraOffers = choice.Selections.Where(s => session!.Catalog.Offers.All(o => o.Id != s.OfferId))
+            .Select(s => new CourseOffer(s.OfferId, s.SubjectId, s.Type, s.Variant, OfferStatus.Cancelled,
+                [.. s.Semesters.Order().Select(h => new SemesterHours(h, 0))], []))
+            .ToArray();
+        foreach (var offer in session!.Catalog.Offers.Concat(extraOffers))
         {
-            var isOffered = offer.Status is OfferStatus.Offered or OfferStatus.Established;
-            var alreadyChosen = choice.Selections.Any(s => s.OfferId == offer.Id);
+            var inCatalog = session.Catalog.Offers.Any(o => o.Id == offer.Id);
+            var isOffered = inCatalog && offer.Status is OfferStatus.Offered or OfferStatus.Established;
+            var selectedSelection = choice.Selections.FirstOrDefault(s => s.OfferId == offer.Id);
             var religion = ReligionAvailability(offer);
-            if ((!isOffered || religion?.CanSelect == false) && !alreadyChosen) continue;
+            if ((!isOffered || religion?.CanSelect == false) && selectedSelection is null) continue;
+            var scheduled = inCatalog ? offer.Schedule.Select(s => s.Semester).ToHashSet() : new HashSet<int>();
+            var allSemesters = scheduled.Concat(selectedSelection?.Semesters ?? []).Distinct().Order().ToArray();
             var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            line.Children.Add(new TextBlock { Text = OfferLabel(offer.Id) + (isOffered ? "" : $" ({FormatOfferStatus(offer.Status)})"), Width = 240, VerticalAlignment = VerticalAlignment.Center, Foreground = isOffered ? Ink : Brush.Parse("#8C1D1D") });
+            var labelText = inCatalog
+                ? OfferLabel(offer.Id) + (isOffered ? "" : $" ({FormatOfferStatus(offer.Status)})")
+                : $"{SubjectName(offer.SubjectId)} {FormatCourseType(offer.Type)}{(offer.Variant == CourseVariant.Bilingual ? " bilingual" : "")} ({offer.Id}, unbekanntes Angebot)";
+            line.Children.Add(new TextBlock { Text = labelText, Width = 240, VerticalAlignment = VerticalAlignment.Center, Foreground = isOffered ? Ink : Brush.Parse("#8C1D1D") });
             if (religion is not null) ToolTip.SetTip(line, religion.Explanation);
-            foreach (var semester in offer.Schedule)
+            foreach (var semester in allSemesters)
             {
-                var box = new CheckBox { Name = $"TeacherChoice_{offer.Id.Replace('-', '_')}_{semester.Semester}", Content = "HJ " + semester.Semester, IsChecked = choice.Selections.Any(s => s.OfferId == offer.Id && s.Semesters.Contains(semester.Semester)) };
-                if (religion?.CanSelect == false)
-                {
-                    box.IsEnabled = box.IsChecked == true;
+                var isSelected = selectedSelection?.Semesters.Contains(semester) == true;
+                var allowed = inCatalog && scheduled.Contains(semester) && religion?.CanSelect != false;
+                var box = new CheckBox { Name = $"TeacherChoice_{offer.Id.Replace('-', '_')}_{semester}", Content = "HJ " + semester, IsChecked = isSelected, IsEnabled = allowed || isSelected };
+                if (!allowed)
                     box.IsCheckedChanged += (_, _) => { if (box.IsChecked != true) box.IsEnabled = false; };
-                }
-                line.Children.Add(box); selections.Add((offer, semester.Semester, box));
+                line.Children.Add(box); selections.Add((offer, semester, box));
             }
             choiceTab.Children.Add(line);
         }
@@ -335,10 +360,13 @@ public sealed partial class TeacherWindow : Window
             .Select(s => new SubjectItem(s, SubjectName(s)))).ToArray();
         ComboBox OralBox(string name, string? current)
         {
-            var items = oralItems.Select(i => (Item: i, Availability: session.Catalog.Offers.Where(o => o.SubjectId == i.Id && o.Type == CourseType.Bf)
-                    .Select(ReligionAvailability).FirstOrDefault()))
+            var baseItems = oralItems.ToList();
+            if (!string.IsNullOrWhiteSpace(current) && baseItems.All(i => i.Id != current))
+                baseItems.Add(new SubjectItem(current, SubjectName(current)));
+            var items = baseItems.Select(i => (Item: i, Availability: session.Catalog.Offers.Where(o => o.SubjectId == i.Id && o.Type == CourseType.Bf)
+                    .Select(ReligionAvailability).FirstOrDefault(), InOralItems: oralItems.Any(o => o.Id == i.Id)))
                 .Where(x => x.Availability?.CanSelect != false || x.Item.Id == current)
-                .Select(x => new ComboBoxItem { Content = x.Item.Label, Tag = x.Item, IsEnabled = x.Availability?.CanSelect != false }).ToArray();
+                .Select(x => new ComboBoxItem { Content = x.Item.Label, Tag = x.Item, IsEnabled = x.InOralItems && x.Availability?.CanSelect != false }).ToArray();
             return new() { Name = name, ItemsSource = items, SelectedItem = items.FirstOrDefault(i => ((SubjectItem)i.Tag!).Id == current) ?? items[0], Width = 220, Margin = new Thickness(0, 0, 10, 0) };
         }
         var oral1 = OralBox("OralSubject1", choice.PlannedOralSubjects.ElementAtOrDefault(0));

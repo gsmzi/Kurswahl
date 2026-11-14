@@ -136,4 +136,49 @@ public sealed class ChoicePageTests
         }
         finally { Directory.Delete(root, true); }
     }
+
+    [AvaloniaFact]
+    public void ChangingDepartureOnResultsPageUpdatesOpenEditorAndState()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-departure-" + Guid.NewGuid());
+        var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json")));
+        try
+        {
+            DemoWorkspace.Prepare(root, catalog);
+            var window = new TeacherWindow(root) { Width = 1400, Height = 900 };
+            try
+            {
+                window.Show(); window.UpdateLayout();
+                IEnumerable<T> All<T>() where T : Control => window.GetLogicalDescendants().OfType<T>().Distinct();
+                T Named<T>(string name) where T : Control => All<T>().Single(c => c.Name == name);
+                All<Button>().Single(b => b.Content?.ToString() == "Kurswahlen").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+
+                Named<Button>("ResultOpen_demo-001").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+                Named<ComboBox>("ResultDeparture_demo-001").SelectedIndex = (int)DepartureStatus.ExpectedDeparture;
+                window.UpdateLayout();
+                Assert.Equal((int)DepartureStatus.ExpectedDeparture, Named<ComboBox>("ResultDeparture_demo-001").SelectedIndex);
+
+                // Changing another pupil's departure keeps unsaved edits in the currently open editor.
+                Named<Button>("ChoiceRemove_G_BF").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+                Assert.True(Named<Button>("ChoiceSave").IsEnabled);
+                Named<ComboBox>("ResultDeparture_demo-002").SelectedIndex = (int)DepartureStatus.ConfirmedDeparture;
+                window.UpdateLayout();
+                Assert.True(Named<Button>("ChoiceSave").IsEnabled);
+            }
+            finally { window.Close(); }
+
+            var workspace = new TeacherWorkspace(root);
+            using var store = workspace.OpenActive();
+            var d1 = store.Students().Single(s => s.Student.ExternalStudentId == "demo-001");
+            var d2 = store.Students().Single(s => s.Student.ExternalStudentId == "demo-002");
+            Assert.Equal(DepartureStatus.ExpectedDeparture, d1.Student.Departure);
+            Assert.Equal(2, d1.Version);
+            Assert.Equal(DepartureStatus.ConfirmedDeparture, d2.Student.Departure);
+            Assert.Equal(2, d2.Version);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
 }

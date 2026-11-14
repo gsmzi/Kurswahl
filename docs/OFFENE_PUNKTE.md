@@ -144,3 +144,8 @@ Schülertexte am 28.10.2026 berichtigt: Die automatische Regelprüfung ist vorha
 - Offen: Die ältere Bearbeitung im Schülerbestand (Reiter „Kurswahl und Nachwahl“) besteht parallel weiter; sie kann entfallen, sobald die neue Seite erprobt ist.
 - Offen: Kontrollbogen aus dem Lehrerprogramm ist ein eigenes Layout (nicht identisch mit dem des Schülerprogramms); Abgleich mit dem ASV-Formular steht aus.
 - Offen: Ein nach dem abschließenden Einsammeln neu hinzugekommener Schüler ohne archivierte Dateien würde weiter automatisch gelesen; das ist gewollt (Neuzugang), aber im Pilot zu prüfen.
+
+## Startsperre Lehrerprogramm (12.11.2026)
+
+- Nutzerauftrag umgesetzt: Lehrerstart sperrt die mitgelieferte `lehrerprogramm.sperre` im gemeinsamen Programmordner exklusiv und nur lesend für die gesamte Anwendungslaufzeit. Zweiter Start und fehlende/unzugängliche Sperrdatei öffnen keine Verwaltung. Die Testpaket-Starter übergeben die Originalablage, damit auch lokale Programmkopien dieselbe Freigabesperre verwenden. Reine Testdatenvorbereitung ohne Fenster bleibt parallel möglich. Keine Bestands-/Schemaänderung, SQLite bleibt lokal. Unabhängige Programm-/Paketkopien sind getrennt.
+- Offen: tatsächlicher SMB-/Schulnetztest mit zwei Rechnern, UNC-/Laufwerksalias, schreibgeschützter Programmablage sowie Verbindungsabbruch und Serverfreigabe nach Rechnerausfall. Bei nachträglichem Verbindungsverlust wird ein laufendes Programm nicht automatisch beendet. Keine Zusammenführung lokaler Bestände und keine Produktivfreigabe durch die Startsperre.

@@ -45,41 +45,50 @@ internal static class Program
 }
 public sealed class App : Avalonia.Application
 {
+    private TeacherProgramStartup? startup;
     public override void Initialize() => Styles.Add(new FluentTheme());
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            if (desktop.Args is ["--test-stage", var stage, var stageRoot])
-            {
-                try
-                {
-                    DemoStages.Prepare(stage, stageRoot, Program.DemoCatalog());
-                    desktop.MainWindow = new TeacherWindow(stageRoot);
-                    desktop.MainWindow.Title += " · TESTSTAND: " + DemoStages.Find(stage).Title;
-                }
-                catch (Exception ex)
-                {
-                    desktop.MainWindow = new Window { Title = "Teststand", Width = 700, Height = 300,
-                        Content = new TextBlock { Text = "Teststand konnte nicht geöffnet werden.\n\n" + ex.Message, Margin = new Avalonia.Thickness(24), TextWrapping = TextWrapping.Wrap } };
-                }
-            }
-            else if (desktop.Args is ["--demo-80", var root])
-            {
-                try
-                {
-                    DemoWorkspace.Prepare(root, Program.DemoCatalog());
-                    desktop.MainWindow = new TeacherWindow(root);
-                    desktop.MainWindow.Title += " · DEMO mit 80 Schülern";
-                }
-                catch (Exception ex)
-                {
-                    desktop.MainWindow = new Window { Title = "Demo-Testbestand", Width = 700, Height = 300,
-                        Content = new TextBlock { Text = "Testbestand konnte nicht geöffnet werden.\n\n" + ex.Message, Margin = new Avalonia.Thickness(24), TextWrapping = TextWrapping.Wrap } };
-                }
-            }
-            else desktop.MainWindow = new TeacherWindow();
+            startup = TeacherProgramStartup.ForArguments(desktop.Args ?? [], AppContext.BaseDirectory, out var args);
+            desktop.Exit += (_, _) => startup.Dispose();
+            desktop.MainWindow = startup.OpenMainWindow(() => CreateMainWindow(args));
         }
         base.OnFrameworkInitializationCompleted();
+    }
+    private static Window CreateMainWindow(string[] args)
+    {
+        if (args is ["--test-stage", var stage, var stageRoot])
+        {
+            try
+            {
+                DemoStages.Prepare(stage, stageRoot, Program.DemoCatalog());
+                var window = new TeacherWindow(stageRoot);
+                window.Title += " · TESTSTAND: " + DemoStages.Find(stage).Title;
+                return window;
+            }
+            catch (Exception ex)
+            {
+                return new Window { Title = "Teststand", Width = 700, Height = 300,
+                    Content = new TextBlock { Text = "Teststand konnte nicht geöffnet werden.\n\n" + ex.Message, Margin = new Avalonia.Thickness(24), TextWrapping = TextWrapping.Wrap } };
+            }
+        }
+        if (args is ["--demo-80", var root])
+        {
+            try
+            {
+                DemoWorkspace.Prepare(root, Program.DemoCatalog());
+                var window = new TeacherWindow(root);
+                window.Title += " · DEMO mit 80 Schülern";
+                return window;
+            }
+            catch (Exception ex)
+            {
+                return new Window { Title = "Demo-Testbestand", Width = 700, Height = 300,
+                    Content = new TextBlock { Text = "Testbestand konnte nicht geöffnet werden.\n\n" + ex.Message, Margin = new Avalonia.Thickness(24), TextWrapping = TextWrapping.Wrap } };
+            }
+        }
+        return new TeacherWindow();
     }
 }

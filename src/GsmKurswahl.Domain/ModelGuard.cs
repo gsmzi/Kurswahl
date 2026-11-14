@@ -49,6 +49,20 @@ public static class ModelGuard
         }
     }
 
+    public static void PriorEducation(PriorEducation? p)
+    {
+        Require(p is not null
+            && Enum.IsDefined(p.InformaticsBridge) && Enum.IsDefined(p.InformaticsImp)
+            && Enum.IsDefined(p.ItalianProfile) && Enum.IsDefined(p.ContinuousBilingual)
+            && Enum.IsDefined(p.ReligionEthicsPermission) && Enum.IsDefined(p.ReligionEthicsExamPermission)
+            && Enum.IsDefined(p.PermanentSportExemption)
+            && p.ReligionEthicsGrade10 is null or "ETH" or "ER" or "KR"
+            && (p.SportExemptSemesters is not { } s || (!s.IsDefault && s.All(h => h is >= 1 and <= 4) && s.Distinct().Count() == s.Length))
+            && !p.ContinuedLanguages.IsDefault && p.ContinuedLanguages.All(l => !string.IsNullOrWhiteSpace(l))
+            && p.ContinuedLanguages.Distinct(StringComparer.OrdinalIgnoreCase).Count() == p.ContinuedLanguages.Length,
+            "Ungültige Vorbildungsangaben.");
+    }
+
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new ArgumentException(message);
