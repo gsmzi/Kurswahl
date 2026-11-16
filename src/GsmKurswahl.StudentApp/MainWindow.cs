@@ -39,6 +39,9 @@ public sealed class MainWindow : Window
     private readonly Button load = new() { Content = "Entwurf _laden", Name = "LoadButton" };
     private readonly CheckBox autosave = new() { Content = "Automatisch zwischenspeichern", IsChecked = true };
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1.5) };
+    private readonly StackPanel prerequisiteList = new() { Spacing = 3 };
+    private readonly Expander prerequisiteExpander;
+    private readonly string technicalDetails;
     private string? expandedTask;
     private bool closeConfirmed;
     private bool closePromptOpen;
@@ -46,7 +49,17 @@ public sealed class MainWindow : Window
     public MainWindow(StudentSession session, string filePath, string account)
     {
         this.session = session;
-        Title = "GSM-Kurswahl | Schülerprogramm · Demo";
+        technicalDetails = $"Datei: {filePath} · Betriebssystemkonto: {account} (keine bestätigte Schulzuordnung)";
+        prerequisiteExpander = new Expander
+        {
+            Name = "Prerequisites",
+            Content = new ScrollViewer { Content = prerequisiteList, MaxHeight = 140 },
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(0), MinHeight = 0, IsExpanded = false
+        };
+        Title = session.AllowSelfServicePrerequisites
+            ? "GSM-Kurswahl | Testversion (Selbstauskunft)"
+            : "GSM-Kurswahl | Schülerprogramm · Demo";
         Width = 1440; Height = 900; MinWidth = 900; MinHeight = 600;
         WindowState = WindowState.Maximized;
         Background = Page;
@@ -62,9 +75,11 @@ public sealed class MainWindow : Window
         ToolTip.SetTip(badge, "Die automatische Prüfung unterstützt deine Planung. Die Oberstufenberatung muss den Regelstand für deinen Abiturjahrgang fachlich freigeben und offene Einzelfragen klären. In dieser Demo ist keine verbindliche Abgabe möglich.");
         titleLine.Children.Add(badge);
         title.Children.Add(titleLine);
-        var identityText = string.IsNullOrWhiteSpace(session.Profile.DisplayName)
-            ? $"Synthetische Person {session.Choice.StudentId}"
-            : $"{session.Profile.DisplayName}" + (string.IsNullOrWhiteSpace(session.Profile.ClassName) ? "" : $" · Klasse {session.Profile.ClassName}") + $" ({session.Choice.StudentId})";
+        var identityText = session.AllowSelfServicePrerequisites
+            ? "Unverbindliche Testversion (Selbstauskunft)"
+            : string.IsNullOrWhiteSpace(session.Profile.DisplayName)
+                ? $"Synthetische Person {session.Choice.StudentId}"
+                : $"{session.Profile.DisplayName}" + (string.IsNullOrWhiteSpace(session.Profile.ClassName) ? "" : $" · Klasse {session.Profile.ClassName}") + $" ({session.Choice.StudentId})";
         title.Children.Add(Text($"{identityText} · Abitur {session.Catalog.GraduationYear} · Demoangebot ohne schulische Freigabe", 13, color: Muted));
         if (session.Catalog.SubmissionDeadline is { } deadline)
         {
@@ -115,7 +130,7 @@ public sealed class MainWindow : Window
         footer.Children.Add(hoursWarning);
         fileStatus.Name = "FileStatus";
         footer.Children.Add(fileStatus);
-        footer.Children.Add(PrerequisitePanel($"Datei: {filePath} · Betriebssystemkonto: {account} (keine bestätigte Schulzuordnung)"));
+        footer.Children.Add(prerequisiteExpander);
         Grid.SetRow(footer, 3); root.Children.Add(footer);
         Content = root;
 
@@ -176,12 +191,13 @@ public sealed class MainWindow : Window
         var focused = (FocusManager?.GetFocusedElement() as Control)?.Name;
         BuildStepper();
         content.Children.Clear();
-        content.Children.Add(session.Step switch { 1 => LfStep(), 2 => OralStep(), 3 => AreaStep(), 4 => ExtraStep(), _ => ReviewStep() });
+        content.Children.Add(session.Step switch { 0 => PrerequisitesStep(), 1 => LfStep(), 2 => OralStep(), 3 => AreaStep(), 4 => ExtraStep(), _ => ReviewStep() });
         BuildPlan();
+        UpdatePrerequisitePanel();
         var hoursMessage = session.Validation.Messages.FirstOrDefault(m => m.Rule.Id == "GSM-HOURS-UPPER");
         hoursWarning.IsVisible = hoursMessage is not null;
         ((TextBlock)hoursWarning.Child!).Text = hoursMessage?.Explanation ?? "";
-        previous.IsEnabled = !session.IsBusy && session.Step > 1;
+        previous.IsEnabled = !session.IsBusy && session.Step > session.FirstStep;
         next.IsVisible = session.Step < StudentSession.LastStep;
         next.IsEnabled = !session.IsBusy && session.StepError is null;
         next.Content = session.Step switch { 3 when session.Tasks.Any(t => !t.IsSatisfied) => "Später entscheiden, _weiter", _ => "_Weiter" };
@@ -206,10 +222,11 @@ public sealed class MainWindow : Window
     {
         stepper.Children.Clear();
         var open = session.Tasks.Count(t => !t.IsSatisfied);
-        for (var i = 1; i <= StudentSession.LastStep; i++)
+        for (var i = session.FirstStep; i <= StudentSession.LastStep; i++)
         {
             var step = i;
-            var label = StepNames[i - 1] + (i == 3 && session.Step >= 3 && open > 0 ? $" · {open} offen" : "");
+            var label = i == 0 ? "Vorinfos"
+                : StepNames[i - 1] + (i == 3 && session.Step >= 3 && open > 0 ? $" · {open} offen" : "");
             var current = i == session.Step;
             var done = i < session.Step;
             var text = (done ? "✓ " : $"{i} ") + label;
@@ -229,6 +246,92 @@ public sealed class MainWindow : Window
             button.Click += (_, _) => Edit(() => { expandedTask = null; session.GoToStep(step); });
             stepper.Children.Add(button);
         }
+    }
+
+    private Control PrerequisitesStep()
+    {
+        var panel = Step("Deine Vorinfos für den Probelauf", "Gib hier deine bisherigen Fächer und dein Profil aus der Mittelstufe an. In der echten Schulversion sind diese Angaben bereits durch die Oberstufenberatung hinterlegt.");
+        panel.Children.Add(Notice("Unverbindliche Testversion für zu Hause: Deine Angaben hier steuern sofort, welche Fächer und Hinweise im Probelauf angezeigt werden.", AccentSoft, Accent));
+        var p = session.Profile.Prerequisites;
+        var hasF = p.ContinuedLanguages.Contains("F", StringComparer.OrdinalIgnoreCase);
+        var hasL = p.ContinuedLanguages.Contains("L", StringComparer.OrdinalIgnoreCase);
+        var hasI = p.ItalianProfile == Knowledge.Yes;
+
+        void UpdatePrior(Func<PriorEducation, PriorEducation> update) =>
+            Edit(() => session.SetTestPrerequisites(update(session.Profile.Prerequisites)));
+
+        ImmutableArray<string> BuildLanguages(bool f, bool l, bool i)
+        {
+            var list = ImmutableArray.CreateBuilder<string>();
+            list.Add("E");
+            if (f) list.Add("F");
+            if (l) list.Add("L");
+            if (i) list.Add("I");
+            return list.ToImmutable();
+        }
+
+        void AddRadio(StackPanel target, string name, string group, string label, bool selected, Action onSelected)
+        {
+            var button = new RadioButton { Name = name, GroupName = group, Content = label, IsChecked = selected, IsEnabled = !session.IsBusy };
+            button.IsCheckedChanged += (_, _) => { if (button.IsChecked == true) onSelected(); };
+            target.Children.Add(Option(button, selected));
+        }
+
+        void AddCheck(StackPanel target, string name, string label, bool selected, Action<bool> onChanged)
+        {
+            var box = new CheckBox { Name = name, Content = label, IsChecked = selected, IsEnabled = !session.IsBusy };
+            box.IsCheckedChanged += (_, _) => onChanged(box.IsChecked == true);
+            target.Children.Add(Option(box, selected));
+        }
+
+        panel.Children.Add(Text("Fortgeführte Fremdsprachen (spätestens ab Klasse 8)", 15, FontWeight.SemiBold));
+        panel.Children.Add(Text("Englisch (1. Fremdsprache) ist am GSM für alle fortgeführt.", 13, color: Muted));
+        AddRadio(panel, "Prereq_Lang_F", "Prereq_Lang", "Englisch + Französisch", hasF && !hasL,
+            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(true, false, x.ItalianProfile == Knowledge.Yes) }));
+        AddRadio(panel, "Prereq_Lang_L", "Prereq_Lang", "Englisch + Latein", hasL && !hasF,
+            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(false, true, x.ItalianProfile == Knowledge.Yes) }));
+        AddRadio(panel, "Prereq_Lang_FL", "Prereq_Lang", "Englisch + Französisch und Latein", hasF && hasL,
+            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(true, true, x.ItalianProfile == Knowledge.Yes) }));
+
+        panel.Children.Add(Text("Profil & Zusatzqualifikationen (Klasse 8–10)", 15, FontWeight.SemiBold));
+        AddCheck(panel, "Prereq_Italian", "Italienisch als 3. Fremdsprache (sprachliches Profil ab Klasse 8)", hasI,
+            yes => UpdatePrior(x => x with
+            {
+                ItalianProfile = yes ? Knowledge.Yes : Knowledge.No,
+                ContinuedLanguages = BuildLanguages(
+                    x.ContinuedLanguages.Contains("F", StringComparer.OrdinalIgnoreCase),
+                    x.ContinuedLanguages.Contains("L", StringComparer.OrdinalIgnoreCase),
+                    yes)
+            }));
+        AddCheck(panel, "Prereq_Imp", "Profilfach IMP (Informatik, Mathematik, Physik) in Klasse 8–10", p.InformaticsImp == Knowledge.Yes,
+            yes => UpdatePrior(x => x with { InformaticsImp = yes ? Knowledge.Yes : Knowledge.No }));
+        AddCheck(panel, "Prereq_InfBridge", "Informatik-Brückenkurs in Klasse 10 besucht", p.InformaticsBridge == Knowledge.Yes,
+            yes => UpdatePrior(x => x with { InformaticsBridge = yes ? Knowledge.Yes : Knowledge.No }));
+        AddCheck(panel, "Prereq_Bili", "Durchgängig bilingualer Bildungsgang (Englisch)", p.ContinuousBilingual == Knowledge.Yes,
+            yes => UpdatePrior(x => x with { ContinuousBilingual = yes ? Knowledge.Yes : Knowledge.No }));
+
+        panel.Children.Add(Text("Besuchter Religions- bzw. Ethikunterricht in Klasse 10", 15, FontWeight.SemiBold));
+        AddRadio(panel, "Prereq_Rel_ER", "Prereq_Rel", "Evangelische Religion (ER)", p.ReligionEthicsGrade10 == "ER",
+            () => UpdatePrior(x => x with { ReligionEthicsGrade10 = "ER", ReligionEthicsPermission = Knowledge.Yes, ReligionEthicsExamPermission = Knowledge.Unknown }));
+        AddRadio(panel, "Prereq_Rel_KR", "Prereq_Rel", "Katholische Religion (KR)", p.ReligionEthicsGrade10 == "KR",
+            () => UpdatePrior(x => x with { ReligionEthicsGrade10 = "KR", ReligionEthicsPermission = Knowledge.Yes, ReligionEthicsExamPermission = Knowledge.Unknown }));
+        AddRadio(panel, "Prereq_Rel_ETH", "Prereq_Rel", "Ethik (ETH)", p.ReligionEthicsGrade10 == "ETH",
+            () => UpdatePrior(x => x with { ReligionEthicsGrade10 = "ETH", ReligionEthicsPermission = Knowledge.Yes, ReligionEthicsExamPermission = Knowledge.Unknown }));
+        AddRadio(panel, "Prereq_Rel_Unknown", "Prereq_Rel", "Keiner / Wechsel / Sonderfall prüfen", p.ReligionEthicsGrade10 is not ("ER" or "KR" or "ETH"),
+            () => UpdatePrior(x => x with { ReligionEthicsGrade10 = null, ReligionEthicsPermission = Knowledge.Unknown, ReligionEthicsExamPermission = Knowledge.Unknown }));
+
+        panel.Children.Add(Text("Sportunterricht in der Kursstufe", 15, FontWeight.SemiBold));
+        var sport = p.SportExemptSemesters ?? [];
+        AddRadio(panel, "Prereq_Sport_None", "Prereq_Sport", "Keine Sportbefreiung (reguläre Teilnahme)", sport.IsEmpty,
+            () => UpdatePrior(x => x with { SportExemptSemesters = [], PermanentSportExemption = Knowledge.No }));
+        AddRadio(panel, "Prereq_Sport_12", "Prereq_Sport", "Sportbefreiung in HJ 1+2", sport.SequenceEqual([1, 2]),
+            () => UpdatePrior(x => x with { SportExemptSemesters = [1, 2], PermanentSportExemption = Knowledge.Yes }));
+        AddRadio(panel, "Prereq_Sport_34", "Prereq_Sport", "Sportbefreiung in HJ 3+4", sport.SequenceEqual([3, 4]),
+            () => UpdatePrior(x => x with { SportExemptSemesters = [3, 4], PermanentSportExemption = Knowledge.Yes }));
+        AddRadio(panel, "Prereq_Sport_1234", "Prereq_Sport", "Dauerhafte Sportbefreiung in HJ 1–4", sport.SequenceEqual([1, 2, 3, 4]),
+            () => UpdatePrior(x => x with { SportExemptSemesters = [1, 2, 3, 4], PermanentSportExemption = Knowledge.Yes }));
+
+        return panel;
     }
 
     private Control LfStep()
@@ -560,31 +663,23 @@ public sealed class MainWindow : Window
         plan.Children.Add(Text("Belegungszahlen und Wochenstunden sind keine Anrechnungs- oder Zulassungsbestätigung.", 11, color: Muted));
     }
 
-    // Shown read-only: students cannot declare prerequisites themselves (Pflichtenheft §5, §5a).
-    private Control PrerequisitePanel(string technicalDetails)
+    // Shown read-only in official mode; updated live in test mode when prerequisites change on step 0.
+    private void UpdatePrerequisitePanel()
     {
-        var list = new StackPanel { Spacing = 3 };
-        list.Children.Add(Text(session.ProfileStatusText, 11, color: Muted));
+        prerequisiteList.Children.Clear();
+        prerequisiteList.Children.Add(Text(session.ProfileStatusText, 11, color: Muted));
         foreach (var item in session.Prerequisites)
         {
-            list.Children.Add(Text($"{item.Label}: {item.Value}.", 11, color: Muted));
+            prerequisiteList.Children.Add(Text($"{item.Label}: {item.Value}.", 11, color: Muted));
         }
-        list.Children.Add(Text("Änderungen und Rückfragen: Oberstufenberatung.", 11, color: Muted));
-        list.Children.Add(Text(technicalDetails, 11, color: Muted));
-        var expander = new Expander
+        prerequisiteList.Children.Add(Text("Änderungen und Rückfragen: Oberstufenberatung.", 11, color: Muted));
+        prerequisiteList.Children.Add(Text(technicalDetails, 11, color: Muted));
+        prerequisiteExpander.Header = Text(session.Profile.Status switch
         {
-            Name = "Prerequisites",
-            Header = Text(session.Profile.Status switch
-            {
-                ProfileStatus.Verified => "Deine Voraussetzungen und technische Details",
-                ProfileStatus.ProfileInvalid => "Voraussetzungen · Profil ungültig · Oberstufenberatung kontaktieren",
-                _ => "Voraussetzungen ungeprüft · Details bei Bedarf"
-            }, 11, color: Muted),
-            Content = new ScrollViewer { Content = list, MaxHeight = 140 },
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            Padding = new Thickness(0), MinHeight = 0, IsExpanded = false
-        };
-        return expander;
+            ProfileStatus.Verified => "Deine Voraussetzungen und technische Details",
+            ProfileStatus.ProfileInvalid => "Voraussetzungen · Profil ungültig · Oberstufenberatung kontaktieren",
+            _ => "Voraussetzungen ungeprüft · Details bei Bedarf"
+        }, 11, color: Muted);
     }
 
     private string Progress()

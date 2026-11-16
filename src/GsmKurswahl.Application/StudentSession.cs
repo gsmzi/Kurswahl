@@ -21,7 +21,9 @@ public sealed class StudentSession
     private readonly Dictionary<string, DisplacedBasic> displacedBasics = [];
     private string? lfChangeSubject;
     public OfferCatalog Catalog { get; }
-    public ProfileContext Profile { get; }
+    public ProfileContext Profile { get; private set; }
+    public bool AllowSelfServicePrerequisites { get; }
+    public int FirstStep => AllowSelfServicePrerequisites ? 0 : 1;
     public CourseChoice Choice { get; private set; }
     public bool IsDirty { get; private set; }
     public bool IsBusy { get; private set; }
@@ -88,14 +90,14 @@ public sealed class StudentSession
 
     public void PreviousStep()
     {
-        if (IsBusy || Step == 1) return;
+        if (IsBusy || Step <= FirstStep) return;
         Step--; Changed?.Invoke();
     }
 
     // Only completed steps can be revisited directly; moving forward always runs NextStep's checks.
     public void GoToStep(int step)
     {
-        if (IsBusy || step < 1 || step >= Step) return;
+        if (IsBusy || step < FirstStep || step >= Step) return;
         Step = step; Changed?.Invoke();
     }
 
@@ -212,6 +214,12 @@ public sealed class StudentSession
     public void NextStep()
     {
         if (IsBusy) throw new InvalidOperationException("Dateivorgang läuft; bitte warten.");
+        if (Step == 0)
+        {
+            Step = 1;
+            Changed?.Invoke();
+            return;
+        }
         if (StepError is { } error) throw new InvalidOperationException(error);
         if (Step == 1)
         {
@@ -276,18 +284,54 @@ public sealed class StudentSession
         AutomaticMessage = string.Join("\n", notes);
     }
 
-    public StudentSession(OfferCatalog catalog, string demoStudentId, IChoiceStore store, ProfileContext? profile = null)
+    public StudentSession(OfferCatalog catalog, string demoStudentId, IChoiceStore store, ProfileContext? profile = null,
+        bool allowSelfServicePrerequisites = false)
     {
         ModelGuard.Catalog(catalog);
         if (!catalog.IsDemo || !demoStudentId.StartsWith("demo-", StringComparison.Ordinal))
             throw new ArgumentException("Der Demonstrator unterstützt nur ausdrücklich synthetische Demoangebote und demo-Schüler-IDs.");
         Catalog = catalog;
-        Profile = profile ?? ProfileContext.Missing;
+        AllowSelfServicePrerequisites = allowSelfServicePrerequisites;
+        Step = FirstStep;
+        Profile = profile ?? (allowSelfServicePrerequisites
+            ? CreateDefaultTestProfile()
+            : ProfileContext.Missing);
         this.store = store;
         var now = DateTimeOffset.UtcNow;
         Choice = new(2, Guid.NewGuid(), demoStudentId, catalog.GraduationYear, catalog.Version, ChoiceValidator.Version,
             1, now, now, SubmissionStatus.Draft, ElectionPhase.Preliminary, [], []);
     }
+
+    public void SetTestPrerequisites(PriorEducation prerequisites)
+    {
+        if (!AllowSelfServicePrerequisites)
+            throw new InvalidOperationException("Vorbildungsangaben können nur in der Testversion geändert werden.");
+        if (IsBusy)
+            throw new InvalidOperationException("Dateivorgang läuft; bitte warten.");
+        ModelGuard.PriorEducation(prerequisites);
+        Profile = new ProfileContext(ProfileStatus.Verified, prerequisites)
+        {
+            Revision = (Profile.Revision ?? 0) + 1,
+            IssuedAt = DateTimeOffset.UtcNow,
+            Detail = "Unverbindliche Selbstauskunft (Testversion für zu Hause – keine schulische Bestätigung)"
+        };
+        Changed?.Invoke();
+    }
+
+    private static ProfileContext CreateDefaultTestProfile() =>
+        new(ProfileStatus.Verified, new PriorEducation(
+            Knowledge.No, Knowledge.No, Knowledge.No, Knowledge.No, "ETH", [])
+        {
+            ContinuedLanguages = ["E", "F"],
+            ReligionEthicsPermission = Knowledge.Yes,
+            ReligionEthicsExamPermission = Knowledge.Unknown,
+            PermanentSportExemption = Knowledge.No
+        })
+        {
+            Revision = 1,
+            IssuedAt = DateTimeOffset.UtcNow,
+            Detail = "Unverbindliche Selbstauskunft (Testversion für zu Hause)"
+        };
 
     public Availability Availability(CourseOffer offer) => validator.GetAvailability(offer, Profile);
 
@@ -394,7 +438,7 @@ public sealed class StudentSession
                 var versionUpdated = upgraded || candidate.OfferVersion != Catalog.Version || candidate.RuleVersion != ChoiceValidator.Version;
                 // Preserve even now-invalid selections; never silently discard unknown or restricted offers.
                 Choice = versionUpdated ? candidate with { OfferVersion = Catalog.Version, RuleVersion = ChoiceValidator.Version } : candidate;
-                Step = 1;
+                Step = FirstStep;
                 AutomaticMessage = "";
                 LfChangeMessage = "";
                 lfChangeSubject = null;

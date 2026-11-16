@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GSM-Kurswahl | Testversion für zu Hause</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="AppShell" class="app-shell">
+    <header class="app-header">
+      <div id="WindowHeading" class="title-block">
+        <div class="title-line">
+          <h1>GSM-Kurswahl</h1>
+          <span id="StateBadge" class="pill pill-warn" title="Die automatische Prüfung unterstützt deine Planung. Dies ist eine unverbindliche Testversion für zu Hause (Selbstauskunft) ohne Abgabe an die Schule.">Vorläufig · unverbindlicher Probelauf</span>
+        </div>
+        <p id="Subtitle" class="subtitle">Unverbindliche Testversion für zu Hause (Selbstauskunft) · Abitur 2029 · keine Abgabe an die Schule</p>
+      </div>
+      <div id="FileToolbar" class="toolbar">
+        <label class="checkbox-inline">
+          <input id="AutosaveCheckbox" type="checkbox" checked />
+          <span>Automatisch zwischenspeichern</span>
+        </label>
+        <button id="LoadButton" type="button" class="btn">Entwurf laden</button>
+        <button id="SaveButton" type="button" class="btn">Entwurf speichern</button>
+        <button id="ResetButton" type="button" class="btn">Neu beginnen</button>
+      </div>
+    </header>
+
+    <nav id="Stepper" class="stepper" aria-label="Wahlschritte"></nav>
+
+    <main class="main-body">
+      <section class="left-column">
+        <div id="ErrorNotice" class="notice notice-danger hidden" role="alert"></div>
+        <div class="card">
+          <div id="StepContent" class="step-content"></div>
+        </div>
+        <div class="step-navigation">
+          <button id="PreviousStep" type="button" class="btn">Zurück</button>
+          <button id="NextStep" type="button" class="btn btn-primary">Weiter</button>
+        </div>
+      </section>
+
+      <aside class="card plan-panel" aria-label="Dein Plan">
+        <div id="PlanPanel" class="plan-panel"></div>
+      </aside>
+    </main>
+
+    <footer class="app-footer">
+      <div id="HoursWarning" class="notice notice-warn hidden"></div>
+      <div id="FileStatus" class="muted-text hidden"></div>
+      <details id="Prerequisites" class="expander">
+        <summary id="PrerequisitesSummary">Deine Voraussetzungen und technische Details</summary>
+        <div id="PrerequisitesList" class="expander-body"></div>
+      </details>
+    </footer>
+  </div>
+
+  <div id="ConfirmModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="ConfirmTitle">
+    <div class="modal-dialog">
+      <h2 id="ConfirmTitle">Entwurf schützen</h2>
+      <p id="ConfirmMessage" style="margin: 0;"></p>
+      <div class="modal-actions">
+        <button id="ConfirmCancel" type="button" class="btn">Abbrechen</button>
+        <button id="ConfirmAccept" type="button" class="btn btn-primary">Bestätigen</button>
+      </div>
+    </div>
+  </div>
+
+  <section id="PrintSheet" class="print-sheet" aria-hidden="true"></section>
+
+  <script src="./catalog.js"></script>
+  <script src="./kurswahltest.js"></script>
+</body>
+</html>

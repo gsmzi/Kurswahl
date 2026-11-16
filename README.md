@@ -174,3 +174,11 @@ Unter **Abgleich / Abschluss** stehen ein allgemeiner CSV/XLSX-Kurswahlabgleich 
 Übertragungsvermerke benötigen die ausdrücklich aktivierte Erweiterung von Datenbankschema 2 auf 3. Vorher sichern; ältere Programme können Schema 3 nicht öffnen. Sicherung/Wiederherstellung verwendet den bestehenden vollständigen Jahrgangstransport; Wiederherstellung stets als neuer lokaler Bestand. Die Kursplanung exportiert angezeigte Nachfragezahlen jetzt auch nach CSV/XLSX.
 
 Bedienung, Formate, Backup-/Wiederherstellungsablauf und Schulnetz-Pilotplan: [M5-Abschluss](docs/M5_ABSCHLUSS.md). Synthetisches, bewusst unvollständiges Prüffallsample: `samples/kursabgleich-demo.csv`. Releasevorbereitung: `./scripts/Publish-Release.ps1` (Schülerprogramm immer selbstenthaltend für Windows x64, also ohne .NET-Installation auf Schülerrechnern; Lehrerprogramm frameworkabhängig, mit `-SelfContained` ebenfalls selbstenthaltend; GSM-Vorgaben `schulvorgaben.json` liegen automatisch neben dem Lehrerprogramm, `-Schulvorgaben <Datei>` ersetzt sie, siehe [Lehrerverwaltung](docs/LEHRERVERWALTUNG.md)). Keine Produktivfreigabe und kein Deployment.
+
+## Browser-Testversion für Schülerinnen und Schüler (`Kurswahltest`)
+
+Unter [web/Kurswahltest](web/Kurswahltest/index.html) liegt eine statische Browser-Testversion für zu Hause (Zieladresse `https://gsmzi.github.io/Kurswahltest`). Sie entspricht optisch und fachlich dem Schülermodul, stellt aber **Schritt 0 („Vorinfos“)** voran, in dem Schülerinnen und Schüler ihre Sprachenfolge, Profil- und Religionsangaben sowie eventuelle Sportbefreiungen selbst auswählen. Alle Daten bleiben lokal im Browser (`localStorage`); es findet keine Übertragung ins Netz und keine Abgabe an die Schule statt.
+
+- Desktop-Testmodus derselben Oberfläche: `GsmKurswahl.StudentApp.exe --testversion`
+- Fachangebot aktualisieren und statisches Web-Bundle bauen: `./scripts/Publish-Kurswahltest.ps1` (übernimmt `samples/fachangebot-demo.json` oder ein eigenes exportiertes Angebot via `-CatalogPath` nach `web/Kurswahltest/` und `artifacts/kurswahltest/`)
+- GitHub-Pages-Bereitstellung: Workflow [deploy-kurswahltest.yml](.github/workflows/deploy-kurswahltest.yml) (in den GitHub-Repository-Einstellungen unter *Settings → Pages → Source* „GitHub Actions“ wählen).

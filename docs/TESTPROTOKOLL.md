@@ -810,3 +810,25 @@ M3-Korrekturen zuvor separat als 07c83c9 committet. Die M4-Änderungen liegen an
   - Abschließende Gesamtsuite (`artifacts/test-results/final`): **397/397 Tests bestanden**, 0 fehlgeschlagen, 0 übersprungen (Application 50, Domain 8, ImportExport 27, Rules 101, Storage 128 inkl. `CompatibilityTests`, StudentApp inkl. Headless-UI und Monkey-Tests 83).
   - Schemaprüfung `scripts/Test-Schemas.ps1` (PowerShell 7): **19/19 Schemafälle bestanden**. Keine Schema- oder Paket-/Lockdateiänderung.
   - Nicht ausgeführt: Publish/Testpaket-Neubau, natives Fenster-Durchklicken, Schulnetz-/SMB-Ausfalltest.
+
+### Browser-Testversion `Kurswahltest` mit Vorinfo-Schritt 0 (16.11.2026)
+
+- Anlass: Nutzerauftrag für eine browserlauffähige, auf GitHub Pages (`https://gsmzi.github.io/Kurswahltest`) veröffentlichbare Testversion für zu Hause, optisch und fachlich identisch zum Schülermodul, mit vorgeschaltetem Schritt 0 („Vorinfos“) zur Selbstauskunft über Sprachenfolge, Profil, Informatik-Vorbildung, bilingualen Bildungsgang, Klasse-10-Religion/Ethik und Sportbefreiung.
+- Umsetzung ohne neue NuGet-Pakete/Lockdateiänderungen (kein `Avalonia.Browser`/WASM-Workload im lokalen Offline-Paketcache):
+  1. `StudentSession` (`Application`) um `AllowSelfServicePrerequisites`, `FirstStep` (`0` im Testmodus, `1` regulär), `SetTestPrerequisites(PriorEducation)` und Schritt-0-Navigation erweitert; `MainWindow` & `App` (`StudentApp`) um `PrerequisitesStep()` (Schritt 0) und CLI-Schalter `--testversion` ergänzt.
+  2. Statische Browser-Anwendung unter `web/Kurswahltest/` (`index.html`, `styles.css`, `kurswahltest.js`, `catalog.js`, `fachangebot.json`, `.nojekyll`) mit vollständigem Port des Regel- und Workflow-Kerns (`m2-2`), lokaler Browser-Speicherung (`localStorage`) und Druck-/PDF-Kontrollbogen.
+  3. Publish-Skript `scripts/Publish-Kurswahltest.ps1` und GitHub-Pages-Workflow `.github/workflows/deploy-kurswahltest.yml`; Abschnitt in `README.md` ergänzt.
+  4. Neue Tests: 2 in `StudentSessionTests` (Application), `TestversionStartsAtStepZeroAndConfiguresPrerequisitesInUi` in `WindowTests` sowie 2 Tests in `KurswahltestWebParityTests` (Bundle-Konsistenz und automatisierter C#-↔-Node.js-Paritätsabgleich über 8 Szenarien inklusive 3 deterministischer 45-Schritt-Zufallsläufe).
+- Zwischenläufe und behobene Fehler:
+  - Build von `StudentApp`: 3× CS7036 in `MainWindow.cs` (`AddRadio` ohne `group`-Argument `"Prereq_Rel"` bei `ER`/`KR`/`ETH`) behoben; anschließender Release-Build 0 Warnungen/0 Fehler.
+  - Solution-Build: 1× CS1061 in `KurswahltestWebParityTests.cs` (`List<...>.Length` statt `.Count`) behoben; anschließender Release-Build über alle 14 Projekte **0 Warnungen, 0 Fehler**.
+  - Gezielter Testlauf in der Windows-Sandbox blieb an VSTest-Sockets hängen; nach Abbruch außerhalb der Sandbox gestartet: `GsmKurswahl.Application.Tests` **52/52 bestanden**, `KurswahltestWebParityTests` **2/2 bestanden**, `TestversionStartsAtStepZeroAndConfiguresPrerequisitesInUi` scheiterte zunächst an `Assert.Equal(["E", "L", "I"], ...)` wegen `ImmutableArray<T>.Equals`-Referenzgleichheit in xUnit (auf `new[] { ... }` korrigiert).
+  - Danach hing `TestversionStartsAtStepZeroAndConfiguresPrerequisitesInUi` beim Schließen (`window.Close()` bei `IsDirty == true` öffnete den modalen Bestätigungsdialog `Confirm`); `session.SaveAsync().GetAwaiter().GetResult()` im `finally`-Block ergänzt. Korrigierter gezielter Lauf: **3/3 bestanden** (1 s).
+- Abschließende Verifikation (16.11.2026):
+  - Locked-Restore (`dotnet restore GSM-Kurswahl.sln --configfile NuGet.Config --locked-mode -m:1 -nr:false`): erfolgreich, keine Paket-/Lockdateiänderung.
+  - Release-Build (`dotnet build GSM-Kurswahl.sln -c Release --no-restore -m:1 -p:UseSharedCompilation=false -nr:false`): **0 Warnungen, 0 Fehler** (alle 14 Projekte).
+  - Testausführung außerhalb der Sandbox-Socketsperre (`artifacts/test-results/kurswahltest`): **353/353 Tests bestanden**, 0 fehlgeschlagen, 0 übersprungen (`Domain.Tests` 8/8, `Rules.Tests` 101/101, `Application.Tests` 52/52, `ImportExport.Tests` 27/27, `Storage.Tests` 128/128 sowie in `StudentApp.Tests` gefiltert `WindowTests|KurswahltestWebParityTests` **37/37** in 1 min 2 s).
+  - Schemaprüfung `pwsh -NoProfile -File scripts/Test-Schemas.ps1`: **19/19 Schemafälle bestanden** (mit erweitertem Zugriff wegen WindowsApps-Alias von `pwsh`).
+  - `./scripts/Publish-Kurswahltest.ps1`: Bundle unter `artifacts/kurswahltest` erstellt (`demo-2029-v3`, Abitur 2029).
+  - `git diff --check`: keine Whitespacefehler (nur vorhandene LF/CRLF-Hinweise).
+  - **Nicht ausgeführt / Grenzen:** In `StudentApp.Tests` wurden zur Laufzeitbegrenzung nur `WindowTests` und `KurswahltestWebParityTests` ausgeführt (37 Tests); die unveränderten Lehrer-UI- und Monkey-Tests (`TeacherWindowTests`, `StudentMonkeyTests`, `DemoStagesTests` u. a.) liefen in diesem Abschlusslauf nicht erneut. Keine manuelle Browser-Sichtprüfung auf GitHub Pages (kein GitHub-Push/Deployment ausgeführt).

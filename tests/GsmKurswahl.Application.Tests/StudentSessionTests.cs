@@ -170,6 +170,77 @@ public class StudentSessionTests
         Assert.False(reloaded.IsDirty);
     }
 
+    [Fact]
+    public async Task SelfServiceTestVersionStartsAtStepZeroAndUpdatesPrerequisitesWithoutLosingDraft()
+    {
+        var inf = TestData.Offer("INF-BF", "INF") with { Requirements = [Requirement.Informatics] };
+        var bili = TestData.Offer("BIO-BF-BILI", "BIO") with { Variant = CourseVariant.Bilingual, Requirements = [Requirement.ContinuousBilingual] };
+        var er = TestData.Offer("ER-BF", "ER");
+        var kr = TestData.Offer("KR-BF", "KR");
+        var f = TestData.Offer("F-BF", "F");
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = [.. TestData.WorkflowCatalog.Subjects, new("INF", "Informatik"), new("ER", "Evangelische Religion"), new("KR", "Katholische Religion"), new("F", "Französisch") { IsForeignLanguage = true }],
+            Offers = [.. TestData.WorkflowCatalog.Offers, inf, bili, er, kr, f]
+        };
+        var store = new MemoryStore();
+        var session = new StudentSession(catalog, "demo-testversion", store, allowSelfServicePrerequisites: true);
+
+        Assert.True(session.AllowSelfServicePrerequisites);
+        Assert.Equal(0, session.FirstStep);
+        Assert.Equal(0, session.Step);
+        Assert.Equal(ProfileStatus.Verified, session.Profile.Status);
+        Assert.False(session.Availability(inf).CanSelect);
+        Assert.False(session.Availability(bili).CanSelect);
+
+        session.SetTestPrerequisites(new PriorEducation(
+            Knowledge.Yes, Knowledge.No, Knowledge.Yes, Knowledge.Yes, "KR", [1, 2])
+        {
+            ContinuedLanguages = ["E", "F", "I"],
+            ReligionEthicsPermission = Knowledge.Yes,
+            ReligionEthicsExamPermission = Knowledge.Unknown,
+            PermanentSportExemption = Knowledge.Yes
+        });
+
+        Assert.True(session.Availability(inf).CanSelect);
+        Assert.True(session.Availability(bili).CanSelect);
+        Assert.True(session.Availability(kr).CanSelect);
+        Assert.False(session.Availability(er).CanSelect);
+
+        session.NextStep();
+        Assert.Equal(1, session.Step);
+        session.SetSelection("D-LF", [1, 2, 3, 4]);
+        session.PreviousStep();
+        Assert.Equal(0, session.Step);
+        session.PreviousStep();
+        Assert.Equal(0, session.Step);
+
+        session.NextStep();
+        session.SetSelection("M-LF", [1, 2, 3, 4]);
+        session.SetSelection("E-LF", [1, 2, 3, 4]);
+        session.NextStep();
+        Assert.Equal(2, session.Step);
+        session.GoToStep(0);
+        Assert.Equal(0, session.Step);
+        Assert.Equal(3, session.Choice.Selections.Length);
+
+        await session.SaveAsync();
+        var reloaded = new StudentSession(catalog, "demo-testversion", store, allowSelfServicePrerequisites: true);
+        await reloaded.LoadAsync();
+        Assert.Equal(0, reloaded.Step);
+        Assert.Equal(3, reloaded.Choice.Selections.Length);
+    }
+
+    [Fact]
+    public void SetTestPrerequisitesRejectedInOfficialMode()
+    {
+        var session = new StudentSession(TestData.Catalog, "demo-001", new MemoryStore());
+        Assert.False(session.AllowSelfServicePrerequisites);
+        Assert.Equal(1, session.FirstStep);
+        Assert.Equal(1, session.Step);
+        Assert.Throws<InvalidOperationException>(() => session.SetTestPrerequisites(PriorEducation.Unknown));
+    }
+
     private sealed class MemoryStore : IChoiceStore
     {
         public StoredChoice? Value { get; set; }

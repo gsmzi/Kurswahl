@@ -22,6 +22,7 @@ public sealed class App : Avalonia.Application
                     : configuredSettings;
                 var settings = StudentSettings.Load(settingsPath);
                 var arguments = desktop.Args ?? [];
+                var testVersion = Array.IndexOf(arguments, "--testversion") >= 0;
                 var folderIndex = Array.IndexOf(arguments, "--wahlordner");
                 var personalFolder = folderIndex >= 0 && folderIndex + 1 < arguments.Length
                     ? arguments[folderIndex + 1] : Environment.GetEnvironmentVariable("GSM_KURSWAHL_HOME");
@@ -29,10 +30,20 @@ public sealed class App : Avalonia.Application
                     personalFolder = StudentSettings.DeliveredChoiceDirectory(AppContext.BaseDirectory);
                 if (!string.IsNullOrWhiteSpace(personalFolder))
                     settings = settings with { HomeDirectory = personalFolder, ChoiceDirectory = "" };
-                var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(settings.ResolveCatalogPath(settingsPath)));
+                var catalogPath = settings.ResolveCatalogPath(settingsPath);
+                if (testVersion && !File.Exists(catalogPath))
+                    catalogPath = Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json");
+                var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(catalogPath));
                 var path = settings.ResolveChoicePath();
-                var personal = settings.ReadPersonalProfile(catalog.GraduationYear);
-                var session = new StudentSession(catalog, personal.StudentId, new JsonChoiceStore(path, settings.ResolveHomeDirectory()), personal.Profile);
+                var store = new JsonChoiceStore(path, settings.ResolveHomeDirectory());
+                StudentSession session;
+                if (testVersion)
+                    session = new StudentSession(catalog, "demo-testversion", store, allowSelfServicePrerequisites: true);
+                else
+                {
+                    var personal = settings.ReadPersonalProfile(catalog.GraduationYear);
+                    session = new StudentSession(catalog, personal.StudentId, store, personal.Profile);
+                }
                 desktop.MainWindow = new MainWindow(session, path, new OperatingSystemIdentityProvider().GetCurrent().Username);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)

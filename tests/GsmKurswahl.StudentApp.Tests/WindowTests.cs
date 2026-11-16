@@ -389,6 +389,77 @@ public class WindowTests
         }
         finally { window.Close(); }
     }
+
+    [AvaloniaFact]
+    public void TestversionStartsAtStepZeroAndConfiguresPrerequisitesInUi()
+    {
+        var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "samples", "fachangebot-demo.json")));
+        var session = new StudentSession(catalog, "demo-testversion", new UiMemoryStore(), allowSelfServicePrerequisites: true);
+        var window = new MainWindow(session, "browser://test", "test");
+        try
+        {
+            window.Show();
+            ToggleButton Box(string name) => window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == name);
+            Button Btn(string name) => window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == name);
+            bool Has(string name) => window.GetVisualDescendants().OfType<Control>().Any(c => c.Name == name);
+
+            Assert.Equal(0, session.Step);
+            Assert.True(Has("Step_0"));
+            Assert.False(Btn("PreviousStep").IsEnabled);
+            Assert.True(Btn("NextStep").IsEnabled);
+
+            Box("Prereq_Lang_L").IsChecked = true;
+            Box("Prereq_Italian").IsChecked = true;
+            Box("Prereq_Imp").IsChecked = true;
+            Box("Prereq_Bili").IsChecked = true;
+            Box("Prereq_Rel_KR").IsChecked = true;
+            Box("Prereq_Sport_12").IsChecked = true;
+
+            Assert.Equal(new[] { "E", "L", "I" }, session.Profile.Prerequisites.ContinuedLanguages);
+            Assert.Equal(Knowledge.Yes, session.Profile.Prerequisites.ItalianProfile);
+            Assert.Equal(Knowledge.Yes, session.Profile.Prerequisites.InformaticsImp);
+            Assert.Equal(Knowledge.Yes, session.Profile.Prerequisites.ContinuousBilingual);
+            Assert.Equal("KR", session.Profile.Prerequisites.ReligionEthicsGrade10);
+            Assert.Equal(new[] { 1, 2 }, session.Profile.Prerequisites.SportExemptSemesters);
+
+            var prerequisites = window.GetVisualDescendants().OfType<Expander>().Single(e => e.Name == "Prerequisites");
+            prerequisites.IsExpanded = true;
+            var footerTexts = prerequisites.GetLogicalDescendants().OfType<TextBlock>().Select(t => t.Text ?? "").ToArray();
+            Assert.Contains(footerTexts, t => t.Contains("Katholische Religion"));
+            Assert.Contains(footerTexts, t => t.Contains("Durchgängig bilingualer Bildungsgang: ja"));
+            Assert.Contains(footerTexts, t => t.Contains("Sportbefreiung: HJ 1, 2"));
+
+            Btn("NextStep").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(1, session.Step);
+            Assert.True(Btn("PreviousStep").IsEnabled);
+            Assert.True(Has("Offer_BIO_LF_BILI"));
+            Assert.False(Has("Offer_F_LF"));
+            Assert.False(Has("Offer_SP_LF"));
+
+            foreach (var s in new[] { "D", "M", "E" }) Box("Offer_" + s + "_LF").IsChecked = true;
+            Btn("NextStep").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(2, session.Step);
+            Assert.True(Has("Oral_KR"));
+            Assert.False(Has("Oral_ER"));
+            Assert.False(Has("Oral_SP"));
+
+            Box("Oral_BIO").IsChecked = true;
+            Box("Oral_G").IsChecked = true;
+            Btn("NextStep").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(3, session.Step);
+            var relTask = session.Tasks.Single(t => t.Id == "PLAN-AREA-RELIGION");
+            Assert.Contains("KR-BF", relTask.OptionOfferIds);
+            Assert.DoesNotContain("ER-BF", relTask.OptionOfferIds);
+            var breadthTask = session.Tasks.Single(t => t.Id == "PLAN-AREA-BREADTH");
+            Assert.Contains("INF-BF", breadthTask.OptionOfferIds);
+            Assert.DoesNotContain("F-BF", breadthTask.OptionOfferIds);
+
+            Btn("Step_0").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(0, session.Step);
+            Assert.Equal(3, session.Choice.Selections.Count(s => s.Type == CourseType.Lf));
+        }
+        finally { session.SaveAsync().GetAwaiter().GetResult(); window.Close(); }
+    }
     private sealed class UiMemoryStore : IChoiceStore
     {
         private StoredChoice? value;
