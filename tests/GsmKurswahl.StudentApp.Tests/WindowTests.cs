@@ -5,6 +5,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
+using Avalonia.Media;
 using Avalonia.Themes.Fluent;
 using Avalonia.VisualTree;
 using GsmKurswahl.Application;
@@ -195,6 +196,47 @@ public class WindowTests
             Assert.Equal(ReviewStatus.NeedsReview, sportRow.Issue);
             Assert.Contains("AGVO-SPORT", sportRow.IssueText);
             Assert.Contains(window.GetVisualDescendants().OfType<Control>(), c => ToolTip.GetTip(c)?.ToString()?.Contains("AGVO-SPORT") == true);
+        }
+        finally { if (session.IsDirty) await session.SaveAsync(); window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task CompleteReviewMakesControlSheetExportOptional()
+    {
+        var profile = new ProfileContext(ProfileStatus.Verified,
+            new PriorEducation(Knowledge.No, Knowledge.No, Knowledge.No, Knowledge.No, "ETH", [])
+            {
+                ContinuedLanguages = ["E", "F"],
+                ReligionEthicsPermission = Knowledge.Yes,
+                PermanentSportExemption = Knowledge.No
+            });
+        var session = new StudentSession(TestData.WorkflowCatalog, "demo-001", new UiMemoryStore(), profile);
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            foreach (var subject in new[] { "D", "M", "E" }) session.SetSelection(subject + "-LF", [1, 2, 3, 4]);
+            session.NextStep();
+            session.SetOral("BIO", true);
+            session.SetOral("G", true);
+            session.NextStep();
+            session.ChooseTaskOption("PLAN-AREA-ART", "BK-BF", true);
+            session.ChooseTaskOption("PLAN-AREA-RELIGION", "ETH-BF", true);
+            session.ChooseTaskOption("PLAN-AREA-BREADTH", "CH-BF", true);
+            session.NextStep();
+            session.SetSelection("GK-BF", [1, 2, 3, 4]);
+            session.NextStep();
+            window.UpdateLayout();
+
+            Assert.Equal(5, session.Step);
+            var visibleTexts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text ?? "").ToArray();
+            Assert.Contains(visibleTexts, t => t.Contains("✓ Nichts mehr zu tun"));
+            Assert.Contains(visibleTexts, t => t.Contains("Wenn du möchtest, kannst du zusätzlich den Kontrollbogen als PDF exportieren."));
+            Assert.DoesNotContain(visibleTexts, t => t.Contains("und exportiere den Kontrollbogen"));
+
+            var exportButton = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ControlSheetButton");
+            Assert.True(exportButton.IsEnabled);
+            Assert.NotEqual(Color.Parse("#185FA5"), (exportButton.Background as ISolidColorBrush)?.Color);
         }
         finally { if (session.IsDirty) await session.SaveAsync(); window.Close(); }
     }
@@ -459,6 +501,81 @@ public class WindowTests
             Assert.Equal(3, session.Choice.Selections.Count(s => s.Type == CourseType.Lf));
         }
         finally { session.SaveAsync().GetAwaiter().GetResult(); window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void UsabilityFeedbackBlockerHintAndTodoJumpWork()
+    {
+        var session = new StudentSession(TestData.WorkflowCatalog, "demo-001", new UiMemoryStore());
+        var window = new MainWindow(session, "demo.json", "demo-account");
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            T Vis<T>(string name) where T : Control => window.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
+            void Click(string name)
+            {
+                Vis<Button>(name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+            }
+
+            Assert.Equal(1, session.Step);
+            var blocker = Vis<TextBlock>("StepBlockerHint");
+            Assert.True(blocker.IsVisible);
+            Assert.False(string.IsNullOrWhiteSpace(blocker.Text));
+            Assert.DoesNotContain("PLAN-LF:", blocker.Text);
+            Assert.False(Vis<Button>("NextStep").IsEnabled);
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(),
+                t => t.Text?.Contains("bisheriges Basisfach als Leistungsfach") == true);
+
+            foreach (var s in new[] { "D", "M", "E" }) Vis<CheckBox>("Offer_" + s + "_LF").IsChecked = true;
+            window.UpdateLayout();
+            Assert.False(Vis<TextBlock>("StepBlockerHint").IsVisible);
+            Click("NextStep");
+
+            Vis<CheckBox>("Oral_BIO").IsChecked = true;
+            Vis<CheckBox>("Oral_G").IsChecked = true;
+            Click("NextStep"); // Step 3 (Pflichtbereiche)
+            Click("NextStep"); // Step 4 (Weitere Kurse, open tasks allowed with "Später entscheiden, weiter")
+            Click("NextStep"); // Step 5 (Überblick)
+            Assert.Equal(5, session.Step);
+
+            var jumpToThree = window.GetVisualDescendants().OfType<Button>()
+                .First(b => b.Name is not null && b.Name.StartsWith("TodoJump_", StringComparison.Ordinal) && b.Name.EndsWith("_3", StringComparison.Ordinal));
+            jumpToThree.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
+            Assert.Equal(3, session.Step);
+
+            Click("Step_1");
+            Assert.Equal(1, session.Step);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(),
+                t => t.Text?.Contains("bisheriges Basisfach als Leistungsfach") == true);
+        }
+        finally { session.SaveAsync().GetAwaiter().GetResult(); window.Close(); }
+
+        var failingSession = new StudentSession(TestData.WorkflowCatalog, "demo-001", new FailingLoadStore());
+        var failWindow = new MainWindow(failingSession, "demo.json", "demo-account");
+        try
+        {
+            failWindow.Show();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            failWindow.UpdateLayout();
+            var errorNotice = failWindow.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ErrorNotice");
+            Assert.True(errorNotice.IsVisible);
+            failWindow.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "DismissError")
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            failWindow.UpdateLayout();
+            Assert.False(errorNotice.IsVisible);
+        }
+        finally { failWindow.Close(); }
+    }
+
+    private sealed class FailingLoadStore : IChoiceStore
+    {
+        public Task<StoredChoice?> LoadAsync(CancellationToken cancellationToken = default) =>
+            Task.FromException<StoredChoice?>(new IOException("Synthetischer Lesefehler"));
+        public Task<StoredChoice> SaveAsync(CourseChoice choice, string? expectedToken, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
     private sealed class UiMemoryStore : IChoiceStore
     {

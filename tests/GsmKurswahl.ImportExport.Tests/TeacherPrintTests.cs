@@ -57,4 +57,17 @@ public class TeacherPrintTests
         AssertPdf(bytes);
         Assert.Equal(2, Pages(bytes));
     }
+
+    [Fact] public void StructuredReselectionStepsRenderCleanlyInPdfAndWord()
+    {
+        var step = new ReselectionStep("Neues Leistungsfach (HJ 1–4)",
+            "Du brauchst 1 neues Leistungsfach über alle vier Halbjahre.",
+            "Wählbare Leistungsfächer: Biologie, Chemie.");
+        var item = new ReselectionPrintItem(Record(1), Choice(1), ["D-BF"]) { Steps = [step] };
+        var pdf = PlanningPrint.Reselections([item], TestData.Catalog);
+        AssertPdf(pdf);
+        Assert.Equal(1, Pages(pdf));
+        var word = ReselectionWord.Render([item], TestData.Catalog);
+        Assert.True(word.Length > 1000);
+    }
 }

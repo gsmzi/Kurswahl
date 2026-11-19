@@ -31,6 +31,20 @@
     <Setter Property="Foreground" Value="#105350" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
+  <Style Selector="Button.compact">
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="Button.danger">
+    <Setter Property="Background" Value="#FCEBEB" />
+    <Setter Property="BorderBrush" Value="#E09B9B" />
+    <Setter Property="Foreground" Value="#8C1D1D" />
+  </Style>
+  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#F7D4D4" />
+    <Setter Property="Foreground" Value="#8C1D1D" />
+  </Style>
   <Style Selector="TextBox, ComboBox, NumericUpDown">
     <Setter Property="MinHeight" Value="38" />
     <Setter Property="CornerRadius" Value="6" />

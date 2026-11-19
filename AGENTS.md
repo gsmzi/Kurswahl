@@ -11,3 +11,50 @@
 - Nach jedem abgeschlossenen Entwicklungsschritt verfügbare Tests ausführen und tatsächliche Ergebnisse inklusive Fehlern in `docs/TESTPROTOKOLL.md` dokumentieren. Abschließend Restore, Release-Build, gesamte Testsuite und verfügbaren UI-Smoke-Test ausführen. Keine erfolgreichen Tests behaupten, die nicht liefen.
 - Pakete explizit pinnen, Lockdateien behalten, Lizenz-/Sicherheitsstand in `docs/ABHAENGIGKEITEN.md` pflegen. Keine automatischen Onlinezugriffe der Desktopanwendungen.
 - Änderungen im bestehenden Arbeitsverzeichnis erhalten. Keine ungefragten Deployments; M5 funktional freigegeben (Nutzerentscheidung 28.10.2026); Schulnetz-Pilot und Produktivfreigabe nicht fingieren. M3 umfasst die getrennte AdministrationStorage-Komponente (nur Domain-Abhängigkeit), die nicht vom Schülerprogramm referenziert werden darf.
+- Änderungen an Regeln (`GsmKurswahl.Rules`), Schülerablauf/Darstellung (`StudentSession`, `MainWindow`) oder dem Demo-Fachangebot (`samples/fachangebot-demo.json`) immer auch in der Browser-Testversion (`web/Kurswahltest/`) nachziehen, über `./scripts/Publish-Kurswahltest.ps1` aktualisieren und mit `KurswahltestWebParityTests` gegen C# verifizieren.
+- Nach jeder wesentlichen, geprüften Änderung (Code, Regeln, UI, Dokumentation) einen sauberen Git-Commit erstellen und nach `origin/main` pushen (Nutzerwunsch vom 19.11.2026); ZIP-Pakete, Sicherungen, Laufzeitdaten, Schlüssel und Echtdaten bleiben dabei stets außerhalb von Git.
+
+## Testpakete
+
+Wenn der Nutzer ein „Testpaket“, „Testprojekt“ oder eine neue portable Windows-„Testversion“
+anfordert, die Testversion beider Desktopprogramme aus dem aktuellen Arbeitsstand bauen
+und versioniert im folgenden Basisordner bereitstellen, sofern kein anderes Ziel genannt wird:
+
+`C:\Users\m-zim\116522 Gymnasium bei St. Michael\ESL - General\Schulorganisation\Softwareentwicklung\Kurswahl-Testversion`
+
+- Für jede neue Bereitstellung im Basisordner einen neuen Unterordner mit Datum und
+  Uhrzeit (`YYYY-MM-DD_HH-MM`, z. B. `2026-11-17_14-20`) anlegen. Bei belegtem Namen
+  einen eindeutigen späteren Zeitstempel verwenden; keinen vorhandenen Stand überschreiben.
+  Darin liegt das entpackte, startfähige Paket mit den vorhandenen `.cmd`-Startern und
+  `LIESMICH.txt` direkt auf oberster Ebene sowie `_system` daneben (kein zusätzlicher Paket-Unterordner).
+- Den vorhandenen Bauprozess `scripts/Publish-Testpaket.ps1` (bzw. `Testpaket-bauen.cmd`)
+  verwenden: beide Programme für Windows x64 selbstenthaltend. Ausschließlich die
+  synthetischen Stände aus `DemoStages` verwenden; sie werden beim Teststart frisch
+  lokal erzeugt. Keine bestehenden Verwaltungsdatenbanken, Schülerdateien oder echten
+  Schulvorgaben in das Paket übernehmen.
+- Vor der Bereitstellung `scripts/Test.ps1 -LockedMode` für Restore, Release-Build,
+  gesamte Testsuite einschließlich Headless-UI-Smoke und Schemaprüfung ausführen.
+  Das entpackte Paket zusätzlich mit `scripts/Test-Testpaket.ps1 -PackageDirectory <Paketordner>`
+  über seine eigenen selbstenthaltenden Programme prüfen; passende Tests bei
+  Programmänderungen ebenfalls ausführen. Ergebnisse und Fehler tatsächlich in
+  `docs/TESTPROTOKOLL.md` protokollieren. Headless-/Vorbereitungstests ersetzen keinen Schulnetztest.
+- Das Paket vollständig mit Langpfad-Unterstützung in den neuen Zeitstempel-Ordner
+  kopieren und dort Dateibestand und sämtliche SHA-256-Prüfsummen gegen den Bauordner
+  prüfen. Erst nach erfolgreicher Prüfung gilt die Bereitstellung als abgeschlossen.
+- Der unmittelbar vorherige Zeitstempel-Ordner bleibt als funktionsfähige Vorversion
+  stehen, sodass zwei Versionen verfügbar bleiben. Ältere Zeitstempel-Ordner erst nach
+  erfolgreicher Prüfung des neuen Ordners entfernen. Vorher dort etwaige ungesicherte
+  Laufzeitdaten unter `artifacts/testpaket/sicherung/` mit eindeutigem Zeitstempel
+  sichern und die Sicherung prüfen. Löschziele auf Zugehörigkeit zum Basisordner
+  prüfen; unbekannte Ordner und eine etwaige ältere, direkt im Basisordner liegende
+  Bereitstellung nicht automatisch löschen.
+- Die vom Starter getrennt unter `%LOCALAPPDATA%\GSM-Kurswahl-Testpaket` erzeugten
+  Testläufe bleiben erhalten; die Versionsbereinigung löscht keine lokalen Arbeitsdaten.
+- ZIP-Pakete, Sicherungen und Laufzeitdaten bleiben außerhalb von Git. Für zugehörige wesentliche Änderungen im Repository (z. B. Code- oder Protokolländerungen) gilt die allgemeine Commit-und-Push-Regel oben.
+
+Diese Zielvorgabe ist ein ausdrücklicher Nutzerwunsch vom 17.11.2026 und gilt auch
+in späteren Chats zu diesem Projekt. Ein angefordertes Testpaket umfasst die oben
+beschriebene Bereitstellung; dafür ist keine erneute inhaltliche Bestätigung nötig.
+Technische Sandbox-Freigaben bei Bedarf über das vorgesehene Tool anfordern.
+Die Browser-Testversion `web/Kurswahltest/` und eine Produktivverteilung werden dadurch
+nicht automatisch veröffentlicht.

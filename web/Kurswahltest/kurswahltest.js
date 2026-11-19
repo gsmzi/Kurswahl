@@ -1664,12 +1664,170 @@
     return list.join(", ");
   }
 
+  function formatPrintCourseType(type) {
+    return type === "lf" ? "Leistungsfach" : type === "bf" ? "Basisfach" : type === "elective" ? "Wahlfach" : "Seminarkurs";
+  }
+
+  function formatPrintSemesters(semesters) {
+    const ordered = sortNumbers(distinct(semesters));
+    if (ordered.length === 0) return "";
+    if (ordered.length === 1) return "HJ " + ordered[0];
+    if (ordered.length === 2 && ordered[1] === ordered[0] + 1) return `HJ ${ordered[0]} und ${ordered[1]}`;
+    if (ordered.length >= 3 && ordered[ordered.length - 1] - ordered[0] === ordered.length - 1) {
+      return `HJ ${ordered[0]}–${ordered[ordered.length - 1]}`;
+    }
+    return "HJ " + ordered.join(", ");
+  }
+
+  function printSubjectName(catalog, subjectId) {
+    const found = catalog.subjects.find((s) => s.id === subjectId);
+    if (found) return found.name;
+    const fallback = {
+      D: "Deutsch", M: "Mathematik", E: "Englisch", F: "Französisch", L: "Latein", I: "Italienisch",
+      BIO: "Biologie", CH: "Chemie", PH: "Physik", G: "Geschichte", GK: "Gemeinschaftskunde", GEO: "Geographie",
+      W: "Wirtschaft", BK: "Bildende Kunst", MU: "Musik", ETH: "Ethik", ER: "Evangelische Religion",
+      KR: "Katholische Religion", SP: "Sport", INF: "Informatik", PSY: "Psychologie", SIA: "Schüler-Ingenieur-Akademie (SIA)"
+    };
+    return fallback[subjectId] || subjectId;
+  }
+
+  function sanitizePrintText(text, catalog) {
+    let value = String(text || "").trim().replace(/^(?:(?:AGVO|PLAN|GSM|CATALOG|PROFILE|OFFER|SUBJECT|PREREQUISITE)-[A-Z0-9-]+:\s*)+/, "");
+    const sortedSubjects = catalog.subjects.slice().sort((a, b) => b.id.length - a.id.length);
+    for (const subject of sortedSubjects) {
+      if (value.startsWith(subject.id + ": ")) {
+        value = subject.name + ": " + value.slice(subject.id.length + 2);
+        break;
+      }
+      if (value.startsWith(subject.id + " ")) {
+        value = subject.name + value.slice(subject.id.length);
+        break;
+      }
+    }
+    value = displayText(value)
+      .replaceAll("BIO/CH/PH", "Biologie, Chemie oder Physik")
+      .replaceAll("BK / MU", "Bildende Kunst oder Musik")
+      .replaceAll("ETH / ER / KR", "Ethik, Evangelische Religion oder Katholische Religion")
+      .replaceAll("ER / KR / ETH", "Evangelische Religion, Katholische Religion oder Ethik")
+      .replaceAll("Profilstatus: Missing", "persönliches Profil fehlt")
+      .replaceAll("Profilstatus: ProfileInvalid", "persönliches Profil ungültig")
+      .replaceAll("Profilstatus: Unverified", "persönliches Profil ungeprüft")
+      .replaceAll("Profilstatus: Verified", "persönliches Profil geprüft")
+      .replaceAll(" -> ", " → ");
+    for (const id of ["ETH", "ER", "KR", "GEO", "GK", "INF"]) {
+      const fullName = printSubjectName(catalog, id);
+      value = value.replace(new RegExp(`(?<![A-Za-zÄÖÜäöüß])${id}(?![A-Za-zÄÖÜäöüß])`, "g"), fullName);
+    }
+    value = value
+      .replace(/(?<!Schüler-Ingenieur-Akademie \()(?<![A-Za-zÄÖÜäöüß])SIA(?![A-Za-zÄÖÜäöüß])(?!\))/g, "Schüler-Ingenieur-Akademie (SIA)")
+      .replaceAll("LF-Halbjahreskurse", "Leistungsfach-Halbjahreskurse")
+      .replaceAll("LF-Belegung", "Leistungsfach-Belegung")
+      .replaceAll("LF-Eignung", "Leistungsfach-Eignung")
+      .replaceAll("INF-Alternative", "Informatik-Alternative")
+      .replaceAll("GK-Kurse", "Gemeinschaftskunde-Kurse")
+      .replace(/(?<![A-Za-zÄÖÜäöüß-])LF(?![A-Za-zÄÖÜäöüß-])/g, "Leistungsfach")
+      .replace(/(?<![A-Za-zÄÖÜäöüß-])BF(?![A-Za-zÄÖÜäöüß-])/g, "Basisfach");
+    return value;
+  }
+
+  function shouldSuppressPrintMessage(m, choice) {
+    if (m.rule.id === "PROFILE-TRUST") return true;
+    if (choice && m.rule.id === "AGVO-COURSES") {
+      const lfCourses = choice.selections.filter((s) => s.type === "lf").reduce((a, s) => a + s.semesters.length, 0);
+      const otherCourses = choice.selections.filter((s) => s.type !== "lf").reduce((a, s) => a + s.semesters.length, 0);
+      if (lfCourses < 12 && otherCourses >= 30) return true;
+    }
+    return false;
+  }
+
+  function formatPrintMessage(m, catalog, choice) {
+    switch (m.rule.id) {
+      case "AGVO-LF": {
+        if (choice) {
+          const lfCount = distinct(choice.selections.filter((s) => s.type === "lf").map((s) => s.subjectId)).length;
+          if (lfCount < 3) {
+            const missing = 3 - lfCount;
+            return (missing === 1 ? "Es fehlt noch 1 Leistungsfach." : `Es fehlen noch ${missing} Leistungsfächer.`)
+              + " Insgesamt werden drei verschiedene Leistungsfächer über alle vier Halbjahre benötigt, davon mindestens zwei aus Deutsch, Mathematik, fortgeführten Fremdsprachen oder einer Naturwissenschaft (Biologie, Chemie oder Physik).";
+          }
+          return "Leistungsfächer: Mindestens zwei der drei Leistungsfächer müssen aus Deutsch, Mathematik, fortgeführten Fremdsprachen oder einer Naturwissenschaft (Biologie, Chemie oder Physik) sein.";
+        }
+        return "Leistungsfächer: Benötigt werden genau drei verschiedene Leistungsfächer über alle vier Halbjahre, davon mindestens zwei aus Deutsch, Mathematik, fortgeführten Fremdsprachen oder einer Naturwissenschaft (Biologie, Chemie oder Physik).";
+      }
+      case "AGVO-COURSES": {
+        if (choice) {
+          const otherCourses = choice.selections.filter((s) => s.type !== "lf").reduce((a, s) => a + s.semesters.length, 0);
+          if (otherCourses < 30) {
+            const missing = 30 - otherCourses;
+            return `Kursanzahl: Es ${missing === 1 ? "fehlt noch 1 weiterer Halbjahreskurs" : `fehlen noch ${missing} weitere Halbjahreskurse`} bis zur Mindestzahl von 42 Kursen (12 Leistungsfachkurse und mindestens 30 weitere Kurse).`;
+          }
+        }
+        return "Kursanzahl: Insgesamt werden 12 Leistungsfachkurse und mindestens 30 weitere Halbjahreskurse (zusammen mindestens 42 Kurse) benötigt. Die Schüler-Ingenieur-Akademie (SIA) zählt dabei mit ihren zwei Halbjahren.";
+      }
+      case "AGVO-REQUIRED": {
+        if (m.subjectIds.some((s) => s === "BK" || s === "MU")) {
+          return "Bildende Kunst oder Musik: Es fehlen durchgehend vier Halbjahreskurse (HJ 1–4) in einem der beiden Fächer.";
+        }
+        if (m.subjectIds.some((s) => s === "ETH" || s === "ER" || s === "KR")) {
+          return "Religion oder Ethik: In allen vier Halbjahren (HJ 1–4) muss Religion oder Ethik belegt sein.";
+        }
+        if (m.subjectIds.length === 1) {
+          const subject = m.subjectIds[0];
+          const sems = m.semesters.length === 0 ? "HJ 1–4" : formatPrintSemesters(m.semesters);
+          return `${printSubjectName(catalog, subject)}: Pflichtbelegung fehlt (${sems}).`;
+        }
+        return sanitizePrintText(m.explanation, catalog);
+      }
+      case "AGVO-LANGUAGE-SCIENCE":
+        return "Sprachen und Naturwissenschaften: Erforderlich sind mindestens eine fortgeführte Fremdsprache und eine Naturwissenschaft (Biologie, Chemie oder Physik) über HJ 1–4 sowie zusätzlich eine zweite fortgeführte Fremdsprache oder eine zweite Naturwissenschaft (bei entsprechender Vorbildung kann Informatik die zweite Naturwissenschaft ersetzen).";
+      case "AGVO-SEMESTERS": {
+        const subject = m.subjectIds[0];
+        const prefix = subject ? printSubjectName(catalog, subject) + ": " : "";
+        const extra = subject === "GK" || subject === "GEO"
+          ? " Bei Leistungsfach Wirtschaft sind Gemeinschaftskunde in HJ 1/2 und Geographie in HJ 3/4 einzeln wählbar; zusätzliche Kurse in Gemeinschaftskunde in HJ 3 und 4 bleiben zusammen."
+          : "";
+        return prefix + "Kurse werden in der Regel für ganze Schuljahre (HJ 1 und 2 bzw. HJ 3 und 4) gewählt." + extra;
+      }
+      case "GSM-GK-CONTINUITY":
+        return "Gemeinschaftskunde: Bei Leistungsfach Wirtschaft darf Gemeinschaftskunde nach einer Pause in HJ 2 nicht in HJ 3 und 4 weiterbelegt werden. Für Gemeinschaftskunde in HJ 3 und 4 bitte auch HJ 2 wählen.";
+      case "GSM-RELIGION-EXCLUSIVE":
+        return "Religion oder Ethik: Ethik und Religion sowie verschiedene Religionsfächer dürfen nicht gleichzeitig belegt werden. Bitte nur ein Fach wählen.";
+      case "GSM-RELIGION-CONFESSION":
+        return "Religionswahl: Evangelische bzw. Katholische Religion ist nur passend zum in Klasse 10 besuchten Fach wählbar (Ethik bleibt wählbar). Bei Fragen bitte an die Oberstufenberatung wenden.";
+      case "PLAN-ORAL": {
+        if (m.explanation.includes("Aufgabenfelder")) {
+          return "Mündliche Prüfungsfächer: Zusammen mit den drei Leistungsfächern und zwei mündlichen Prüfungsfächern müssen Deutsch, Mathematik und alle drei Aufgabenfelder abgedeckt sein.";
+        }
+        if (m.explanation.includes("Zwei verschiedene")) {
+          return "Mündliche Prüfungsfächer: Es müssen zwei verschiedene Basisfächer als mündliche Prüfungsfächer geplant werden.";
+        }
+        if (m.explanation.includes("passt nicht mehr")) {
+          return "Mündliche Prüfungsfächer: Die bisherige mündliche Prüfungsplanung passt nicht mehr zu den gewählten Kursen und muss neu festgelegt werden.";
+        }
+        return sanitizePrintText(m.explanation, catalog);
+      }
+      case "AGVO-EXAM":
+        return "Prüfungsfächer: Aus den aktuell belegten Kursen ergibt sich noch keine zulässige Kombination aus drei Leistungsfächern und zwei mündlichen Prüfungsfächern für Deutsch, Mathematik und alle drei Aufgabenfelder.";
+      case "PLAN-HOURS": {
+        const match = /Durchschnitt\s+([0-9.,]+)\s+Wochenstunden/.exec(m.explanation);
+        return match
+          ? `Wochenstunden: Durchschnittlich ${match[1]} Wochenstunden pro Halbjahr (Planungsrichtwert sind 32 Wochenstunden; dies ist ein Hinweis, kein automatischer Fehler).`
+          : sanitizePrintText(m.explanation, catalog);
+      }
+      default:
+        return sanitizePrintText(m.explanation, catalog);
+    }
+  }
+
   function mountBrowserApp(catalogRaw) {
     const doc = root.document;
     if (!doc) return;
     const session = createSession(catalogRaw, { allowSelfServicePrerequisites: true });
     let expandedTask = null;
     let errorText = "";
+    let previousErrorText = "";
+    let successText = "";
+    let lastRenderedStep = session.step;
     let autosaveTimer = null;
 
     const el = (tag, attrs = {}, children = []) => {
@@ -1696,9 +1854,15 @@
     const stateBadgeEl = doc.getElementById("StateBadge");
     const stepperEl = doc.getElementById("Stepper");
     const errorNoticeEl = doc.getElementById("ErrorNotice");
+    const errorNoticeTextEl = doc.getElementById("ErrorNoticeText");
+    const dismissErrorBtn = doc.getElementById("DismissError");
+    const successNoticeEl = doc.getElementById("SuccessNotice");
+    const successNoticeTextEl = doc.getElementById("SuccessNoticeText");
+    const dismissSuccessBtn = doc.getElementById("DismissSuccess");
     const stepContentEl = doc.getElementById("StepContent");
     const planPanelEl = doc.getElementById("PlanPanel");
     const prevBtn = doc.getElementById("PreviousStep");
+    const stepBlockerHintEl = doc.getElementById("StepBlockerHint");
     const nextBtn = doc.getElementById("NextStep");
     const saveBtn = doc.getElementById("SaveButton");
     const loadBtn = doc.getElementById("LoadButton");
@@ -1764,6 +1928,7 @@
       if (autosaveTimer) clearTimeout(autosaveTimer);
       try {
         errorText = "";
+        successText = "";
         action();
         scheduleAutosave();
       } catch (err) {
@@ -1790,7 +1955,6 @@
     function renderPrerequisitesStep(container) {
       container.appendChild(el("h2", { className: "step-title", textContent: "Deine Vorinfos für den Probelauf" }));
       container.appendChild(el("p", { className: "step-hint", textContent: "Gib hier deine bisherigen Fächer und dein Profil aus der Mittelstufe an. In der echten Schulversion sind diese Angaben bereits durch die Oberstufenberatung hinterlegt." }));
-      container.appendChild(noticeBox("Unverbindliche Testversion für zu Hause: Deine Angaben hier steuern sofort, welche Fächer und Hinweise im Probelauf angezeigt werden.", "accent"));
 
       const p = session.profile.prerequisites;
       const hasF = p.continuedLanguages.some((l) => l.toUpperCase() === "F");
@@ -1806,7 +1970,7 @@
       };
       const updatePrior = (updater) => edit(() => session.setTestPrerequisites(updater(session.profile.prerequisites)));
 
-      const addRadio = (name, group, label, selected, onSelected) => {
+      const addRadio = (parent, name, group, label, selected, onSelected) => {
         const input = el("input", {
           type: "radio",
           name: group,
@@ -1815,10 +1979,10 @@
           onChange: () => { if (input.checked) onSelected(); }
         });
         const lbl = el("label", { className: "option-label" }, [input, el("span", { textContent: label })]);
-        container.appendChild(optionBox(lbl, selected));
+        parent.appendChild(optionBox(lbl, selected));
       };
 
-      const addCheck = (name, label, selected, onChanged) => {
+      const addCheck = (parent, name, label, selected, onChanged) => {
         const input = el("input", {
           type: "checkbox",
           "data-control-name": name,
@@ -1826,20 +1990,25 @@
           onChange: () => onChanged(input.checked)
         });
         const lbl = el("label", { className: "option-label" }, [input, el("span", { textContent: label })]);
-        container.appendChild(optionBox(lbl, selected));
+        parent.appendChild(optionBox(lbl, selected));
       };
 
-      container.appendChild(el("h3", { className: "section-heading", textContent: "Fortgeführte Fremdsprachen (spätestens ab Klasse 8)" }));
-      container.appendChild(el("p", { className: "muted-text", textContent: "Englisch (1. Fremdsprache) ist am GSM für alle fortgeführt." }));
-      addRadio("Prereq_Lang_F", "Prereq_Lang", "Englisch + Französisch", hasF && !hasL,
+      const langGroup = el("div", { className: "prereq-group" }, [
+        el("h3", { className: "section-heading", style: "margin-top:0;", textContent: "Fortgeführte Fremdsprachen (spätestens ab Klasse 8)" }),
+        el("p", { className: "muted-text", textContent: "Englisch (1. Fremdsprache) ist am GSM für alle fortgeführt." })
+      ]);
+      addRadio(langGroup, "Prereq_Lang_F", "Prereq_Lang", "Englisch + Französisch", hasF && !hasL,
         () => updatePrior((x) => ({ ...x, continuedLanguages: buildLanguages(true, false, x.italianProfile === "yes") })));
-      addRadio("Prereq_Lang_L", "Prereq_Lang", "Englisch + Latein", hasL && !hasF,
+      addRadio(langGroup, "Prereq_Lang_L", "Prereq_Lang", "Englisch + Latein", hasL && !hasF,
         () => updatePrior((x) => ({ ...x, continuedLanguages: buildLanguages(false, true, x.italianProfile === "yes") })));
-      addRadio("Prereq_Lang_FL", "Prereq_Lang", "Englisch + Französisch und Latein", hasF && hasL,
+      addRadio(langGroup, "Prereq_Lang_FL", "Prereq_Lang", "Englisch + Französisch und Latein", hasF && hasL,
         () => updatePrior((x) => ({ ...x, continuedLanguages: buildLanguages(true, true, x.italianProfile === "yes") })));
+      container.appendChild(langGroup);
 
-      container.appendChild(el("h3", { className: "section-heading", textContent: "Profil & Zusatzqualifikationen (Klasse 8–10)" }));
-      addCheck("Prereq_Italian", "Italienisch als 3. Fremdsprache (sprachliches Profil ab Klasse 8)", hasI,
+      const profileGroup = el("div", { className: "prereq-group" }, [
+        el("h3", { className: "section-heading", style: "margin-top:0;", textContent: "Profil & Zusatzqualifikationen (Klasse 8–10)" })
+      ]);
+      addCheck(profileGroup, "Prereq_Italian", "Italienisch als 3. Fremdsprache (sprachliches Profil ab Klasse 8)", hasI,
         (yes) => updatePrior((x) => ({
           ...x,
           italianProfile: yes ? "yes" : "no",
@@ -1849,46 +2018,55 @@
             yes
           )
         })));
-      addCheck("Prereq_Imp", "Profilfach IMP (Informatik, Mathematik, Physik) in Klasse 8–10", p.informaticsImp === "yes",
+      addCheck(profileGroup, "Prereq_Imp", "Profilfach IMP (Informatik, Mathematik, Physik) in Klasse 8–10", p.informaticsImp === "yes",
         (yes) => updatePrior((x) => ({ ...x, informaticsImp: yes ? "yes" : "no" })));
-      addCheck("Prereq_InfBridge", "Informatik-Brückenkurs in Klasse 10 besucht", p.informaticsBridge === "yes",
+      addCheck(profileGroup, "Prereq_InfBridge", "Informatik-Brückenkurs in Klasse 10 besucht", p.informaticsBridge === "yes",
         (yes) => updatePrior((x) => ({ ...x, informaticsBridge: yes ? "yes" : "no" })));
-      addCheck("Prereq_Bili", "Durchgängig bilingualer Bildungsgang (Englisch)", p.continuousBilingual === "yes",
+      addCheck(profileGroup, "Prereq_Bili", "Durchgängig bilingualer Bildungsgang (Englisch)", p.continuousBilingual === "yes",
         (yes) => updatePrior((x) => ({ ...x, continuousBilingual: yes ? "yes" : "no" })));
+      container.appendChild(profileGroup);
 
-      container.appendChild(el("h3", { className: "section-heading", textContent: "Besuchter Religions- bzw. Ethikunterricht in Klasse 10" }));
-      addRadio("Prereq_Rel_ER", "Prereq_Rel", "Evangelische Religion (ER)", p.religionEthicsGrade10 === "ER",
+      const relGroup = el("div", { className: "prereq-group" }, [
+        el("h3", { className: "section-heading", style: "margin-top:0;", textContent: "Besuchter Religions- bzw. Ethikunterricht in Klasse 10" })
+      ]);
+      addRadio(relGroup, "Prereq_Rel_ER", "Prereq_Rel", "Evangelische Religion (ER)", p.religionEthicsGrade10 === "ER",
         () => updatePrior((x) => ({ ...x, religionEthicsGrade10: "ER", religionEthicsPermission: "yes", religionEthicsExamPermission: "unknown" })));
-      addRadio("Prereq_Rel_KR", "Prereq_Rel", "Katholische Religion (KR)", p.religionEthicsGrade10 === "KR",
+      addRadio(relGroup, "Prereq_Rel_KR", "Prereq_Rel", "Katholische Religion (KR)", p.religionEthicsGrade10 === "KR",
         () => updatePrior((x) => ({ ...x, religionEthicsGrade10: "KR", religionEthicsPermission: "yes", religionEthicsExamPermission: "unknown" })));
-      addRadio("Prereq_Rel_ETH", "Prereq_Rel", "Ethik (ETH)", p.religionEthicsGrade10 === "ETH",
+      addRadio(relGroup, "Prereq_Rel_ETH", "Prereq_Rel", "Ethik (ETH)", p.religionEthicsGrade10 === "ETH",
         () => updatePrior((x) => ({ ...x, religionEthicsGrade10: "ETH", religionEthicsPermission: "yes", religionEthicsExamPermission: "unknown" })));
-      addRadio("Prereq_Rel_Unknown", "Prereq_Rel", "Keiner / Wechsel / Sonderfall prüfen", !["ER", "KR", "ETH"].includes(p.religionEthicsGrade10),
+      addRadio(relGroup, "Prereq_Rel_Unknown", "Prereq_Rel", "Keiner / Wechsel / Sonderfall prüfen", !["ER", "KR", "ETH"].includes(p.religionEthicsGrade10),
         () => updatePrior((x) => ({ ...x, religionEthicsGrade10: null, religionEthicsPermission: "unknown", religionEthicsExamPermission: "unknown" })));
+      container.appendChild(relGroup);
 
-      container.appendChild(el("h3", { className: "section-heading", textContent: "Sportunterricht in der Kursstufe" }));
       const sport = Array.isArray(p.sportExemptSemesters) ? p.sportExemptSemesters : [];
-      addRadio("Prereq_Sport_None", "Prereq_Sport", "Keine Sportbefreiung (reguläre Teilnahme)", sport.length === 0,
+      const sportGroup = el("div", { className: "prereq-group" }, [
+        el("h3", { className: "section-heading", style: "margin-top:0;", textContent: "Sportunterricht in der Kursstufe" })
+      ]);
+      addRadio(sportGroup, "Prereq_Sport_None", "Prereq_Sport", "Keine Sportbefreiung (reguläre Teilnahme)", sport.length === 0,
         () => updatePrior((x) => ({ ...x, sportExemptSemesters: [], permanentSportExemption: "no" })));
-      addRadio("Prereq_Sport_12", "Prereq_Sport", "Sportbefreiung in HJ 1+2", arraysEqual(sport, [1, 2]),
+      addRadio(sportGroup, "Prereq_Sport_12", "Prereq_Sport", "Sportbefreiung in HJ 1+2", arraysEqual(sport, [1, 2]),
         () => updatePrior((x) => ({ ...x, sportExemptSemesters: [1, 2], permanentSportExemption: "yes" })));
-      addRadio("Prereq_Sport_34", "Prereq_Sport", "Sportbefreiung in HJ 3+4", arraysEqual(sport, [3, 4]),
+      addRadio(sportGroup, "Prereq_Sport_34", "Prereq_Sport", "Sportbefreiung in HJ 3+4", arraysEqual(sport, [3, 4]),
         () => updatePrior((x) => ({ ...x, sportExemptSemesters: [3, 4], permanentSportExemption: "yes" })));
-      addRadio("Prereq_Sport_1234", "Prereq_Sport", "Dauerhafte Sportbefreiung in HJ 1–4", arraysEqual(sport, [1, 2, 3, 4]),
+      addRadio(sportGroup, "Prereq_Sport_1234", "Prereq_Sport", "Dauerhafte Sportbefreiung in HJ 1–4", arraysEqual(sport, [1, 2, 3, 4]),
         () => updatePrior((x) => ({ ...x, sportExemptSemesters: [1, 2, 3, 4], permanentSportExemption: "yes" })));
+      container.appendChild(sportGroup);
     }
 
     function renderLfStep(container) {
       container.appendChild(el("h2", { className: "step-title", textContent: "Wähle drei Leistungsfächer" }));
       container.appendChild(el("p", { className: "step-hint", textContent: "Mindestens zwei davon aus Deutsch, Mathematik, einer fortgeführten Fremdsprache oder einer Naturwissenschaft. Leistungsfächer laufen immer über HJ 1–4." }));
-      container.appendChild(el("p", { className: "muted-text", textContent: "Wenn du ein bisheriges Basisfach als Leistungsfach wählst, wird seine Basisfachbelegung automatisch entfernt. Gehe anschließend die weiteren Schritte erneut durch." }));
+      if (session.choice.selections.some((s) => s.type !== "lf")) {
+        container.appendChild(el("p", { className: "muted-text", textContent: "Wenn du ein bisheriges Basisfach als Leistungsfach wählst, wird seine Basisfachbelegung automatisch entfernt. Gehe anschließend die weiteren Schritte erneut durch." }));
+      }
       if (session.lfChangeMessage.length > 0) container.appendChild(noticeBox(session.lfChangeMessage, "warn"));
       const chosen = session.choice.selections.filter((s) => s.type === "lf");
       container.appendChild(el("p", {
         className: "section-heading",
         textContent: chosen.length < 3 ? `${chosen.length} von 3 gewählt – noch ${3 - chosen.length}` : `${chosen.length} von 3 gewählt · zum Tauschen zuerst ein Leistungsfach abwählen`
       }));
-      if (chosen.length >= 3 && session.stepError) container.appendChild(noticeBox(session.stepError, "warn"));
+      if (chosen.length >= 3 && session.stepError) container.appendChild(noticeBox(plainText(session.stepError, session.catalog), "warn"));
       const offers = [];
       const seen = new Set();
       for (const o of [...session.lfOffers, ...session.catalog.offers.filter((x) => x.type === "lf" && chosen.some((s) => s.offerId === x.id))]) {
@@ -1923,7 +2101,7 @@
         className: "section-heading",
         textContent: free > 0 ? (free === 1 ? "Noch 1 Fach wählen" : "Noch 2 Fächer wählen") : "Beide Prüfungsfächer geplant"
       }));
-      if (planned.length === 2 && session.stepError) container.appendChild(noticeBox(session.stepError, "warn"));
+      if (planned.length === 2 && session.stepError) container.appendChild(noticeBox(plainText(session.stepError, session.catalog), "warn"));
       const list = distinct([...planned.filter((s) => !session.forcedOral.includes(s)), ...session.usefulOralCandidates]);
       for (const subject of list) {
         const p = session.profile.prerequisites;
@@ -2042,7 +2220,11 @@
     function renderExtraStep(container) {
       container.appendChild(el("h2", { className: "step-title", textContent: "Weitere Kurse" }));
       container.appendChild(el("p", { className: "step-hint", textContent: "Ergänze Kurse, bis du das Planungsziel erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten." }));
-      container.appendChild(el("p", { className: "section-heading", textContent: progressText() }));
+      container.appendChild(el("p", {
+        className: "section-heading",
+        style: session.countedCourses >= MINIMUM_COURSES ? "color: var(--done);" : undefined,
+        textContent: progressText()
+      }));
 
       const adjustable = session.choice.selections
         .filter((s) => s.type !== "lf")
@@ -2116,7 +2298,7 @@
       }));
       printSheetEl.appendChild(el("h1", { textContent: "GSM-Kurswahl · Kontrollbogen (Testversion)" }));
       printSheetEl.appendChild(el("p", {
-        textContent: `Abitur ${session.catalog.graduationYear} · Stand ${new Date().toLocaleString("de-DE")} · Angebot ${session.choice.offerVersion} · Regelstand ${session.choice.ruleVersion}`
+        textContent: `Abitur ${session.catalog.graduationYear} · Stand ${new Date().toLocaleString("de-DE")} · Fachangebot ${session.choice.offerVersion}`
       }));
 
       printSheetEl.appendChild(el("h2", { textContent: "Angegebene Vorinfos (Selbstauskunft)" }));
@@ -2148,7 +2330,7 @@
       });
       for (const s of sortedSel) {
         const offer = session.catalog.offers.find((o) => o.id === s.offerId);
-        const typeStr = s.type === "lf" ? "LF" : s.type === "bf" ? "BF" : s.type === "elective" ? "Wahlfach" : "Seminar";
+        const typeStr = formatPrintCourseType(s.type);
         const hrs = (h) => s.semesters.includes(h)
           ? String((offer && offer.schedule.find((x) => x.semester === h) && offer.schedule.find((x) => x.semester === h).weeklyHours) || "?")
           : "-";
@@ -2189,14 +2371,53 @@
         printSheetEl.appendChild(examTable);
       }
 
-      const messages = session.validation.messages.filter((m) => !GENERAL_RULE_IDS.includes(m.rule.id));
-      if (messages.length > 0) {
-        printSheetEl.appendChild(el("h2", { textContent: "Hinweise und offene Punkte" }));
-        const ul = el("ul", {});
-        for (const m of messages) {
-          ul.appendChild(el("li", { textContent: displayText(`${m.rule.id}: ${m.explanation}`) }));
+      const hasPlanOralInvalid = session.validation.messages.some((m) => m.rule.id === "PLAN-ORAL" && m.rule.severity === "invalid");
+      const filteredMessages = session.validation.messages.filter(
+        (m) => !shouldSuppressPrintMessage(m, session.choice) && !(m.rule.id === "AGVO-EXAM" && hasPlanOralInvalid)
+      );
+      const toCorrect = distinct(filteredMessages.filter((m) => m.rule.severity === "invalid").map((m) => formatPrintMessage(m, session.catalog, session.choice)).filter(Boolean));
+      const toClarify = distinct(filteredMessages.filter((m) => m.rule.severity !== "invalid").map((m) => formatPrintMessage(m, session.catalog, session.choice)).filter(Boolean));
+      if (toCorrect.length === 0 && toClarify.length === 0) {
+        printSheetEl.appendChild(el("h2", { textContent: "Prüfergebnis" }));
+        printSheetEl.appendChild(el("p", { textContent: "Deine Wahl ist aus Sicht der automatischen Prüfung vollständig." }));
+      } else {
+        if (toCorrect.length > 0) {
+          printSheetEl.appendChild(el("h2", { textContent: "Noch zu korrigieren" }));
+          const ul = el("ul", {});
+          for (const item of toCorrect) ul.appendChild(el("li", { textContent: item }));
+          printSheetEl.appendChild(ul);
         }
-        printSheetEl.appendChild(ul);
+        if (toClarify.length > 0) {
+          printSheetEl.appendChild(el("h2", { textContent: "Mit der Oberstufenberatung klären" }));
+          const ul = el("ul", {});
+          for (const item of toClarify) ul.appendChild(el("li", { textContent: item }));
+          printSheetEl.appendChild(ul);
+        }
+      }
+    }
+
+    function targetStepForRule(ruleId) {
+      switch (ruleId) {
+        case "AGVO-LF":
+        case "PLAN-LF":
+          return 1;
+        case "PLAN-ORAL":
+        case "AGVO-ORAL":
+        case "AGVO-EXAM":
+          return 2;
+        case "AGVO-ART":
+        case "AGVO-RELIGION":
+        case "AGVO-LANGUAGE":
+        case "AGVO-SCIENCE":
+        case "AGVO-BREADTH":
+        case "AGVO-REQUIRED":
+          return 3;
+        case "AGVO-COURSES":
+        case "AGVO-SPORT-REPLACEMENT":
+        case "PLAN-MIN-COURSES":
+          return 4;
+        default:
+          return null;
       }
     }
 
@@ -2206,12 +2427,18 @@
 
       const messages = session.validation.messages;
       const onlyCountMissing = session.countedCourses < MINIMUM_COURSES && session.choice.selections.filter((x) => x.type === "lf").length === 3;
-      const todo = distinct([
+      const rawTodo = [
         ...messages.filter((m) => m.rule.severity === "invalid" && !(onlyCountMissing && m.rule.id === "AGVO-COURSES"))
-          .map((m) => plainText(m.explanation, session.catalog)),
-        ...session.tasks.filter((t) => !t.isSatisfied).map((t) => t.title + " ist noch offen (Schritt 3)."),
-        ...(session.countedCourses < MINIMUM_COURSES ? [`Es fehlen noch ${MINIMUM_COURSES - session.countedCourses} Halbjahreskurse bis zur Mindestzahl von ${MINIMUM_COURSES} (Schritt 4).`] : [])
-      ]);
+          .map((m) => ({ text: plainText(m.explanation, session.catalog), targetStep: targetStepForRule(m.rule.id) })),
+        ...session.tasks.filter((t) => !t.isSatisfied).map((t) => ({ text: t.title + " ist noch offen (Schritt 3).", targetStep: 3 })),
+        ...(session.countedCourses < MINIMUM_COURSES ? [{ text: `Es fehlen noch ${MINIMUM_COURSES - session.countedCourses} Halbjahreskurse bis zur Mindestzahl von ${MINIMUM_COURSES} (Schritt 4).`, targetStep: 4 }] : [])
+      ];
+      const seenTodo = new Set();
+      const todo = rawTodo.filter((item) => {
+        if (seenTodo.has(item.text)) return false;
+        seenTodo.add(item.text);
+        return true;
+      });
 
       const todoBox = el("div", { className: `review-box ${todo.length === 0 ? "ok" : "danger"}` }, [
         el("p", {
@@ -2219,8 +2446,24 @@
           style: `color: ${todo.length === 0 ? "var(--done)" : "var(--danger)"};`,
           textContent: todo.length === 0 ? "✓ Nichts mehr zu tun" : `Das musst du noch tun (${todo.length})`
         }),
-        ...todo.map((item) => el("p", { style: "margin:0; font-size:13px;", textContent: "• " + displayText(item) })),
-        todo.length === 0 ? el("p", { className: "muted-text", textContent: "Deine Wahl ist aus Sicht der automatischen Prüfung vollständig. Du kannst sie als unverbindlichen Kontrollbogen drucken oder als PDF speichern." }) : null
+        ...todo.map((item, idx) => {
+          const textNode = el("p", { style: "margin:0; font-size:13px;", textContent: "• " + displayText(item.text) });
+          if (item.targetStep !== null && item.targetStep >= session.firstStep && item.targetStep < session.step) {
+            const target = item.targetStep;
+            return el("div", { className: "todo-row" }, [
+              textNode,
+              el("button", {
+                type: "button",
+                className: "btn btn-sm",
+                "data-control-name": `TodoJump_${idx}_${target}`,
+                textContent: `→ Schritt ${target}`,
+                onClick: () => edit(() => { expandedTask = null; session.goToStep(target); })
+              })
+            ]);
+          }
+          return textNode;
+        }),
+        todo.length === 0 ? el("p", { className: "muted-text", textContent: "Deine Wahl ist aus Sicht der automatischen Prüfung vollständig. Wenn du möchtest, kannst du sie als unverbindlichen Kontrollbogen drucken oder als PDF speichern." }) : null
       ]);
       container.appendChild(todoBox);
 
@@ -2247,7 +2490,11 @@
         })
       ]));
 
-      container.appendChild(el("p", { className: "section-heading", textContent: progressText() }));
+      container.appendChild(el("p", {
+        className: "section-heading",
+        style: session.countedCourses >= MINIMUM_COURSES ? "color: var(--done);" : undefined,
+        textContent: progressText()
+      }));
       const sumTable = el("table", { className: "summary-table" });
       for (const s of session.summary) {
         sumTable.appendChild(el("tr", {}, [
@@ -2336,6 +2583,9 @@
           }
         });
         planPanelEl.appendChild(grid);
+        if (session.step > session.firstStep) {
+          planPanelEl.appendChild(el("p", { className: "tiny-muted", textContent: "Tipp: Klicke ein Fach an, um zum zugehörigen Schritt zurückzuspringen." }));
+        }
       }
 
       const legend = el("div", { className: "legend" }, [
@@ -2385,6 +2635,9 @@
       const activeControlName = doc.activeElement && doc.activeElement.getAttribute("data-control-name");
       subtitleEl.textContent = `Unverbindliche Testversion für zu Hause (Selbstauskunft) · Abitur ${session.catalog.graduationYear} · keine Abgabe an die Schule`;
 
+      const stepChanged = lastRenderedStep !== session.step;
+      lastRenderedStep = session.step;
+
       renderStepper();
       stepContentEl.innerHTML = "";
       if (session.step === 0) renderPrerequisitesStep(stepContentEl);
@@ -2396,6 +2649,10 @@
 
       renderPlan();
 
+      if (stepChanged && typeof stepContentEl.scrollIntoView === "function" && (root.scrollY || 0) > 120) {
+        stepContentEl.scrollIntoView({ behavior: "auto", block: "start" });
+      }
+
       const hoursMsg = session.validation.messages.find((m) => m.rule.id === "GSM-HOURS-UPPER");
       if (hoursMsg) {
         hoursWarningEl.textContent = hoursMsg.explanation;
@@ -2404,17 +2661,42 @@
         hoursWarningEl.classList.add("hidden");
       }
 
+      const errorChanged = Boolean(errorText) && errorText !== previousErrorText;
+      previousErrorText = errorText;
       if (errorText) {
-        errorNoticeEl.textContent = errorText;
+        if (errorNoticeTextEl) errorNoticeTextEl.textContent = errorText;
+        else errorNoticeEl.textContent = errorText;
         errorNoticeEl.classList.remove("hidden");
+        if (errorChanged && typeof errorNoticeEl.scrollIntoView === "function") {
+          errorNoticeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
       } else {
+        if (errorNoticeTextEl) errorNoticeTextEl.textContent = "";
+        else errorNoticeEl.textContent = "";
         errorNoticeEl.classList.add("hidden");
+      }
+
+      if (successNoticeEl) {
+        if (successText) {
+          if (successNoticeTextEl) successNoticeTextEl.textContent = successText;
+          else successNoticeEl.textContent = successText;
+          successNoticeEl.classList.remove("hidden");
+        } else {
+          if (successNoticeTextEl) successNoticeTextEl.textContent = "";
+          successNoticeEl.classList.add("hidden");
+        }
       }
 
       prevBtn.disabled = session.step <= session.firstStep;
       nextBtn.style.display = session.step < session.lastStep ? "" : "none";
       nextBtn.disabled = Boolean(session.stepError);
       nextBtn.textContent = session.step === 3 && session.tasks.some((t) => !t.isSatisfied) ? "Später entscheiden, weiter" : "Weiter";
+      if (stepBlockerHintEl) {
+        const blocker = session.step < session.lastStep && session.stepError ? displayText(plainText(session.stepError, session.catalog)) : "";
+        stepBlockerHintEl.textContent = blocker;
+        stepBlockerHintEl.title = blocker;
+        stepBlockerHintEl.classList.toggle("hidden", blocker.length === 0);
+      }
 
       const saved = !session.isDirty && session.hasSavedFile;
       stateBadgeEl.textContent = session.isDirty
@@ -2440,9 +2722,17 @@
       }
     }
 
+    if (dismissErrorBtn) dismissErrorBtn.addEventListener("click", () => { errorText = ""; render(); });
+    if (dismissSuccessBtn) dismissSuccessBtn.addEventListener("click", () => { successText = ""; render(); });
     prevBtn.addEventListener("click", () => edit(() => session.previousStep()));
     nextBtn.addEventListener("click", () => edit(() => { expandedTask = null; session.nextStep(); }));
-    saveBtn.addEventListener("click", () => edit(() => session.saveToBrowser(root.localStorage)));
+    saveBtn.addEventListener("click", () => {
+      edit(() => session.saveToBrowser(root.localStorage));
+      if (!errorText && session.hasSavedFile) {
+        successText = `✓ Entwurf im Browser gespeichert (Revision ${session.choice.revision}).`;
+        render();
+      }
+    });
     loadBtn.addEventListener("click", async () => {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       if (!session.isDirty || await confirmDialog("Ungespeicherte Änderungen verwerfen und den im Browser gespeicherten Entwurf laden?", "Änderungen verwerfen")) {

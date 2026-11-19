@@ -4,9 +4,13 @@ using GsmKurswahl.Domain;
 
 namespace GsmKurswahl.ImportExport;
 
+public sealed record ReselectionStep(string Heading, string Text, string? Options = null);
+
 public sealed record ReselectionPrintItem(StudentRecord Student, CourseChoice Remaining, string[] Removed)
 {
     public string[] Notes { get; init; } = [];
+    public ReselectionStep[] Steps { get; init; } = [];
+    public string? SummaryNote { get; init; }
 }
 
 /// <summary>Editable offline OOXML: clones the retained GSM stationery and replaces only its content slots.</summary>
@@ -20,9 +24,16 @@ public static class ReselectionWord
     private static XElement P(string text, string? style = null, bool keep = false) => E("p",
         E("pPr", style is null ? Array.Empty<object>() : new object[] { E("pStyle", A("val", style)) },
             keep ? new object[] { E("keepNext") } : Array.Empty<object>(), E("spacing", A("after", "100"))), E("r", E("t", new XAttribute(XNamespace.Xml + "space", "preserve"), text)));
+    private static XElement BulletStep(ReselectionStep step) => E("p",
+        E("pPr", E("keepNext"), E("spacing", A("after", string.IsNullOrWhiteSpace(step.Options) ? "100" : "40"))),
+        E("r", E("rPr", E("b")), E("t", new XAttribute(XNamespace.Xml + "space", "preserve"), "• " + step.Heading + ": ")),
+        E("r", E("t", new XAttribute(XNamespace.Xml + "space", "preserve"), step.Text)));
+    private static XElement StepOptions(string options) => E("p",
+        E("pPr", E("ind", A("left", "240")), E("spacing", A("after", "100"))),
+        E("r", E("rPr", E("sz", A("val", "18")), E("color", A("val", "505050"))), E("t", new XAttribute(XNamespace.Xml + "space", "preserve"), options)));
     private static XElement Table(IEnumerable<string[]> rows)
     {
-        int[] widths = [4350, 1250, 3470];
+        int[] widths = [4200, 1750, 3120];
         var table = E("tbl", E("tblPr", E("tblW", A("w", "9070"), A("type", "dxa")), E("tblLayout", A("type", "fixed")),
             E("tblBorders", new[] { "top", "left", "bottom", "right", "insideH", "insideV" }.Select(n => E(n, A("val", "single"), A("sz", "4"), A("color", "AAAAAA"))).ToArray()),
             E("tblCellMar", E("top", A("w", "55"), A("type", "dxa")), E("bottom", A("w", "55"), A("type", "dxa")))),
@@ -80,23 +91,62 @@ public static class ReselectionWord
             relationships.Root!.Add(new XElement(Rel + "Relationship", new XAttribute("Id", headerId), new XAttribute("Type", R.NamespaceName + "/header"), new XAttribute("Target", headerName)));
             ContentType(headerName, "header");
             body.Add(P(item.Student.Student.SyntheticDisplayName + " · Klasse " + item.Student.Student.ClassName));
-            body.Add(P(item.Removed.Length > 0 ? "Folgende gewählte Kurse können leider nicht angeboten werden:" : "Deine Kurswahl muss noch ergänzt oder geändert werden:", keep: true));
-            foreach (var id in item.Removed)
+            if (item.Removed.Length > 0)
             {
-                var offer = catalog.Offers.Single(o => o.Id == id);
-                body.Add(P(catalog.Subjects.Single(s => s.Id == offer.SubjectId).Name + " - " + ControlSheet.Type(offer.Type)
-                    + (offer.Variant == CourseVariant.Bilingual ? " bilingual" : "") + CourseAnnotations.Suffix(offer), keep: true));
+                body.Add(P("Warum eine Nachwahl nötig ist", "GsmHeading", keep: true));
+                body.Add(P(item.Removed.Length == 1
+                    ? "Folgender gewählter Kurs kann leider nicht angeboten werden:"
+                    : "Folgende gewählte Kurse können leider nicht angeboten werden:", keep: true));
+                foreach (var id in item.Removed)
+                {
+                    var offer = catalog.Offers.Single(o => o.Id == id);
+                    body.Add(P("• " + PlainDocumentText.FormatOfferFull(offer, catalog), keep: true));
+                }
             }
-            foreach (var note in item.Notes) body.Add(P("- " + note));
-            body.Add(P("Bitte trage deine Nachwahl und gegebenenfalls weitere Umwahlen unten ein und gib diesen Bogen unterschrieben bei der Oberstufenberatung ab. Die neue Wahl wird anschließend geprüft."));
+            else
+            {
+                body.Add(P("Warum eine Nachwahl oder Korrektur nötig ist", "GsmHeading", keep: true));
+                body.Add(P("Deine bisherige Kurswahl ist noch nicht vollständig oder enthält noch offene Punkte, die angepasst werden müssen.", keep: true));
+            }
+            if (item.Steps.Length > 0)
+            {
+                body.Add(P(item.Removed.Length > 0 ? "Was du jetzt neu wählen musst" : "Was du jetzt ergänzen oder korrigieren musst", "GsmHeading", keep: true));
+                foreach (var step in item.Steps)
+                {
+                    body.Add(BulletStep(step));
+                    if (!string.IsNullOrWhiteSpace(step.Options))
+                        body.Add(StepOptions(step.Options));
+                }
+            }
+            else if (item.Notes.Length > 0)
+            {
+                body.Add(P(item.Removed.Length > 0 ? "Was du jetzt neu wählen musst" : "Was du jetzt ergänzen oder korrigieren musst", "GsmHeading", keep: true));
+                foreach (var note in item.Notes)
+                    body.Add(P("• " + PlainDocumentText.Sanitize(note, catalog)));
+            }
+            else if (!string.IsNullOrWhiteSpace(item.SummaryNote))
+            {
+                body.Add(P("Hinweis zu deiner verbleibenden Wahl", "GsmHeading", keep: true));
+                body.Add(P(item.SummaryNote));
+            }
+            body.Add(P("Bitte trage deine Nachwahl (und ggf. weitere Umwahlen) unten ein und gib diesen Bogen unterschrieben bei der Oberstufenberatung ab. Die neue Wahl wird anschließend geprüft."));
             body.Add(P("Deine verbleibenden Kurse", "GsmHeading"));
             var rows = new List<string[]> { new[] { "Fach und Hinweise", "Kursart", "Belegung" } };
-            rows.AddRange(item.Remaining.Selections.OrderBy(s => s.Type).ThenBy(s => s.SubjectId).Select(s => new[] {
-                catalog.Subjects.Single(x => x.Id == s.SubjectId).Name + (s.Variant == CourseVariant.Bilingual ? " bilingual" : "") + CourseAnnotations.Suffix(catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId)),
-                ControlSheet.Type(s.Type), string.Join(", ", s.Semesters.Select(h => "HJ " + h)) }));
+            rows.AddRange(item.Remaining.Selections
+                .OrderBy(s => s.Type)
+                .ThenBy(s => PlainDocumentText.SubjectName(catalog, s.SubjectId), StringComparer.CurrentCulture)
+                .Select(s => new[]
+                {
+                    PlainDocumentText.SubjectName(catalog, s.SubjectId) + (s.Variant == CourseVariant.Bilingual ? " bilingual" : "") + CourseAnnotations.Suffix(catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId)),
+                    PlainDocumentText.FormatCourseTypeFull(s.Type),
+                    PlainDocumentText.FormatSemesters(s.Semesters)
+                }));
             body.Add(Table(rows));
+            body.Add(P("Bisher geplante mündliche Prüfungsfächer (unverbindlich): " + (item.Remaining.PlannedOralSubjects.IsEmpty
+                ? "noch nicht geplant"
+                : string.Join(", ", item.Remaining.PlannedOralSubjects.Select(o => PlainDocumentText.SubjectName(catalog, o))))));
             body.Add(P("Nachwahl und weitere Umwahlen", "GsmHeading"));
-            body.Add(P("Neu gewähltes Fach / Kursart / Halbjahre; bei Umwahl auch das bisherige Fach nennen.", keep: true));
+            body.Add(P("Neu gewähltes Fach, Kursart (Leistungsfach/Basisfach/Wahlfach) und Halbjahre; bei einer Umwahl bitte auch das bisherige Fach angeben.", keep: true));
             for (var i = 0; i < 3; i++) body.Add(E("p", E("pPr", E("keepNext"), E("spacing", A("before", "160"), A("after", "100")),
                 E("pBdr", new[] { "bottom", "between" }.Select(n => E(n, A("val", "single"), A("sz", "4"), A("color", "AAAAAA"))).ToArray())), E("r", E("t", " "))));
             body.Add(P("Die endgültige Belegbarkeit wird durch die Oberstufenberatung geprüft.", keep: true));

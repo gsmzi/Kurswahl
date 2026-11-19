@@ -257,15 +257,21 @@ public class TeacherWindowTests
         try
         {
             window.Show();
-            picker.Load(new ImportTable(["studentId", "Anzeigename", "IMP"], []));
+            picker.Load(new ImportTable(["studentId", "Personenbezeichnung", "Zusatzfeld", "IMP"], []));
             var boxes = picker.GetLogicalDescendants().OfType<ComboBox>().ToDictionary(b => b.Name!);
             Assert.Equal("studentId", picker.Read()["studentId"]);
-            Assert.DoesNotContain("imp", picker.Read().Keys);
-            boxes["Column_name"].SelectedIndex = 2;
-            boxes["Column_imp"].SelectedIndex = 3;
-            Assert.Equal("Anzeigename", picker.Read()["name"]);
             Assert.Equal("IMP", picker.Read()["imp"]);
+            Assert.DoesNotContain("name", picker.Read().Keys);
+            Assert.DoesNotContain("bridge", picker.Read().Keys);
+            boxes["Column_name"].SelectedIndex = 2;
+            boxes["Column_bridge"].SelectedIndex = 3;
+            Assert.Equal("Personenbezeichnung", picker.Read()["name"]);
+            Assert.Equal("Zusatzfeld", picker.Read()["bridge"]);
             Assert.NotNull(ToolTip.GetTip(boxes["Column_imp"]));
+            picker.Load(new ImportTable(["ASV-ID", "Nachname", "Vornamen"], []));
+            Assert.Equal("ASV-ID", picker.Read()["studentId"]);
+            Assert.Equal("Nachname", picker.Read()["lastName"]);
+            Assert.Equal("Vornamen", picker.Read()["firstName"]);
             picker.Load(new ImportTable(["Andere Spalte"], []));
             Assert.Empty(picker.Read());
             picker.Clear(); Assert.Empty(picker.Read());
@@ -458,5 +464,126 @@ public class TeacherWindowTests
             Assert.Equal(["W", "D"], saved.PlannedOralSubjects.ToArray());
         }
         finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [AvaloniaFact]
+    public void UsabilityAlertsExpandersFiltersAndStudentDetailWork()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-usability-ui-" + Guid.NewGuid());
+        var workspace = new TeacherWorkspace(root);
+        workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
+        workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
+        using (var db = workspace.OpenActive())
+        {
+            db.EnablePlanning();
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown),
+                "", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-002", "Demo Zwei", "10b", 2029, DepartureStatus.Active, PriorEducation.Unknown),
+                "", "", "10b/Zwei.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            new GsmKurswahl.Application.TeacherSession(db, TestData.WorkflowCatalog, "demo-beratung").Save(TestData.Choice with
+            {
+                Selections =
+                [
+                    TestData.Select(TestData.WorkflowCatalog.Offers.Single(o => o.Id == "D-LF")),
+                    TestData.Select(TestData.WorkflowCatalog.Offers.Single(o => o.Id == "BIO-LF"))
+                ]
+            }, null, RevisionSource.TeacherEdit, "Synthetischer Ausgangsstand");
+        }
+
+        var window = new TeacherWindow(root) { Width = 1400, Height = 900 };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            IEnumerable<T> All<T>() where T : Control => window.GetLogicalDescendants().OfType<T>().Distinct();
+            T Named<T>(string name) where T : Control => All<T>().Single(c => c.Name == name);
+            void Click(string label)
+            {
+                All<Button>().Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+            }
+            void ClickNamed(string name)
+            {
+                Named<Button>(name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.UpdateLayout();
+            }
+
+            var alertBanner = Named<Border>("AlertBanner");
+
+            // Student details: inline errors + banner + stale error clearing + RestoreReason + no broken tab reference
+            Click("Wahl");
+            Click("Schülerbestand");
+            All<Button>().First(b => b.Content?.ToString() == "Öffnen").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            window.UpdateLayout();
+            Assert.Contains(All<TextBox>(), t => t.Name == "RestoreReason");
+            Assert.DoesNotContain(All<TextBlock>(), t => t.Text?.Contains("im Reiter „Kurswahl und Nachwahl“") == true);
+
+            Named<TextBox>("PrereqSportSemesters").Text = "1, 5";
+            ClickNamed("SavePrerequisites");
+            Assert.True(Named<Border>("StudentPrereqError").IsVisible);
+            Assert.True(alertBanner.IsVisible);
+
+            // Navigating to another page clears stale error banners
+            Click("Kurswahlen");
+            Assert.False(alertBanner.IsVisible);
+
+            // Choices: filter reset & inline reason validation on save
+            Assert.Equal(2, Named<StackPanel>("ResultRows").Children.OfType<Border>().Count());
+            Named<ComboBox>("ResultsClassFilter").SelectedIndex = 1;
+            window.UpdateLayout();
+            Assert.Single(Named<StackPanel>("ResultRows").Children.OfType<Border>());
+            ClickNamed("ResultsResetFilters");
+            Assert.Equal(2, Named<StackPanel>("ResultRows").Children.OfType<Border>().Count());
+
+            ClickNamed("ResultOpen_demo-001");
+            ClickNamed("ChoiceRemove_BIO_LF");
+            Assert.True(Named<Button>("ChoiceSave").IsEnabled);
+            ClickNamed("ChoiceSave");
+            Assert.True(Named<Border>("ChoiceEditorError").IsVisible);
+
+            // Planning: legend and follow-up instructions start collapsed
+            Click("Kursplanung");
+            Assert.False(Named<Expander>("PlanningLegend").IsExpanded);
+            Assert.False(Named<Expander>("PlanningFollowUp").IsExpanded);
+
+            // Reconciliation: name filter + reset
+            Click("ASV-Abgleich");
+            window.LoadAsvComparisonBytes(System.Text.Encoding.UTF8.GetBytes(",Name mit Vornamen,ASV-ID,Fächer Kursstufe\nKS1,\"Eins, Demo\",demo-001,\"D [5];1-L-X-X-X-X\"\nKS1,\"Zwei, Demo\",demo-002,\"D [5];1-L-X-X-X-X\""), "asv-test.csv");
+            window.UpdateLayout();
+            var summary = Named<TextBlock>("AsvSummary");
+            Assert.Contains("2 Abweichungen", summary.Text);
+            Assert.Equal(2, Named<StackPanel>("AsvResultRows").Children.OfType<Border>().Count());
+            Named<TextBox>("AsvSearch").Text = "Demo Zwei";
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Assert.Single(Named<StackPanel>("AsvResultRows").Children.OfType<Border>());
+            Assert.Contains(Named<StackPanel>("AsvResultRows").GetLogicalDescendants().OfType<TextBlock>(),
+                t => t.Text?.Contains("Demo Zwei") == true);
+            ClickNamed("AsvResetFilters");
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Assert.Equal(2, Named<StackPanel>("AsvResultRows").Children.OfType<Border>().Count());
+
+            // Course annotations: success status containing "bitte" must NOT be styled red as error
+            Click("Einstellungen");
+            Click("Jahrgang verwalten");
+            Click("Fachangebot ansehen / für Schülerprogramm exportieren");
+            Named<Expander>("CourseAnnotations").IsExpanded = true;
+            window.UpdateLayout();
+            Named<ComboBox>("Coop_CH_LF").SelectedIndex = 1;
+            window.UpdateLayout();
+            Assert.True(alertBanner.IsVisible);
+            var alertText = string.Join(" ", alertBanner.GetLogicalDescendants().OfType<TextBlock>().Select(t => t.Text ?? ""));
+            Assert.Contains("bitte", alertText, StringComparison.OrdinalIgnoreCase);
+            Assert.NotEqual(Avalonia.Media.Color.Parse("#A32D2D"), ((Avalonia.Media.ISolidColorBrush)alertBanner.BorderBrush!).Color);
+            Assert.NotEqual(Avalonia.Media.Color.Parse("#FCEBEB"), ((Avalonia.Media.ISolidColorBrush)alertBanner.Background!).Color);
+        }
+        finally
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.Close();
+            try { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); } catch { }
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
     }
 }

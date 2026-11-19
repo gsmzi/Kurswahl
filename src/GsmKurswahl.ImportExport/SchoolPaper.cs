@@ -9,7 +9,7 @@ internal sealed class SchoolPaper : IDisposable
     private readonly SKDocument document;
     private readonly SKPaint text, bold, muted, line, fill;
     private readonly SKTypeface regularFace, boldFace, narrowFace;
-    private readonly SKBitmap logo;
+    private readonly SKImage logo;
     private SKCanvas canvas = null!;
     private readonly int year;
     private string context;
@@ -31,7 +31,8 @@ internal sealed class SchoolPaper : IDisposable
         line = new() { Color = new SKColor(170, 170, 170), StrokeWidth = .5f };
         fill = new() { Color = new SKColor(240, 240, 240) };
         using var source = typeof(SchoolPaper).Assembly.GetManifestResourceStream("GsmKurswahl.ImportExport.Assets.SchoolLogo.jpeg")!;
-        logo = SKBitmap.Decode(source);
+        // Keep the original JPEG encoding: bitmap re-encoding changes this logo's blue in Skia PDFs.
+        logo = SKImage.FromEncodedData(source);
         NewPage();
     }
     private void NewPage()
@@ -43,7 +44,9 @@ internal sealed class SchoolPaper : IDisposable
         theme.TextSize = 10;
         canvas.DrawText("Oberstufenberatung · " + DateTime.Now.ToString("dd.MM.yyyy"), Left, 91, theme);
         using var imagePaint = new SKPaint { FilterQuality = SKFilterQuality.High, IsAntialias = true };
-        canvas.DrawBitmap(logo, new SKRect(Left + Width - 148.54f, 56.7f, Left + Width, 104.32f), imagePaint);
+        const float logoWidth = 148.54f, logoTop = 56.7f;
+        var logoHeight = logoWidth * logo.Height / logo.Width;
+        canvas.DrawImage(logo, new SKRect(Left + Width - logoWidth, logoTop, Left + Width, logoTop + logoHeight), imagePaint);
         var footer = $"Abitur {year} · {context}";
         var footerRows = Wrap(footer, muted, Width - 65).Take(2).ToArray();
         for (var i = 0; i < footerRows.Length; i++) canvas.DrawText(footerRows[i], Left, 817 + i * 10, muted);
@@ -65,6 +68,33 @@ internal sealed class SchoolPaper : IDisposable
         y += height + 19;
     }
     public void Heading(string value) { Ensure(55); y += 6; Paragraph(value, false, bold); }
+    public void Bullet(string heading, string body, string? options = null)
+    {
+        Ensure(42);
+        using var subBold = new SKPaint { Typeface = boldFace, TextSize = text.TextSize, IsAntialias = true, Color = SKColors.Black };
+        foreach (var row in Wrap("• " + heading, subBold, Width))
+        {
+            Ensure(subBold.TextSize + 3);
+            canvas.DrawText(row, Left, y, subBold);
+            y += subBold.TextSize + 3;
+        }
+        foreach (var row in Wrap(body, text, Width - 10))
+        {
+            Ensure(text.TextSize + 3.5f);
+            canvas.DrawText(row, Left + 10, y, text);
+            y += text.TextSize + 3.5f;
+        }
+        if (!string.IsNullOrWhiteSpace(options))
+        {
+            foreach (var row in Wrap(options, muted, Width - 10))
+            {
+                Ensure(muted.TextSize + 3.5f);
+                canvas.DrawText(row, Left + 10, y, muted);
+                y += muted.TextSize + 3.5f;
+            }
+        }
+        y += 4;
+    }
     public void Paragraph(string value, bool small = false, SKPaint? paint = null)
     {
         paint ??= small ? muted : text;

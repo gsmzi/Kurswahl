@@ -12,7 +12,7 @@ public sealed class ImportColumnPicker : StackPanel
     private readonly Dictionary<string, ComboBox> columns = [];
     private static readonly (string Field, string Label, string Help)[] Fields =
     [
-        ("studentId", "Schüler-ID *", "Eindeutige Kennung pro Person. Im Erprobungsbetrieb z. B. demo-001."),
+        ("studentId", "Schüler-ID *", "Dauerhafte 36-stellige ASV-ID aus der ASV-BW-Exportformatbibliothek (z. B. über „zz Exportformat für paedML“, passend zu „zz Kursstufe Fächerwahl“). Im aktuellen Erprobungsbetrieb nur synthetische demo-IDs (z. B. demo-001)."),
         ("firstName", "Vorname *", "Zusammen mit Nachname für den Standardordner Nachname.Vorname."),
         ("lastName", "Nachname *", "Zusammen mit Vorname für den Standardordner Nachname.Vorname."),
         ("folder", "Abweichender Schülerordner (optional)", "Nur der Ordnername innerhalb der Klasse, z. B. Muster.Demo2. Überschreibt Nachname.Vorname."),
@@ -43,13 +43,14 @@ public sealed class ImportColumnPicker : StackPanel
     public void Load(ImportTable table)
     {
         columns.Clear(); Children.Clear();
+        var matched = StudentColumnMatcher.Match(table.Headers);
         foreach (var (field, label, help) in Fields)
         {
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("260,*"), Margin = new Thickness(0, 2) };
             var caption = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
             var picker = new ComboBox { Name = "Column_" + field, HorizontalAlignment = HorizontalAlignment.Stretch,
                 ItemsSource = new[] { "— Nicht zuordnen —" }.Concat(table.Headers).ToArray(),
-                SelectedIndex = table.Headers.IndexOf(field) + 1 };
+                SelectedIndex = matched.TryGetValue(field, out var header) ? table.Headers.IndexOf(header) + 1 : 0 };
             Avalonia.Automation.AutomationProperties.SetName(picker, label);
             ToolTip.SetTip(picker, new TextBlock { Text = help, TextWrapping = TextWrapping.Wrap, MaxWidth = 420 });
             ToolTip.SetTip(caption, help);

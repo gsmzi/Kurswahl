@@ -47,6 +47,13 @@ public class KurswahltestWebParityTests
         var catalogJs = File.ReadAllText(Path.Combine(webDir, "catalog.js"), Encoding.UTF8);
         Assert.Contains("window.GSM_DEFAULT_CATALOG", catalogJs);
         Assert.Contains(demoCatalog.Version, catalogJs);
+
+        var appJs = File.ReadAllText(Path.Combine(webDir, "kurswahltest.js"), Encoding.UTF8);
+        Assert.Contains("Wenn du möchtest, kannst du sie als unverbindlichen Kontrollbogen drucken oder als PDF speichern.", appJs);
+        Assert.DoesNotContain("todo.length === 0 ? \"btn btn-primary\" : \"btn\"", appJs);
+        Assert.DoesNotContain("displayText(`${m.rule.id}: ${m.explanation}`)", appJs);
+        Assert.Contains("Noch zu korrigieren", appJs);
+        Assert.Contains("Mit der Oberstufenberatung klären", appJs);
     }
 
     [Fact]

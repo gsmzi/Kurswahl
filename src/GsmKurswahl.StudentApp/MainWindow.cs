@@ -27,10 +27,14 @@ public sealed class MainWindow : Window
     private readonly StudentSession session;
     private readonly WrapPanel stepper = new();
     private readonly StackPanel content = new() { Spacing = 12 };
+    private readonly ScrollViewer stepScroll = new();
     private readonly StackPanel plan = new() { Spacing = 10 };
     private readonly TextBlock fileStatus = Text("", 13);
     private readonly TextBlock error = Text("", 14);
-    private readonly Border errorNotice = new() { Name = "ErrorNotice", Background = Brush("#FCEBEB"), CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 6), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
+    private readonly Border errorNotice = new() { Name = "ErrorNotice", Background = Brush("#FCEBEB"), BorderBrush = Danger, BorderThickness = new Thickness(4, 1, 1, 1), CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 6), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
+    private readonly TextBlock successText = Text("", 13, color: Done);
+    private readonly Border successNotice = new() { Name = "SuccessNotice", Background = DoneSoft, BorderBrush = Done, BorderThickness = new Thickness(4, 1, 1, 1), CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 6), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
+    private readonly TextBlock stepBlockerHint = new() { Name = "StepBlockerHint", FontSize = 13, Foreground = Warn, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 1, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(12, 0), IsVisible = false };
     private readonly Border stateBadge = Pill("", WarnSoft, Warn);
     private readonly Border hoursWarning = Notice("", WarnSoft, Warn);
     private readonly Button previous = new() { Content = "_Zurück", Name = "PreviousStep" };
@@ -43,6 +47,7 @@ public sealed class MainWindow : Window
     private readonly Expander prerequisiteExpander;
     private readonly string technicalDetails;
     private string? expandedTask;
+    private int lastRenderedStep = -1;
     private bool closeConfirmed;
     private bool closePromptOpen;
 
@@ -114,11 +119,34 @@ public sealed class MainWindow : Window
         var left = new DockPanel();
         var navigation = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Margin = new Thickness(0, 12, 0, 0) };
         navigation.Children.Add(previous);
+        Grid.SetColumn(stepBlockerHint, 1); navigation.Children.Add(stepBlockerHint);
         Grid.SetColumn(next, 2); navigation.Children.Add(next);
         DockPanel.SetDock(navigation, Dock.Bottom); left.Children.Add(navigation);
-        error.Foreground = Danger; error.Name = "ErrorText"; errorNotice.Child = error;
+
+        error.Foreground = Danger; error.Name = "ErrorText"; error.VerticalAlignment = VerticalAlignment.Center;
+        var errorIcon = new TextBlock { Text = "⚠", FontWeight = FontWeight.Bold, Foreground = Danger, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        var dismissError = new Button { Name = "DismissError", Content = "✕", Padding = new Thickness(6, 2), MinHeight = 24, MinWidth = 24, Background = Brushes.Transparent, BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        ToolTip.SetTip(dismissError, "Meldung ausblenden");
+        dismissError.Click += (_, _) => { error.Text = ""; errorNotice.IsVisible = false; };
+        var errorGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
+        errorGrid.Children.Add(errorIcon);
+        Grid.SetColumn(error, 1); errorGrid.Children.Add(error);
+        Grid.SetColumn(dismissError, 2); errorGrid.Children.Add(dismissError);
+        errorNotice.Child = errorGrid;
         DockPanel.SetDock(errorNotice, Dock.Top); left.Children.Add(errorNotice);
-        left.Children.Add(Panel(new ScrollViewer { Content = content }));
+
+        successText.Name = "SuccessText"; successText.VerticalAlignment = VerticalAlignment.Center;
+        var dismissSuccess = new Button { Name = "DismissSuccess", Content = "✕", Padding = new Thickness(6, 2), MinHeight = 24, MinWidth = 24, Background = Brushes.Transparent, BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        ToolTip.SetTip(dismissSuccess, "Meldung ausblenden");
+        dismissSuccess.Click += (_, _) => ClearSuccess();
+        var successGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        successGrid.Children.Add(successText);
+        Grid.SetColumn(dismissSuccess, 1); successGrid.Children.Add(dismissSuccess);
+        successNotice.Child = successGrid;
+        DockPanel.SetDock(successNotice, Dock.Top); left.Children.Add(successNotice);
+
+        stepScroll.Content = content;
+        left.Children.Add(Panel(stepScroll));
         left.Margin = new Thickness(0, 0, 16, 0);
         body.Children.Add(left);
         var right = Panel(new ScrollViewer { Content = plan });
@@ -136,7 +164,13 @@ public sealed class MainWindow : Window
 
         previous.Click += (_, _) => Edit(session.PreviousStep);
         next.Click += (_, _) => Edit(() => { expandedTask = null; session.NextStep(); });
-        save.Click += async (_, _) => await RunFileAction(() => session.SaveAsync());
+        save.Click += async (_, _) =>
+        {
+            var wasDirty = session.IsDirty || !session.HasSavedFile;
+            await RunFileAction(() => session.SaveAsync());
+            if (wasDirty && !session.IsDirty && !session.LoadFailed && string.IsNullOrEmpty(error.Text))
+                ShowSuccess($"✓ Entwurf gespeichert (Revision {session.Choice.Revision}).");
+        };
         load.Click += async (_, _) =>
         {
             timer.Stop();
@@ -159,16 +193,29 @@ public sealed class MainWindow : Window
             e.Cancel = true; timer.Stop();
             if (closePromptOpen) return;
             closePromptOpen = true;
-            try { if (await Confirm("Ungespeicherte Änderungen verwerfen und schließen?")) { closeConfirmed = true; Close(); } }
+            try { if (await ConfirmClose()) { closeConfirmed = true; Close(); } }
             finally { closePromptOpen = false; }
         };
         Closed += (_, _) => { timer.Stop(); session.Changed -= Refresh; };
         Refresh();
     }
 
+    private void ShowSuccess(string message)
+    {
+        successText.Text = message;
+        successNotice.IsVisible = !string.IsNullOrWhiteSpace(message);
+    }
+
+    private void ClearSuccess()
+    {
+        successText.Text = "";
+        successNotice.IsVisible = false;
+    }
+
     private void Edit(Action edit)
     {
         timer.Stop();
+        ClearSuccess();
         try
         {
             error.Text = ""; edit();
@@ -179,6 +226,7 @@ public sealed class MainWindow : Window
 
     private async Task RunFileAction(Func<Task> action)
     {
+        ClearSuccess();
         try { error.Text = ""; await action(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or System.Text.Json.JsonException)
         { error.Text = ex.Message + " Bei Unklarheiten die Oberstufenberatung kontaktieren."; }
@@ -189,6 +237,11 @@ public sealed class MainWindow : Window
     private void Refresh()
     {
         var focused = (FocusManager?.GetFocusedElement() as Control)?.Name;
+        if (lastRenderedStep != session.Step)
+        {
+            stepScroll.Offset = new Vector(0, 0);
+            lastRenderedStep = session.Step;
+        }
         BuildStepper();
         content.Children.Clear();
         content.Children.Add(session.Step switch { 0 => PrerequisitesStep(), 1 => LfStep(), 2 => OralStep(), 3 => AreaStep(), 4 => ExtraStep(), _ => ReviewStep() });
@@ -201,6 +254,10 @@ public sealed class MainWindow : Window
         next.IsVisible = session.Step < StudentSession.LastStep;
         next.IsEnabled = !session.IsBusy && session.StepError is null;
         next.Content = session.Step switch { 3 when session.Tasks.Any(t => !t.IsSatisfied) => "Später entscheiden, _weiter", _ => "_Weiter" };
+        var blocker = session.Step < StudentSession.LastStep && session.StepError is { } stepErr ? PlainText(stepErr) : "";
+        stepBlockerHint.Text = blocker;
+        stepBlockerHint.IsVisible = blocker.Length > 0;
+        ToolTip.SetTip(stepBlockerHint, blocker.Length > 0 ? blocker : null);
         save.IsEnabled = !session.IsBusy && !session.LoadFailed;
         load.IsEnabled = !session.IsBusy;
         fileStatus.Text = session.IsBusy ? "Dateivorgang läuft …" : session.Message;
@@ -250,8 +307,7 @@ public sealed class MainWindow : Window
 
     private Control PrerequisitesStep()
     {
-        var panel = Step("Deine Vorinfos für den Probelauf", "Gib hier deine bisherigen Fächer und dein Profil aus der Mittelstufe an. In der echten Schulversion sind diese Angaben bereits durch die Oberstufenberatung hinterlegt.");
-        panel.Children.Add(Notice("Unverbindliche Testversion für zu Hause: Deine Angaben hier steuern sofort, welche Fächer und Hinweise im Probelauf angezeigt werden.", AccentSoft, Accent));
+        var panel = Step("Deine Vorinfos für den Probelauf", "Gib hier deine bisherigen Fächer und dein Profil aus der Mittelstufe an. In der Schulversion sind diese Angaben durch die Oberstufenberatung hinterlegt.");
         var p = session.Profile.Prerequisites;
         var hasF = p.ContinuedLanguages.Contains("F", StringComparer.OrdinalIgnoreCase);
         var hasL = p.ContinuedLanguages.Contains("L", StringComparer.OrdinalIgnoreCase);
@@ -284,17 +340,25 @@ public sealed class MainWindow : Window
             target.Children.Add(Option(box, selected));
         }
 
-        panel.Children.Add(Text("Fortgeführte Fremdsprachen (spätestens ab Klasse 8)", 15, FontWeight.SemiBold));
-        panel.Children.Add(Text("Englisch (1. Fremdsprache) ist am GSM für alle fortgeführt.", 13, color: Muted));
-        AddRadio(panel, "Prereq_Lang_F", "Prereq_Lang", "Englisch + Französisch", hasF && !hasL,
-            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(true, false, x.ItalianProfile == Knowledge.Yes) }));
-        AddRadio(panel, "Prereq_Lang_L", "Prereq_Lang", "Englisch + Latein", hasL && !hasF,
-            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(false, true, x.ItalianProfile == Knowledge.Yes) }));
-        AddRadio(panel, "Prereq_Lang_FL", "Prereq_Lang", "Englisch + Französisch und Latein", hasF && hasL,
-            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(true, true, x.ItalianProfile == Knowledge.Yes) }));
+        static Border GroupCard(StackPanel body) => new()
+        {
+            Background = Brush("#F8FAFC"), BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 10), Child = body
+        };
 
-        panel.Children.Add(Text("Profil & Zusatzqualifikationen (Klasse 8–10)", 15, FontWeight.SemiBold));
-        AddCheck(panel, "Prereq_Italian", "Italienisch als 3. Fremdsprache (sprachliches Profil ab Klasse 8)", hasI,
+        var langGroup = new StackPanel { Spacing = 6 };
+        langGroup.Children.Add(Text("Fortgeführte Fremdsprachen (spätestens ab Klasse 8)", 15, FontWeight.SemiBold));
+        langGroup.Children.Add(Text("Englisch (1. Fremdsprache) ist am GSM für alle fortgeführt.", 12, color: Muted));
+        AddRadio(langGroup, "Prereq_Lang_F", "Prereq_Lang", "Englisch + Französisch", hasF && !hasL,
+            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(true, false, x.ItalianProfile == Knowledge.Yes) }));
+        AddRadio(langGroup, "Prereq_Lang_L", "Prereq_Lang", "Englisch + Latein", hasL && !hasF,
+            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(false, true, x.ItalianProfile == Knowledge.Yes) }));
+        AddRadio(langGroup, "Prereq_Lang_FL", "Prereq_Lang", "Englisch + Französisch und Latein", hasF && hasL,
+            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(true, true, x.ItalianProfile == Knowledge.Yes) }));
+        panel.Children.Add(GroupCard(langGroup));
+
+        var profileGroup = new StackPanel { Spacing = 6 };
+        profileGroup.Children.Add(Text("Profil & Zusatzqualifikationen (Klasse 8–10)", 15, FontWeight.SemiBold));
+        AddCheck(profileGroup, "Prereq_Italian", "Italienisch als 3. Fremdsprache (sprachliches Profil ab Klasse 8)", hasI,
             yes => UpdatePrior(x => x with
             {
                 ItalianProfile = yes ? Knowledge.Yes : Knowledge.No,
@@ -303,33 +367,38 @@ public sealed class MainWindow : Window
                     x.ContinuedLanguages.Contains("L", StringComparer.OrdinalIgnoreCase),
                     yes)
             }));
-        AddCheck(panel, "Prereq_Imp", "Profilfach IMP (Informatik, Mathematik, Physik) in Klasse 8–10", p.InformaticsImp == Knowledge.Yes,
+        AddCheck(profileGroup, "Prereq_Imp", "Profilfach IMP (Informatik, Mathematik, Physik) in Klasse 8–10", p.InformaticsImp == Knowledge.Yes,
             yes => UpdatePrior(x => x with { InformaticsImp = yes ? Knowledge.Yes : Knowledge.No }));
-        AddCheck(panel, "Prereq_InfBridge", "Informatik-Brückenkurs in Klasse 10 besucht", p.InformaticsBridge == Knowledge.Yes,
+        AddCheck(profileGroup, "Prereq_InfBridge", "Informatik-Brückenkurs in Klasse 10 besucht", p.InformaticsBridge == Knowledge.Yes,
             yes => UpdatePrior(x => x with { InformaticsBridge = yes ? Knowledge.Yes : Knowledge.No }));
-        AddCheck(panel, "Prereq_Bili", "Durchgängig bilingualer Bildungsgang (Englisch)", p.ContinuousBilingual == Knowledge.Yes,
+        AddCheck(profileGroup, "Prereq_Bili", "Durchgängig bilingualer Bildungsgang (Englisch)", p.ContinuousBilingual == Knowledge.Yes,
             yes => UpdatePrior(x => x with { ContinuousBilingual = yes ? Knowledge.Yes : Knowledge.No }));
+        panel.Children.Add(GroupCard(profileGroup));
 
-        panel.Children.Add(Text("Besuchter Religions- bzw. Ethikunterricht in Klasse 10", 15, FontWeight.SemiBold));
-        AddRadio(panel, "Prereq_Rel_ER", "Prereq_Rel", "Evangelische Religion (ER)", p.ReligionEthicsGrade10 == "ER",
+        var relGroup = new StackPanel { Spacing = 6 };
+        relGroup.Children.Add(Text("Besuchter Religions- bzw. Ethikunterricht in Klasse 10", 15, FontWeight.SemiBold));
+        AddRadio(relGroup, "Prereq_Rel_ER", "Prereq_Rel", "Evangelische Religion (ER)", p.ReligionEthicsGrade10 == "ER",
             () => UpdatePrior(x => x with { ReligionEthicsGrade10 = "ER", ReligionEthicsPermission = Knowledge.Yes, ReligionEthicsExamPermission = Knowledge.Unknown }));
-        AddRadio(panel, "Prereq_Rel_KR", "Prereq_Rel", "Katholische Religion (KR)", p.ReligionEthicsGrade10 == "KR",
+        AddRadio(relGroup, "Prereq_Rel_KR", "Prereq_Rel", "Katholische Religion (KR)", p.ReligionEthicsGrade10 == "KR",
             () => UpdatePrior(x => x with { ReligionEthicsGrade10 = "KR", ReligionEthicsPermission = Knowledge.Yes, ReligionEthicsExamPermission = Knowledge.Unknown }));
-        AddRadio(panel, "Prereq_Rel_ETH", "Prereq_Rel", "Ethik (ETH)", p.ReligionEthicsGrade10 == "ETH",
+        AddRadio(relGroup, "Prereq_Rel_ETH", "Prereq_Rel", "Ethik (ETH)", p.ReligionEthicsGrade10 == "ETH",
             () => UpdatePrior(x => x with { ReligionEthicsGrade10 = "ETH", ReligionEthicsPermission = Knowledge.Yes, ReligionEthicsExamPermission = Knowledge.Unknown }));
-        AddRadio(panel, "Prereq_Rel_Unknown", "Prereq_Rel", "Keiner / Wechsel / Sonderfall prüfen", p.ReligionEthicsGrade10 is not ("ER" or "KR" or "ETH"),
+        AddRadio(relGroup, "Prereq_Rel_Unknown", "Prereq_Rel", "Keiner / Wechsel / Sonderfall prüfen", p.ReligionEthicsGrade10 is not ("ER" or "KR" or "ETH"),
             () => UpdatePrior(x => x with { ReligionEthicsGrade10 = null, ReligionEthicsPermission = Knowledge.Unknown, ReligionEthicsExamPermission = Knowledge.Unknown }));
+        panel.Children.Add(GroupCard(relGroup));
 
-        panel.Children.Add(Text("Sportunterricht in der Kursstufe", 15, FontWeight.SemiBold));
+        var sportGroup = new StackPanel { Spacing = 6 };
+        sportGroup.Children.Add(Text("Sportunterricht in der Kursstufe", 15, FontWeight.SemiBold));
         var sport = p.SportExemptSemesters ?? [];
-        AddRadio(panel, "Prereq_Sport_None", "Prereq_Sport", "Keine Sportbefreiung (reguläre Teilnahme)", sport.IsEmpty,
+        AddRadio(sportGroup, "Prereq_Sport_None", "Prereq_Sport", "Keine Sportbefreiung (reguläre Teilnahme)", sport.IsEmpty,
             () => UpdatePrior(x => x with { SportExemptSemesters = [], PermanentSportExemption = Knowledge.No }));
-        AddRadio(panel, "Prereq_Sport_12", "Prereq_Sport", "Sportbefreiung in HJ 1+2", sport.SequenceEqual([1, 2]),
+        AddRadio(sportGroup, "Prereq_Sport_12", "Prereq_Sport", "Sportbefreiung in HJ 1+2", sport.SequenceEqual([1, 2]),
             () => UpdatePrior(x => x with { SportExemptSemesters = [1, 2], PermanentSportExemption = Knowledge.Yes }));
-        AddRadio(panel, "Prereq_Sport_34", "Prereq_Sport", "Sportbefreiung in HJ 3+4", sport.SequenceEqual([3, 4]),
+        AddRadio(sportGroup, "Prereq_Sport_34", "Prereq_Sport", "Sportbefreiung in HJ 3+4", sport.SequenceEqual([3, 4]),
             () => UpdatePrior(x => x with { SportExemptSemesters = [3, 4], PermanentSportExemption = Knowledge.Yes }));
-        AddRadio(panel, "Prereq_Sport_1234", "Prereq_Sport", "Dauerhafte Sportbefreiung in HJ 1–4", sport.SequenceEqual([1, 2, 3, 4]),
+        AddRadio(sportGroup, "Prereq_Sport_1234", "Prereq_Sport", "Dauerhafte Sportbefreiung in HJ 1–4", sport.SequenceEqual([1, 2, 3, 4]),
             () => UpdatePrior(x => x with { SportExemptSemesters = [1, 2, 3, 4], PermanentSportExemption = Knowledge.Yes }));
+        panel.Children.Add(GroupCard(sportGroup));
 
         return panel;
     }
@@ -337,11 +406,12 @@ public sealed class MainWindow : Window
     private Control LfStep()
     {
         var panel = Step("Wähle drei Leistungsfächer", "Mindestens zwei davon aus Deutsch, Mathematik, einer fortgeführten Fremdsprache oder einer Naturwissenschaft. Leistungsfächer laufen immer über HJ 1–4.");
-        panel.Children.Add(Text("Wenn du ein bisheriges Basisfach als Leistungsfach wählst, wird seine Basisfachbelegung automatisch entfernt. Gehe anschließend die weiteren Schritte erneut durch.", 13, color: Muted));
+        if (session.Choice.Selections.Any(s => s.Type != CourseType.Lf))
+            panel.Children.Add(Text("Wenn du ein bisheriges Basisfach als Leistungsfach wählst, wird seine Basisfachbelegung automatisch entfernt. Gehe anschließend die weiteren Schritte erneut durch.", 13, color: Muted));
         if (session.LfChangeMessage.Length > 0) panel.Children.Add(Notice(session.LfChangeMessage, WarnSoft, Warn));
         var chosen = session.Choice.Selections.Where(s => s.Type == CourseType.Lf).ToArray();
         panel.Children.Add(Text(chosen.Length < 3 ? $"{chosen.Length} von 3 gewählt – noch {3 - chosen.Length}" : $"{chosen.Length} von 3 gewählt · zum Tauschen zuerst ein Leistungsfach abwählen", 15, FontWeight.SemiBold));
-        if (chosen.Length >= 3 && session.StepError is { } stepError) panel.Children.Add(Notice(stepError, WarnSoft, Warn));
+        if (chosen.Length >= 3 && session.StepError is { } stepError) panel.Children.Add(Notice(PlainText(stepError), WarnSoft, Warn));
         var offers = session.LfOffers.Concat(session.Catalog.Offers.Where(o => o.Type == CourseType.Lf && chosen.Any(s => s.OfferId == o.Id))).Distinct();
         foreach (var offer in offers)
         {
@@ -364,7 +434,7 @@ public sealed class MainWindow : Window
         var planned = session.Choice.PlannedOralSubjects;
         var free = 2 - planned.Length;
         panel.Children.Add(Text(free > 0 ? (free == 1 ? "Noch 1 Fach wählen" : "Noch 2 Fächer wählen") : "Beide Prüfungsfächer geplant", 15, FontWeight.SemiBold));
-        if (planned.Length == 2 && session.StepError is { } stepError) panel.Children.Add(Notice(stepError, WarnSoft, Warn));
+        if (planned.Length == 2 && session.StepError is { } stepError) panel.Children.Add(Notice(PlainText(stepError), WarnSoft, Warn));
         foreach (var subject in planned.Where(s => !session.ForcedOral.Contains(s)).Concat(session.UsefulOralCandidates).Distinct())
         {
             var p = session.Profile.Prerequisites;
@@ -455,7 +525,7 @@ public sealed class MainWindow : Window
     private Control ExtraStep()
     {
         var panel = Step("Weitere Kurse", "Ergänze Kurse, bis du das Planungsziel erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten.");
-        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold));
+        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold, session.CountedCourses >= ChoiceWorkflow.MinimumCourses ? Done : null));
         var adjustable = session.Choice.Selections.Where(s => s.Type != CourseType.Lf).Select(s => (Selection: s, Offer: session.Catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId)))
             .Where(x => x.Offer is not null && (!session.LockedSemesters(x.Selection.OfferId).Any() || x.Offer.Schedule.Length > session.LockedSemesters(x.Selection.OfferId).Length)).ToArray();
         if (adjustable.Length > 0)
@@ -521,19 +591,56 @@ public sealed class MainWindow : Window
         return text;
     }
 
+    private static int? TargetStepForRule(string ruleId) => ruleId switch
+    {
+        "AGVO-LF" or "PLAN-LF" => 1,
+        "PLAN-ORAL" or "AGVO-ORAL" or "AGVO-EXAM" => 2,
+        "AGVO-ART" or "AGVO-RELIGION" or "AGVO-LANGUAGE" or "AGVO-SCIENCE" or "AGVO-BREADTH" or "AGVO-REQUIRED" => 3,
+        "AGVO-COURSES" or "AGVO-SPORT-REPLACEMENT" or "PLAN-MIN-COURSES" => 4,
+        _ => null
+    };
+
     private Control ReviewStep()
     {
         var panel = Step("Überblick", "Hier siehst du, was noch fehlt und was die Oberstufenberatung mit dir klärt. Gespeicherte Wahlen sammelt die Oberstufenberatung ein; eine eigene Abgabe ist nicht nötig.");
         var messages = session.Validation.Messages;
         var onlyCountMissing = session.CountedCourses < ChoiceWorkflow.MinimumCourses && session.Choice.Selections.Count(x => x.Type == CourseType.Lf) == 3;
-        var todo = messages.Where(m => m.Rule.Severity == ReviewStatus.Invalid && !(onlyCountMissing && m.Rule.Id == "AGVO-COURSES")).Select(m => PlainText(m.Explanation))
-            .Concat(session.Tasks.Where(t => !t.IsSatisfied).Select(t => t.Title + " ist noch offen (Schritt 3)."))
-            .Concat(session.CountedCourses < ChoiceWorkflow.MinimumCourses ? [$"Es fehlen noch {ChoiceWorkflow.MinimumCourses - session.CountedCourses} Halbjahreskurse bis zur Mindestzahl von {ChoiceWorkflow.MinimumCourses} (Schritt 4)."] : Array.Empty<string>())
-            .Distinct().ToArray();
-        var todoPanel = new StackPanel { Name = "TodoList", Spacing = 4 };
+        var rawTodo = messages.Where(m => m.Rule.Severity == ReviewStatus.Invalid && !(onlyCountMissing && m.Rule.Id == "AGVO-COURSES"))
+                .Select(m => (Text: PlainText(m.Explanation), TargetStep: TargetStepForRule(m.Rule.Id)))
+            .Concat(session.Tasks.Where(t => !t.IsSatisfied).Select(t => (Text: t.Title + " ist noch offen (Schritt 3).", TargetStep: (int?)3)))
+            .Concat(session.CountedCourses < ChoiceWorkflow.MinimumCourses ? [(Text: $"Es fehlen noch {ChoiceWorkflow.MinimumCourses - session.CountedCourses} Halbjahreskurse bis zur Mindestzahl von {ChoiceWorkflow.MinimumCourses} (Schritt 4).", TargetStep: (int?)4)] : Array.Empty<(string Text, int? TargetStep)>())
+            .ToArray();
+        var seenTodo = new HashSet<string>(StringComparer.Ordinal);
+        var todo = rawTodo.Where(item => seenTodo.Add(item.Text)).ToArray();
+
+        var todoPanel = new StackPanel { Name = "TodoList", Spacing = 6 };
         todoPanel.Children.Add(Text(todo.Length == 0 ? "✓ Nichts mehr zu tun" : $"Das musst du noch tun ({todo.Length})", 16, FontWeight.SemiBold, todo.Length == 0 ? Done : Danger));
-        foreach (var item in todo) todoPanel.Children.Add(Text("• " + item, 13));
-        if (todo.Length == 0) todoPanel.Children.Add(Text("Deine Wahl ist aus Sicht der automatischen Prüfung vollständig. Speichere sie und exportiere den Kontrollbogen.", 13, color: Muted));
+        for (var idx = 0; idx < todo.Length; idx++)
+        {
+            var item = todo[idx];
+            if (item.TargetStep is { } target && target >= session.FirstStep && target < session.Step)
+            {
+                var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+                var line = Text("• " + item.Text, 13); line.VerticalAlignment = VerticalAlignment.Center;
+                row.Children.Add(line);
+                var jump = new Button
+                {
+                    Name = $"TodoJump_{idx}_{target}",
+                    Content = $"→ Schritt {target}",
+                    FontSize = 12,
+                    Padding = new Thickness(8, 3),
+                    Margin = new Thickness(8, 0, 0, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    IsEnabled = !session.IsBusy
+                };
+                jump.Click += (_, _) => Edit(() => { expandedTask = null; session.GoToStep(target); });
+                Grid.SetColumn(jump, 1); row.Children.Add(jump);
+                todoPanel.Children.Add(row);
+            }
+            else
+                todoPanel.Children.Add(Text("• " + item.Text, 13));
+        }
+        if (todo.Length == 0) todoPanel.Children.Add(Text("Deine Wahl ist aus Sicht der automatischen Prüfung vollständig. Speichere sie. Wenn du möchtest, kannst du zusätzlich den Kontrollbogen als PDF exportieren.", 13, color: Muted));
         panel.Children.Add(new Border { Child = todoPanel, Padding = new Thickness(12, 8), CornerRadius = new CornerRadius(8), Background = todo.Length == 0 ? DoneSoft : Brush("#FCEBEB") });
 
         var clarify = messages.Where(m => m.Rule.Severity != ReviewStatus.Invalid && !GeneralRuleIds.Contains(m.Rule.Id)).Select(m => PlainText(m.Explanation)).Distinct().ToArray();
@@ -547,25 +654,31 @@ public sealed class MainWindow : Window
         }
 
         var export = new Button { Content = "Kontrollbogen als _PDF exportieren", Name = "ControlSheetButton" };
-        export.Click += async (_, _) => await RunFileAction(async () =>
+        export.Click += async (_, _) =>
         {
-            var file = await StorageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+            var exported = false;
+            await RunFileAction(async () =>
             {
-                Title = "Kontrollbogen speichern", SuggestedFileName = "kurswahl-kontrollbogen.pdf", DefaultExtension = "pdf",
-                FileTypeChoices = [new("PDF-Kontrollbogen") { Patterns = ["*.pdf"] }], ShowOverwritePrompt = true
+                var file = await StorageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+                {
+                    Title = "Kontrollbogen speichern", SuggestedFileName = "kurswahl-kontrollbogen.pdf", DefaultExtension = "pdf",
+                    FileTypeChoices = [new("PDF-Kontrollbogen") { Patterns = ["*.pdf"] }], ShowOverwritePrompt = true
+                });
+                if (file is null) return;
+                if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Kontrollbögen müssen als .pdf gespeichert werden; Wahl- und Profildateien bleiben geschützt.");
+                var pdf = GsmKurswahl.ImportExport.ControlSheet.Render(session.Choice, session.Catalog,
+                    session.Profile, session.Validation, session.Summary, session.ExamOptions);
+                await using var stream = await file.OpenWriteAsync();
+                stream.SetLength(0);
+                await stream.WriteAsync(pdf);
+                exported = true;
             });
-            if (file is null) return;
-            if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Kontrollbögen müssen als .pdf gespeichert werden; Wahl- und Profildateien bleiben geschützt.");
-            var pdf = GsmKurswahl.ImportExport.ControlSheet.Render(session.Choice, session.Catalog,
-                session.Profile, session.Validation, session.Summary, session.ExamOptions);
-            await using var stream = await file.OpenWriteAsync();
-            stream.SetLength(0);
-            await stream.WriteAsync(pdf);
-        });
+            if (exported && string.IsNullOrEmpty(error.Text)) ShowSuccess("✓ Kontrollbogen als PDF gespeichert.");
+        };
         panel.Children.Add(export);
 
-        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold));
+        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold, session.CountedCourses >= ChoiceWorkflow.MinimumCourses ? Done : null));
         var table = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto"), Margin = new Thickness(0, 4) };
         var summary = session.Summary;
         for (var i = 0; i < summary.Length; i++)
@@ -639,6 +752,8 @@ public sealed class MainWindow : Window
                 }
             }
             plan.Children.Add(grid);
+            if (session.Step > session.FirstStep)
+                plan.Children.Add(Text("Tipp: Klicke ein Fach an, um zum zugehörigen Schritt zurückzuspringen.", 11, color: Muted));
         }
         var legend = new WrapPanel();
         foreach (var (name, fill) in new[] { ("Leistungsfach", LfFill), ("Basisfach", BfFill), ("Wahlfach/Seminar", OtherFill) })
@@ -767,6 +882,33 @@ public sealed class MainWindow : Window
         var cancel = new Button { Content = "Abbrechen" }; var discard = new Button { Content = "Änderungen verwerfen" };
         cancel.Click += (_, _) => dialog.Close(false); discard.Click += (_, _) => dialog.Close(true);
         buttons.Children.Add(cancel); buttons.Children.Add(discard); panel.Children.Add(buttons); dialog.Content = panel;
+        return await dialog.ShowDialog<bool>(this);
+    }
+
+    private async Task<bool> ConfirmClose()
+    {
+        if (session.LoadFailed) return await Confirm("Ungespeicherte Änderungen verwerfen und schließen?");
+        var dialog = new Window { Title = "Entwurf schützen", Width = 540, Height = 220, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var panel = new StackPanel { Margin = new Thickness(22), Spacing = 18 };
+        panel.Children.Add(Text("Du hast ungespeicherte Änderungen. Möchtest du vor dem Schließen speichern?", 16));
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = new Button { Content = "Abbrechen" };
+        var discard = new Button { Content = "Änderungen verwerfen" };
+        var saveClose = new Button { Content = "Speichern und schließen", Background = Accent, Foreground = Brushes.White, FontWeight = FontWeight.SemiBold };
+        cancel.Click += (_, _) => dialog.Close(false);
+        discard.Click += (_, _) => dialog.Close(true);
+        saveClose.Click += async (_, _) =>
+        {
+            saveClose.IsEnabled = false;
+            try
+            {
+                await RunFileAction(() => session.SaveAsync());
+                dialog.Close(string.IsNullOrEmpty(error.Text));
+            }
+            catch { dialog.Close(false); }
+        };
+        buttons.Children.Add(cancel); buttons.Children.Add(discard); buttons.Children.Add(saveClose);
+        panel.Children.Add(buttons); dialog.Content = panel;
         return await dialog.ShowDialog<bool>(this);
     }
 

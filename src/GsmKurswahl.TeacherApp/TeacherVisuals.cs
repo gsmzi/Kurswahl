@@ -17,10 +17,14 @@ public sealed partial class TeacherWindow
     private static readonly IBrush Accent = Brush.Parse("#176B68");
     private static readonly IBrush SoftAccent = Brush.Parse("#E2F1EE");
     private static readonly IBrush Line = Brush.Parse("#DAE3E9");
+    private enum FeedbackKind { Info, Success, Warning, Error }
     private readonly StackPanel workflowProgress = new() { Name = "WorkflowProgress", Spacing = 10 };
     private readonly TextBlock sectionLabel = new() { FontSize = 12, Foreground = Muted, FontWeight = FontWeight.SemiBold };
     private readonly Button yearSwitchButton = new() { Content = "Jahrgang wechseln / neu …", Name = "SwitchYearHeader", Padding = new Thickness(10, 4), MinHeight = 28, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock statusIcon = new() { Text = "ℹ", FontSize = 14, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
     private Border statusBanner = null!;
+    private FeedbackKind feedbackKind = FeedbackKind.Info;
+    private bool updatingFeedback;
 
     internal static string FormatStatus(ReviewStatus? status) => status switch
     {
@@ -81,6 +85,79 @@ public sealed partial class TeacherWindow
         _ => kind.ToString()
     };
 
+    private static bool IsErrorMessage(string msg) =>
+        msg.Contains("nicht abgeschlossen", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("nicht gespeichert", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("nicht vollständig gespeichert", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsSuccessMessage(string msg) =>
+        msg.Contains("gespeichert", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("verteilt", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("übernommen", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("exportiert", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("angelegt", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("wiederhergestellt", StringComparison.OrdinalIgnoreCase)
+        || msg.Contains("erstellt", StringComparison.OrdinalIgnoreCase);
+
+    private void SetStatus(string message, FeedbackKind kind = FeedbackKind.Info)
+    {
+        updatingFeedback = true;
+        try
+        {
+            feedbackKind = kind;
+            status.Text = message;
+            ApplyFeedbackStyle();
+        }
+        finally { updatingFeedback = false; }
+    }
+
+    private void SetError(string message) =>
+        SetStatus(message.StartsWith("Vorgang nicht abgeschlossen:", StringComparison.Ordinal) ? message : "Vorgang nicht abgeschlossen: " + message, FeedbackKind.Error);
+
+    private void ClearError()
+    {
+        if (feedbackKind == FeedbackKind.Error)
+            SetStatus("", FeedbackKind.Info);
+    }
+
+    private void ApplyFeedbackStyle()
+    {
+        var msg = status.Text ?? "";
+        if (statusBanner is null) return;
+        statusBanner.IsVisible = !string.IsNullOrWhiteSpace(msg);
+        statusBanner.Background = feedbackKind switch
+        {
+            FeedbackKind.Error => Brush.Parse("#FCEBEB"),
+            FeedbackKind.Warning => Brush.Parse("#FAEEDA"),
+            FeedbackKind.Success => Brush.Parse("#E6F4EA"),
+            _ => Brush.Parse("#EDF2F6")
+        };
+        statusBanner.BorderBrush = feedbackKind switch
+        {
+            FeedbackKind.Error => Brush.Parse("#A32D2D"),
+            FeedbackKind.Warning => Brush.Parse("#C48723"),
+            FeedbackKind.Success => Accent,
+            _ => Line
+        };
+        status.Foreground = feedbackKind switch
+        {
+            FeedbackKind.Error => Brush.Parse("#8C1D1D"),
+            FeedbackKind.Warning => Brush.Parse("#785311"),
+            FeedbackKind.Success => Brush.Parse("#13544E"),
+            _ => Ink
+        };
+        statusIcon.Text = feedbackKind switch
+        {
+            FeedbackKind.Error => "⚠",
+            FeedbackKind.Warning => "⚠",
+            FeedbackKind.Success => "✓",
+            _ => "ℹ"
+        };
+        statusIcon.Foreground = status.Foreground;
+    }
+
     private void BuildVisualShell()
     {
         RequestedThemeVariant = ThemeVariant.Light;
@@ -107,46 +184,80 @@ public sealed partial class TeacherWindow
         header.Children.Add(workflowProgress);
         header.Margin = new Thickness(0, 0, 0, 12);
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-        var footer = new StackPanel { Spacing = 4, Margin = new Thickness(0, 12, 0, 0) };
+
         status.FontSize = 13; status.Foreground = Ink; status.FontWeight = FontWeight.Medium;
+        status.VerticalAlignment = VerticalAlignment.Center;
+        var dismissAlert = new Button
+        {
+            Name = "DismissAlert", Content = "✕", Padding = new Thickness(6, 2), MinHeight = 24, MinWidth = 24,
+            Background = Brushes.Transparent, BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(8, 0, 0, 0)
+        };
+        ToolTip.SetTip(dismissAlert, "Meldung ausblenden");
+        dismissAlert.Click += (_, _) => { statusBanner.IsVisible = false; if (feedbackKind == FeedbackKind.Error) ClearError(); };
+        var alertGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
+        alertGrid.Children.Add(statusIcon);
+        var alertScroll = new ScrollViewer { Content = status, MaxHeight = 160 };
+        Grid.SetColumn(alertScroll, 1); alertGrid.Children.Add(alertScroll);
+        Grid.SetColumn(dismissAlert, 2); alertGrid.Children.Add(dismissAlert);
         statusBanner = new Border
         {
-            Background = Brush.Parse("#EDF2F6"), BorderBrush = Line, BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 6),
-            Child = new ScrollViewer { Content = status, MaxHeight = 54 }
+            Name = "AlertBanner",
+            Background = Brush.Parse("#EDF2F6"), BorderBrush = Line, BorderThickness = new Thickness(4, 1, 1, 1),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 8), Margin = new Thickness(8, 0, 8, 10),
+            Child = alertGrid
         };
         status.PropertyChanged += (_, e) =>
         {
-            if (e.Property != TextBlock.TextProperty) return;
+            if (e.Property != TextBlock.TextProperty || updatingFeedback) return;
             var msg = status.Text ?? "";
-            var isError = msg.Contains("nicht abgeschlossen", StringComparison.OrdinalIgnoreCase)
-                || msg.Contains("nicht gespeichert", StringComparison.OrdinalIgnoreCase)
-                || msg.Contains("fehlgeschlagen", StringComparison.OrdinalIgnoreCase)
-                || msg.Contains("Bitte ", StringComparison.OrdinalIgnoreCase);
-            var isSuccess = !isError && (msg.Contains("gespeichert", StringComparison.OrdinalIgnoreCase)
-                || msg.Contains("verteilt", StringComparison.OrdinalIgnoreCase)
-                || msg.Contains("übernommen", StringComparison.OrdinalIgnoreCase)
-                || msg.Contains("abgeschlossen", StringComparison.OrdinalIgnoreCase)
-                || msg.Contains("exportiert", StringComparison.OrdinalIgnoreCase)
-                || msg.Contains("angelegt", StringComparison.OrdinalIgnoreCase));
-            statusBanner.Background = isError ? Brush.Parse("#FCEBEB") : isSuccess ? Brush.Parse("#E6F4EA") : Brush.Parse("#EDF2F6");
-            statusBanner.BorderBrush = isError ? Brush.Parse("#E09B9B") : isSuccess ? Accent : Line;
-            status.Foreground = isError ? Brush.Parse("#8C1D1D") : isSuccess ? Brush.Parse("#13544E") : Ink;
+            feedbackKind = IsErrorMessage(msg) ? FeedbackKind.Error
+                : IsSuccessMessage(msg) ? FeedbackKind.Success
+                : FeedbackKind.Info;
+            ApplyFeedbackStyle();
         };
-        busyPanel.Children.Add(busyText); busyPanel.Children.Add(busyProgress);
-        footer.Children.Add(busyPanel);
-        footer.Children.Add(statusBanner);
+        ApplyFeedbackStyle();
+
+        var footer = new StackPanel { Spacing = 2, Margin = new Thickness(0, 8, 0, 0) };
         footer.Children.Add(new TextBlock { Text = "Synthetische Daten · fachliche Freigabe offen · keine verbindliche Abgabe", FontSize = 11, Foreground = Muted });
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
+
+        busyPanel.Children.Add(busyText); busyPanel.Children.Add(busyProgress);
+        busyPanel.Margin = new Thickness(8, 0, 8, 8);
+
         var content = new DockPanel();
-        sectionLabel.Margin = new Thickness(8, 0, 8, 12); DockPanel.SetDock(sectionLabel, Dock.Top); content.Children.Add(sectionLabel); content.Children.Add(pageHost);
+        sectionLabel.Margin = new Thickness(8, 0, 8, 8); DockPanel.SetDock(sectionLabel, Dock.Top); content.Children.Add(sectionLabel);
+        DockPanel.SetDock(busyPanel, Dock.Top); content.Children.Add(busyPanel);
+        DockPanel.SetDock(statusBanner, Dock.Top); content.Children.Add(statusBanner);
+        content.Children.Add(pageHost);
         root.Children.Add(Surface(content, 20)); Content = root;
     }
     private static Border Surface(Control content, double padding = 16) => new()
     {
         Background = Brushes.White, BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(padding), Child = content
     };
+    private static Border SubtleCard(Control content, double padding = 12) => new()
+    {
+        Background = Brush.Parse("#F8FAFC"), BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(padding), Child = content
+    };
+    private static Border InlineErrorBox(string name, out TextBlock text)
+    {
+        text = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brush.Parse("#8C1D1D"), FontSize = 13 };
+        return new Border
+        {
+            Name = name, Background = Brush.Parse("#FCEBEB"), BorderBrush = Brush.Parse("#A32D2D"), BorderThickness = new Thickness(4, 1, 1, 1),
+            CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 6), IsVisible = false, Child = text
+        };
+    }
+    private static void SetInlineError(Border box, TextBlock text, string? message)
+    {
+        var has = !string.IsNullOrWhiteSpace(message);
+        text.Text = has ? message : "";
+        box.IsVisible = has;
+    }
     private static Button Primary(Button button) { button.Classes.Add("primary"); return button; }
+    private static Button Compact(Button button) { button.Classes.Add("compact"); return button; }
+    private static Button Danger(Button button) { button.Classes.Add("danger"); return button; }
     private void UpdateVisualNavigation()
     {
         yearSwitchButton.IsVisible = workspace?.Active is not null && visiblePage != "new";
@@ -156,7 +267,7 @@ public sealed partial class TeacherWindow
             "offer" => "EINRICHTUNG  /  FACHANGEBOT", "import" => "SCHÜLERLISTE  /  IMPORT & ABGLEICH",
             "profiles" => "SCHÜLERDATEIEN  /  VERTEILUNG", "collection" => "KURSWAHLEN  /  EINGANG & KONFLIKTE",
             "wahl" => "WAHL / VORBEREITEN & EINSAMMELN", "results" => "KURSWAHLEN / PRÜFEN, ÄNDERN, DRUCKEN", "people" => "WAHL / SCHÜLERBESTAND", "settings" => "EINSTELLUNGEN", "help" => "HILFE & DATEIEN",
-            "planning" => "KURSPLANUNG / SZENARIEN & ANALYSE", "manage" => "JAHRGANG VERWALTEN", "catalog" => "FACHANGEBOT", "new" => "WILLKOMMEN", "asv" => "ABGLEICH / ABSCHLUSS", _ => "JAHRGANGSÜBERSICHT"
+            "planning" => "KURSPLANUNG / SZENARIEN & ANALYSE", "manage" => "JAHRGANG VERWALTEN", "catalog" => "FACHANGEBOT", "new" => "WILLKOMMEN", "asv" => "ASV-ABGLEICH", _ => "JAHRGANGSÜBERSICHT"
         };
         foreach (var button in navigation.Children.OfType<Button>())
         {
@@ -166,7 +277,7 @@ public sealed partial class TeacherWindow
                 "Übersicht" => visiblePage == "start", "Wahl" => visiblePage is "wahl" or "offer" or "import" or "profiles" or "collection" or "people",
                 "Kurswahlen" => visiblePage == "results",
                 "Kursplanung" => visiblePage == "planning",
-                "Abgleich / Abschluss" => visiblePage == "asv",
+                "ASV-Abgleich" => visiblePage == "asv",
                 "Jahrgang verwalten" => visiblePage is "manage" or "catalog", "Einstellungen" => visiblePage == "settings",
                 "Hilfe" => visiblePage == "help", "Zur Einrichtung" => visiblePage is "new" or "offer" or "import" or "profiles", _ => false
             };
@@ -190,17 +301,27 @@ public sealed partial class TeacherWindow
             var stepIndex = i;
             var complete = active is not null && (i == 0 ? setup != YearSetupStep.Offer : i == 1 ? stage > 1 || setup == YearSetupStep.Complete && summary?.Students > 0 : i == 2 ? distributed : summary is { Students: > 0 } && summary.Choices == summary.Students && collections.IsEmpty);
             var current = stage == i || setup == YearSetupStep.Complete && (i == 2 && !distributed || i == 3 && distributed && !complete);
+            var viewing = i switch
+            {
+                0 => visiblePage is "offer" or "catalog",
+                1 => visiblePage == "import",
+                2 => visiblePage == "profiles",
+                3 => visiblePage == "collection",
+                _ => false
+            };
             var state = current ? "Aktueller Schritt" : complete ? "Erledigt" : "Noch offen";
             if (setup == YearSetupStep.Complete && i == 2 && !distributed) state = "Zustellungen offen";
             var caption = new StackPanel { Spacing = 3 };
-            caption.Children.Add(new TextBlock { Text = titles[i], FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap, Foreground = current ? Accent : Ink });
-            caption.Children.Add(new TextBlock { Name = "WorkflowState" + i, Text = state, FontSize = 12, Foreground = current || complete ? Accent : Muted });
-            var number = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = current ? Accent : complete ? SoftAccent : Brush.Parse("#EDF1F4"), VerticalAlignment = VerticalAlignment.Top,
-                Child = new TextBlock { Text = complete && !current ? "✓" : (i + 1).ToString(), Foreground = current ? Brushes.White : complete ? Accent : Muted, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+            caption.Children.Add(new TextBlock { Text = titles[i], FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap, Foreground = viewing || current ? Accent : Ink });
+            caption.Children.Add(new TextBlock { Name = "WorkflowState" + i, Text = state, FontSize = 12, Foreground = viewing || current || complete ? Accent : Muted });
+            var number = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = current || viewing ? Accent : complete ? SoftAccent : Brush.Parse("#EDF1F4"), VerticalAlignment = VerticalAlignment.Top,
+                Child = new TextBlock { Text = complete && !current ? "✓" : (i + 1).ToString(), Foreground = current || viewing ? Brushes.White : complete ? Accent : Muted, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("42,*") }; row.Children.Add(number); Grid.SetColumn(caption, 1); row.Children.Add(caption);
             var tile = Surface(row, 12); tile.Name = "WorkflowStep" + i;
             tile.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
-            tile.Background = current ? Brush.Parse("#F0F8F6") : Brushes.White; tile.BorderBrush = current ? Accent : Line;
+            tile.Background = viewing ? SoftAccent : current ? Brush.Parse("#F0F8F6") : Brushes.White;
+            tile.BorderBrush = viewing || current ? Accent : Line;
+            tile.BorderThickness = new Thickness(viewing ? 2 : 1);
             tile.PointerPressed += (_, _) => JumpToWorkflowStep(stepIndex);
             AutomationProperties.SetName(tile, $"Schritt {i + 1}: {titles[i]}. {state}.");
             ToolTip.SetTip(tile, descriptions[i] + ". Anklicken, um direkt zu diesem Schritt zu wechseln. Die Anzeige beschreibt den Arbeitsablauf, keine fachliche Freigabe.");
@@ -213,27 +334,31 @@ public sealed partial class TeacherWindow
         }
         workflowProgress.Children.Add(strip);
     }
-    private static Control SummaryCards(TeacherDashboard summary)
+    private Control SummaryCards(TeacherDashboard summary)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*") };
-        (string Value, string Label, string Tip)[] values = [
-            (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen."),
-            ($"{summary.Delivered} / {summary.Students}", "Profile zugestellt", "Anzahl der Personen, deren aktuelles persönliches Profil (profil.json) und Fachangebot erfolgreich im Wahlordner abgelegt wurden."),
-            (summary.Choices.ToString(), "Wahlen eingelesen", "Anzahl der Personen, für die bereits eine Kurswahl im Lehrerbestand vorliegt."),
-            (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen, Sonderfällen (z. B. Sportersatz, Religion/Ethik) oder Regelverstößen.")];
+        (string Value, string Label, string Tip, Action Open)[] values = [
+            (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen.", () => ShowPage("people")),
+            ($"{summary.Delivered} / {summary.Students}", "Profile zugestellt", "Anzahl der Personen, deren aktuelles persönliches Profil (profil.json) und Fachangebot erfolgreich im Wahlordner abgelegt wurden.", () => ShowPage("profiles")),
+            (summary.Choices.ToString(), "Wahlen eingelesen", "Anzahl der Personen, für die bereits eine Kurswahl im Lehrerbestand vorliegt.", () => { choiceFilter = new(); ShowResults(); }),
+            (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen, Sonderfällen (z. B. Sportersatz, Religion/Ethik) oder Regelverstößen.", () => { choiceFilter = new(State: ChoiceStateFilter.NeedsReview); ShowResults(); })];
         if (summary.Students > 0 && summary.Choices == summary.Students)
             values = [
-                (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen."),
-                (summary.Choices.ToString(), "Wahlen eingelesen", "Alle Schüler dieses Jahrgangs haben eine erfasste Kurswahl."),
-                (summary.Reselections.ToString(), "Offene Nachwahlen", "Schüler, die nach einer Kursstreichung oder wegen eines Regelverstoßes erneut wählen müssen."),
-                (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen, Sonderfällen oder Regelverstößen.")];
+                (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen.", () => ShowPage("people")),
+                (summary.Choices.ToString(), "Wahlen eingelesen", "Alle Schüler dieses Jahrgangs haben eine erfasste Kurswahl.", () => { choiceFilter = new(); ShowResults(); }),
+                (summary.Reselections.ToString(), "Offene Nachwahlen", "Schüler, die nach einer Kursstreichung oder wegen eines Regelverstoßes erneut wählen müssen.", () => { choiceFilter = new(State: ChoiceStateFilter.ReselectionOpen); ShowResults(); }),
+                (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen, Sonderfällen oder Regelverstößen.", () => { choiceFilter = new(State: ChoiceStateFilter.NeedsReview); ShowResults(); })];
         for (var i = 0; i < values.Length; i++)
         {
+            var entry = values[i];
             var body = new StackPanel { Spacing = 5 };
-            body.Children.Add(new TextBlock { Text = values[i].Value, FontSize = 28, FontWeight = FontWeight.SemiBold, Foreground = i == 3 && summary.Reviews > 0 ? Brush.Parse("#946312") : Accent });
-            body.Children.Add(new TextBlock { Text = values[i].Label, FontSize = 12, Foreground = Muted, TextWrapping = TextWrapping.Wrap });
+            body.Children.Add(new TextBlock { Text = entry.Value, FontSize = 28, FontWeight = FontWeight.SemiBold, Foreground = i == 3 && summary.Reviews > 0 ? Brush.Parse("#946312") : Accent });
+            body.Children.Add(new TextBlock { Text = entry.Label, FontSize = 12, Foreground = Muted, TextWrapping = TextWrapping.Wrap });
             var card = Surface(body); card.Margin = new Thickness(i == 0 ? 0 : 8, 0, 0, 0);
-            ToolTip.SetTip(card, values[i].Tip);
+            card.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+            card.PointerPressed += (_, _) => entry.Open();
+            AutomationProperties.SetName(card, $"{entry.Label}: {entry.Value}");
+            ToolTip.SetTip(card, entry.Tip + "\n\nKlicken zum Öffnen.");
             Grid.SetColumn(card, i); grid.Children.Add(card);
         }
         return grid;

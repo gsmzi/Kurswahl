@@ -123,7 +123,17 @@ Alle 80 Wahlen werden beim Erzeugen mit dem produktiven Regelkern auf Invalid-Me
 
 ## Testpaket für Kolleginnen und Kollegen
 
-`Testpaket-bauen.cmd` doppelklicken (benötigt das .NET-10-SDK). Es entsteht `artifacts/testpaket/GSM-Kurswahl-Testpaket-<Datum>-<Kennung>.zip` mit beiden Programmen (Windows x64, selbstenthaltend, keine Installation nötig) und einer `.cmd`-Datei je Stand. Das gesamte ZIP in einen eigenen Ordner auf dem Netzlaufwerk im Verwaltungsnetz entpacken und Kollegen dort Leserechte geben. Den gewünschten Stand doppelklicken; `LIESMICH.txt` im Paket erklärt die Bedienung.
+`Testpaket-bauen.cmd` doppelklicken (benötigt das .NET-10-SDK). Es entsteht `artifacts/testpaket/GSM-Kurswahl-Testpaket-<Datum>-<Kennung>.zip` mit beiden Programmen (Windows x64, selbstenthaltend, keine Installation nötig) und einer `.cmd`-Datei je Stand. Den gewünschten Stand doppelklicken; `LIESMICH.txt` im Paket erklärt die Bedienung.
+
+Für angeforderte Testpakete gilt seit 17.11.2026 als Standardziel
+`C:\Users\m-zim\116522 Gymnasium bei St. Michael\ESL - General\Schulorganisation\Softwareentwicklung\Kurswahl-Testversion`.
+Jede Bereitstellung erhält einen eigenen Unterordner `YYYY-MM-DD_HH-MM`; die Starter
+liegen direkt darin. Vor der Bereitstellung Gesamttests und Paketprüfung ausführen,
+danach die vollständige Kopie per SHA-256 mit dem Bauordner vergleichen. Die neue
+und die unmittelbar vorherige Version bleiben verfügbar; ältere erst nach erfolgreicher
+Prüfung und gegebenenfalls geprüfter Sicherung ihrer Arbeitsdaten entfernen.
+Der Bauprozess selbst erzeugt weiterhin nur das lokale Paket. Verbindlicher Ablauf,
+Sicherungsort und Schutz bestehender Daten: [Testpaket-Regeln](AGENTS.md#testpakete).
 
 | Stand | Inhalt |
 | --- | --- |

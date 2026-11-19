@@ -76,4 +76,65 @@ public sealed class ReconciliationTests : IDisposable
         using var check = restored.OpenActive(); Assert.Equal(2, check.TransferReceipts().Length); Assert.Equal(2, check.History("demo-001").Length);
         Assert.True(check.TransferTrackingEnabled); Assert.True(check.PlanningEnabled);
     }
+
+    [Fact]
+    public void AsvComparisonMatchesBilingualBiologyWithNoteAndDetectsTypeOralWarningAndDepartureDifferences()
+    {
+        var biliCatalog = catalog with
+        {
+            Offers = [.. catalog.Offers, new("BIO-LF-BILI", "BIO", CourseType.Lf, CourseVariant.Bilingual, OfferStatus.Offered,
+                [new(1, 5), new(2, 5), new(3, 5), new(4, 5)], [Requirement.ContinuousBilingual])]
+        };
+        var workspace = new TeacherWorkspace(root); workspace.Create(biliCatalog, "demo-test");
+        using var store = workspace.OpenActive();
+        store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+        store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-002", "Demo Zwei", "10a", 2029, DepartureStatus.ConfirmedDeparture, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+
+        var session = new TeacherSession(store, biliCatalog, "demo-test");
+        session.Save(TestData.Choice with
+        {
+            StudentId = "demo-001",
+            Selections = [TestData.Select(biliCatalog.Offers.Single(o => o.Id == "BIO-LF-BILI")), TestData.Select(biliCatalog.Offers.Single(o => o.Id == "D-LF"))],
+            PlannedOralSubjects = ["M", "D"]
+        }, null, RevisionSource.TeacherEdit, "Ursprung");
+
+        var service = new ChoiceReconciliation(store, biliCatalog, "demo-test");
+
+        // 1. BIO-LF-BILI internally matches normal BIO-LF in ASV + reversed oral order is identical + missing identity reported + ConfirmedDeparture detail
+        var extMatch = new ExternalChoice("demo-001", 2029,
+            [TestData.Select(biliCatalog.Offers.Single(o => o.Id == "BIO-LF")), TestData.Select(biliCatalog.Offers.Single(o => o.Id == "D-LF"))])
+        {
+            CompareOralSubjects = true,
+            IgnoreBilingualVariant = true,
+            PlannedOralSubjects = ["D", "M"]
+        };
+        var previewMatch = service.Preview([extMatch], Origin, [(4, "Fehlende Id", "KS1")]);
+        var itemMatch = previewMatch.Items.Single(i => i.StudentId == "demo-001");
+        Assert.Equal(ReconciliationKind.Identical, itemMatch.Kind);
+        Assert.Empty(itemMatch.Differences);
+        Assert.Contains(itemMatch.Notes, n => n.Contains("bilingual", StringComparison.OrdinalIgnoreCase));
+
+        var itemInternal = previewMatch.Items.Single(i => i.StudentId == "demo-002");
+        Assert.Equal(ReconciliationKind.OnlyInternal, itemInternal.Kind);
+        Assert.Contains("bestätigter Abgänger", itemInternal.Detail);
+
+        var itemMissingId = previewMatch.Items.Single(i => i.Kind == ReconciliationKind.InvalidIdentity);
+        Assert.Contains("Zeile 4", itemMissingId.Detail);
+
+        // 2. BIO-LF-BILI internally vs BIO-BF in ASV + different oral subjects + unknown ASV warning => Changed with clear lines
+        var extMismatch = new ExternalChoice("demo-001", 2029,
+            [TestData.Select(biliCatalog.Offers.Single(o => o.Id == "BIO-BF")), TestData.Select(biliCatalog.Offers.Single(o => o.Id == "D-LF"))])
+        {
+            CompareOralSubjects = true,
+            IgnoreBilingualVariant = true,
+            PlannedOralSubjects = ["D", "G"],
+            Warnings = ["Unbekanntes ASV-Fach im Katalog: SEM [3] (HJ 1,2)"]
+        };
+        var previewMismatch = service.Preview([extMismatch], Origin);
+        var itemMismatch = previewMismatch.Items.Single(i => i.StudentId == "demo-001");
+        Assert.Equal(ReconciliationKind.Changed, itemMismatch.Kind);
+        Assert.Contains(itemMismatch.Differences, d => d.Contains("BIO", StringComparison.OrdinalIgnoreCase) && d.Contains("LF bilingual") && d.Contains("ASV BF"));
+        Assert.Contains(itemMismatch.Differences, d => d.StartsWith("Mündliche Prüfungsfächer:", StringComparison.Ordinal));
+        Assert.Contains(itemMismatch.Differences, d => d.Contains("SEM [3]"));
+    }
 }

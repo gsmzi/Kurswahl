@@ -10,7 +10,7 @@ public static class ControlSheet
     {
         using var pdf = new SchoolPaper("Entwurf · " + choice.StudentId, choice.GraduationYear);
         pdf.Title("Kontrollbogen zur Kurswahl");
-        pdf.Paragraph("Vorläufiger Entwurf · nicht eingereicht · keine verbindliche Freigabe");
+        pdf.Paragraph("Vorläufige Übersicht · gespeicherte Wahlen sammelt die Oberstufenberatung ein · keine verbindliche Freigabe");
         pdf.Paragraph(string.IsNullOrWhiteSpace(profile.DisplayName) ? "Schüler-ID: " + choice.StudentId
             : profile.DisplayName + " · Klasse " + profile.ClassName + " · " + choice.StudentId);
         pdf.Paragraph($"Wahlstand: {choice.UpdatedAt:dd.MM.yyyy HH:mm zzz} · Revision {choice.Revision}", true);
@@ -20,10 +20,10 @@ public static class ControlSheet
         {
             var offer = catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId);
             return new[] { Name(s.SubjectId) + (s.Variant == CourseVariant.Bilingual ? " bilingual" : "") + CourseAnnotations.Suffix(offer),
-                Type(s.Type), Hours(1), Hours(2), Hours(3), Hours(4) };
+                PlainDocumentText.FormatCourseTypeFull(s.Type), Hours(1), Hours(2), Hours(3), Hours(4) };
             string Hours(int h) => s.Semesters.Contains(h) ? offer?.Schedule.FirstOrDefault(x => x.Semester == h)?.WeeklyHours.ToString() ?? "?" : "-";
         }).ToArray();
-        pdf.Table(["Fach und Hinweise", "Kursart", "HJ 1", "HJ 2", "HJ 3", "HJ 4"], rows, [235, 60, 48, 48, 48, 48]);
+        pdf.Table(["Fach und Hinweise", "Kursart", "HJ 1", "HJ 2", "HJ 3", "HJ 4"], rows, [215, 80, 48, 48, 48, 48]);
         pdf.Heading("Kurse und Wochenstunden");
         var totals = summaries.OrderBy(s => s.Semester).ToArray();
         pdf.Table(new[] { "Übersicht" }.Concat(totals.Select(s => "HJ " + s.Semester)).ToArray(),
@@ -40,28 +40,45 @@ public static class ControlSheet
             pdf.Ensure(100);
             pdf.Paragraph("Mögliche Kombinationen aus deiner Belegung (vorläufig):");
             pdf.Table(["Erstes Fach", "Zweites Fach", "Mindestanrechnung"], options.Select(o => new[] { Name(o.First), Name(o.Second), o.MinimumCredits + " Kurse" }).ToArray(), [170, 170, 140]);
-            pdf.Paragraph("Alle Kombinationen sind vorläufig. Voraussetzungen, Rechtsstand und Anrechnung sind zu bestätigen. BLL/SIA ersetzt kein Fach automatisch.", true);
+            pdf.Paragraph("Alle Kombinationen sind vorläufig. Voraussetzungen, Rechtsstand und Anrechnung bestätigt die Oberstufenberatung. Eine besondere Lernleistung (BLL) oder der Seminarkurs (SIA) ersetzt kein Prüfungsfach automatisch.", true);
         }
         pdf.Heading("Was noch zu tun ist");
-        pdf.Paragraph(validation.Status == ReviewStatus.Invalid ? "Die Kurswahl muss korrigiert werden."
-            : "Die Kurswahl bleibt vorläufig und muss von der Oberstufenberatung geprüft werden.");
-        foreach (var group in validation.Messages.OrderBy(m => m.Rule.Severity == ReviewStatus.Invalid ? 0 : 1).GroupBy(m => m.Rule.Severity == ReviewStatus.Invalid))
+        var hasPlanOralInvalid = validation.Messages.Any(m => m.Rule.Id == "PLAN-ORAL" && m.Rule.Severity == ReviewStatus.Invalid);
+        var filtered = validation.Messages
+            .Where(m => !PlainDocumentText.ShouldSuppressInDocument(m, choice) && !(m.Rule.Id == "AGVO-EXAM" && hasPlanOralInvalid))
+            .ToArray();
+        var toCorrect = filtered.Where(m => m.Rule.Severity == ReviewStatus.Invalid)
+            .Select(m => PlainDocumentText.FormatMessage(m, catalog, choice))
+            .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.Ordinal).ToArray();
+        var toClarify = filtered.Where(m => m.Rule.Severity != ReviewStatus.Invalid)
+            .Select(m => PlainDocumentText.FormatMessage(m, catalog, choice))
+            .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.Ordinal).ToArray();
+        if (toCorrect.Length == 0 && toClarify.Length == 0)
         {
-            pdf.Heading(group.Key ? "Noch zu korrigieren" : "Mit der Oberstufenberatung klären");
-            foreach (var message in group)
+            pdf.Paragraph("Deine Wahl ist aus Sicht der automatischen Prüfung vollständig. Die endgültige Prüfung erfolgt durch die Oberstufenberatung.");
+        }
+        else
+        {
+            if (toCorrect.Length > 0)
             {
-                pdf.Ensure(65);
-                pdf.Paragraph(message.Explanation);
-                pdf.Paragraph("Nächster Schritt: " + message.Remedy + " (" + message.Rule.Id + ")", true);
+                pdf.Heading("Noch zu korrigieren");
+                foreach (var item in toCorrect)
+                    pdf.Paragraph("• " + item);
+            }
+            if (toClarify.Length > 0)
+            {
+                pdf.Heading("Mit der Oberstufenberatung klären");
+                foreach (var item in toClarify)
+                    pdf.Paragraph("• " + item);
             }
         }
-        pdf.Heading("Grundlage dieses Entwurfs");
-        pdf.Paragraph($"Angebot {choice.OfferVersion} · Regelstand {choice.RuleVersion}", true);
+        pdf.Heading("Hinweise zu dieser Übersicht");
+        pdf.Paragraph($"Fachangebot {choice.OfferVersion}", true);
         var status = profile.Status switch { ProfileStatus.Verified => "geladen, verbindliche Lehrerprüfung steht aus", ProfileStatus.ProfileInvalid => "ungültig", ProfileStatus.Missing => "fehlt", _ => "ungeprüft" };
-        pdf.Paragraph($"Persönliches Profil: {status} · Revision {profile.Revision?.ToString() ?? "unbekannt"}", true);
-        pdf.Paragraph("Die Oberstufenberatung prüft gegen den aktuellen geschützten Stammdatenbestand, das Angebot und den Rechtsstand.", true);
+        var revisionText = profile.Revision is { } rev ? $" · Revision {rev}" : "";
+        pdf.Paragraph($"Persönliches Profil: {status}{revisionText}", true);
+        pdf.Paragraph("Die Oberstufenberatung prüft gegen die Schuldaten, das aktuelle Fachangebot und die geltende Abiturverordnung.", true);
         return pdf.Finish();
         string Name(string id) => catalog.Subjects.FirstOrDefault(s => s.Id == id)?.Name ?? id;
     }
-    internal static string Type(CourseType type) => type switch { CourseType.Lf => "LF", CourseType.Bf => "BF", CourseType.Elective => "Wahlfach", _ => "Seminar" };
 }

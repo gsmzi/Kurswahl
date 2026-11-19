@@ -27,7 +27,7 @@ public sealed partial class TeacherWindow
 
     private void ShowResults()
     {
-        Ready(); visiblePage = "results";
+        Ready(); ClearError(); visiblePage = "results";
         var all = YearStates();
         var root = new Grid { Name = "ChoicePage" };
         var listPanel = new DockPanel();
@@ -44,10 +44,11 @@ public sealed partial class TeacherWindow
             .Select(o => new FilterItem(o.Id, ChoiceOverview.OfferTitle(session.Catalog, o)))).ToArray();
         var offerBox = new ComboBox { Name = "ResultsCourseFilter", ItemsSource = offerItems, SelectedItem = offerItems.FirstOrDefault(i => i.Value == choiceFilter.OfferId) ?? offerItems[0], MinWidth = 210, Margin = new Thickness(0, 0, 8, 6) };
         var semesterBox = new ComboBox { Name = "ResultsSemesterFilter", ItemsSource = new[] { "Alle Halbjahre", "HJ 1", "HJ 2", "HJ 3", "HJ 4" }, SelectedIndex = choiceFilter.Semester ?? 0, MinWidth = 130, Margin = new Thickness(0, 0, 8, 6) };
+        var resetFilters = Compact(new Button { Name = "ResultsResetFilters", Content = "Filter zurücksetzen", Margin = new Thickness(0, 0, 0, 6), VerticalAlignment = VerticalAlignment.Center });
         ToolTip.SetTip(stateBox, "Unvollständig: keine Wahl, fehlende Pflichtbelegung, weniger als 42 Kurse oder keine zwei mündlichen Fächer geplant · Rot: Regelverletzung · Gelb: Besonderheit, die die Oberstufenberatung klärt.");
         ToolTip.SetTip(offerBox, "Zeigt nur Personen, die diesen Kurs belegen. Zusammen mit dem Halbjahr entsteht die Kursliste.");
         var filters = new WrapPanel { Orientation = Orientation.Horizontal };
-        foreach (var control in new Control[] { search, classBox, stateBox, offerBox, semesterBox }) filters.Children.Add(control);
+        foreach (var control in new Control[] { search, classBox, stateBox, offerBox, semesterBox, resetFilters }) filters.Children.Add(control);
         var actions = new WrapPanel { Orientation = Orientation.Horizontal };
         TeacherState[] shown = [];
         void AddAction(string label, string name, Func<Task> action, string help)
@@ -57,7 +58,7 @@ public sealed partial class TeacherWindow
         AddAction("Übersicht (PDF) …", "PrintOverview", () => SavePdf(OverviewPdf(shown), "Kurswahlen-Uebersicht"),
             "Eine Zeile je angezeigter Person: Leistungsfächer, Basis- und Wahlfächer, mündliche Planung, Prüfstand.");
         AddAction("Kontrollbögen (PDF) …", "PrintControlSheets", () => SavePdf(ControlSheetsPdf(shown), "Kontrollboegen"),
-            "Ein Kontrollbogen je angezeigter Person in einer Datei, mit Unterschriftenzeile für die Schülerin oder den Schüler.");
+            "Ein Kontrollbogen je angezeigter Person in einer Datei (Übersicht ohne Unterschriftenzeile).");
         AddAction("Kurslisten (PDF) …", "PrintCourseLists", () => SavePdf(CourseListsPdf(shown), "Kurslisten"),
             "Mit gewähltem Kurs: die Liste dieses Kurses (ggf. nur das gewählte Halbjahr). Ohne Kursfilter: alle Kurslisten der angezeigten Personen, je Kurs eine Seite.");
         AddAction("Nachwahlbögen (PDF) …", "PrintReselections", () => SavePdf(ReselectionsPdf(shown), "Nachwahlboegen"),
@@ -70,10 +71,13 @@ public sealed partial class TeacherWindow
         var detail = new ContentControl { Name = "ChoiceDetail" };
         root.Children.Add(listPanel); root.Children.Add(detail);
 
+        var resetting = false;
         void Render()
         {
             all = YearStates();
             shown = [.. ChoiceOverview.Apply(all, choiceFilter)];
+            resetFilters.IsEnabled = !string.IsNullOrEmpty(choiceFilter.Text) || choiceFilter.ClassName is not null
+                || choiceFilter.State != ChoiceStateFilter.All || choiceFilter.OfferId is not null || choiceFilter.Semester is not null;
             var selected = choiceSelectedId is null ? null : all.FirstOrDefault(s => s.Record.Student.ExternalStudentId == choiceSelectedId);
             var open = selected is not null;
             root.ColumnDefinitions = new ColumnDefinitions(open ? "1.05*,14,*" : "*");
@@ -119,12 +123,12 @@ public sealed partial class TeacherWindow
                         Refresh(preserveEditor: true);
                         if (detail.GetLogicalDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "ChoiceSave")?.IsEnabled != true)
                             Render();
-                        status.Text = record.Student.SyntheticDisplayName + ": Abgängerstatus gespeichert. Kursplanung berücksichtigt die Änderung.";
+                        SetStatus(record.Student.SyntheticDisplayName + ": Abgängerstatus gespeichert. Kursplanung berücksichtigt die Änderung.", FeedbackKind.Success);
                     }
                     catch (Exception ex)
                     {
                         updating = true; departure.SelectedIndex = (int)record.Student.Departure; updating = false;
-                        status.Text = "Abgängerstatus nicht gespeichert: " + ex.Message + " Kurswahlen erneut öffnen.";
+                        SetStatus("Abgängerstatus nicht gespeichert: " + ex.Message + " Kurswahlen erneut öffnen.", FeedbackKind.Error);
                     }
                 };
                 var lf = choice is null ? "–" : PlanningPresentation.Choices(choice, true, session!.Catalog);
@@ -136,16 +140,31 @@ public sealed partial class TeacherWindow
                         Text(choice is null ? "" : string.Join(", ", choice.PlannedOralSubjects)), review, departure];
                 rows.Children.Add(new Border { Background = id == choiceSelectedId ? Brush.Parse("#E2F1EE") : index++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White, Child = CompactLine(columns, cells) });
             }
-            if (shown.Length == 0) rows.Children.Add(Text("Keine Person passt zu diesen Filtern."));
+            if (shown.Length == 0) rows.Children.Add(new TextBlock { Text = "Keine Person passt zu diesen Filtern.", Foreground = Muted, Margin = new Thickness(8, 12) });
         }
         void FilterChanged()
         {
             // Text events arrive deferred; ignore them once the page or the year is gone.
-            if (session is null || store is null || visiblePage != "results" || !ReferenceEquals(pageHost.Content, root)) return;
+            if (resetting || session is null || store is null || visiblePage != "results" || !ReferenceEquals(pageHost.Content, root)) return;
             choiceFilter = new(search.Text ?? "", (classBox.SelectedItem as FilterItem)?.Value, (ChoiceStateFilter)Math.Max(0, stateBox.SelectedIndex),
                 (offerBox.SelectedItem as FilterItem)?.Value, semesterBox.SelectedIndex > 0 ? semesterBox.SelectedIndex : null);
             Render();
         }
+        resetFilters.Click += (_, _) =>
+        {
+            resetting = true;
+            try
+            {
+                search.Text = "";
+                classBox.SelectedIndex = 0;
+                stateBox.SelectedIndex = 0;
+                offerBox.SelectedIndex = 0;
+                semesterBox.SelectedIndex = 0;
+                choiceFilter = new();
+            }
+            finally { resetting = false; }
+            Render();
+        };
         search.TextChanged += (_, _) => FilterChanged();
         foreach (var box in new[] { classBox, stateBox, offerBox, semesterBox }) box.SelectionChanged += (_, _) => FilterChanged();
         Render();
@@ -162,7 +181,16 @@ public sealed partial class TeacherWindow
         var draft = original;
         var panel = new StackPanel { Spacing = 8, Margin = new Thickness(4, 0, 8, 0) };
         var titleRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
-        titleRow.Children.Add(new TextBlock { Name = "ChoiceEditorTitle", Text = $"{record.Student.SyntheticDisplayName} · Klasse {record.Student.ClassName}", FontSize = 18, FontWeight = FontWeight.SemiBold, Foreground = Ink, TextWrapping = TextWrapping.Wrap });
+        var titleWrap = new WrapPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        titleWrap.Children.Add(new TextBlock { Name = "ChoiceEditorTitle", Text = $"{record.Student.SyntheticDisplayName} · Klasse {record.Student.ClassName}", FontSize = 18, FontWeight = FontWeight.SemiBold, Foreground = Ink, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center });
+        var dirtyBadge = new Border
+        {
+            Name = "ChoiceDirtyBadge", Background = YellowSoft, BorderBrush = Brush.Parse("#C48723"), BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 2), Margin = new Thickness(8, 2, 0, 2), VerticalAlignment = VerticalAlignment.Center, IsVisible = false,
+            Child = new TextBlock { Text = "Ungespeicherte Änderungen", FontSize = 11, FontWeight = FontWeight.SemiBold, Foreground = Yellow }
+        };
+        titleWrap.Children.Add(dirtyBadge);
+        titleRow.Children.Add(titleWrap);
         var master = Button("Stammdaten und Historie", () => OpenStudent(id), "Vorbildung, Ordner, frühere Stände und Wiederherstellung dieser Person.");
         master.Padding = new Thickness(8, 3); Grid.SetColumn(master, 1); titleRow.Children.Add(master);
         var close = Button("Schließen", () => { choiceSelectedId = null; reload(); }); close.Name = "ChoiceClose"; close.Padding = new Thickness(8, 3); close.Margin = new Thickness(6, 0, 0, 0);
@@ -177,6 +205,9 @@ public sealed partial class TeacherWindow
         var reason = new TextBox { Name = "ChoiceReason", Watermark = "Begründung der Änderung (Pflicht, steht im Änderungsprotokoll)" };
         var force = new CheckBox { Name = "ChoiceForce", Content = "Trotz Regelverletzung speichern (Sonderfall, z. B. Zwischenstand)", IsVisible = false };
         var closeFollowUp = new CheckBox { Name = "ChoiceCloseReselection", Content = "Nachwahl damit abschließen", IsChecked = true, IsVisible = false };
+        var editorErrorBox = InlineErrorBox("ChoiceEditorError", out var editorErrorText);
+        reason.TextChanged += (_, _) => { reason.ClearValue(BorderBrushProperty); SetInlineError(editorErrorBox, editorErrorText, null); };
+        force.IsCheckedChanged += (_, _) => SetInlineError(editorErrorBox, editorErrorText, null);
         Button save = null!;
         bool Changed() => !draft.Selections.OrderBy(s => s.OfferId, StringComparer.Ordinal).Select(s => s.OfferId + ":" + string.Join(",", s.Semesters.Order()))
                 .SequenceEqual(original.Selections.OrderBy(s => s.OfferId, StringComparer.Ordinal).Select(s => s.OfferId + ":" + string.Join(",", s.Semesters.Order())))
@@ -208,7 +239,10 @@ public sealed partial class TeacherWindow
             force.IsVisible = !violations.IsEmpty && Changed();
             if (violations.IsEmpty) force.IsChecked = false;
             closeFollowUp.IsVisible = state.RequiresReselection && violations.IsEmpty;
-            save.IsEnabled = Changed();
+            var changed = Changed();
+            dirtyBadge.IsVisible = changed;
+            save.IsEnabled = changed;
+            SetInlineError(editorErrorBox, editorErrorText, null);
         }
 
         void Set(CourseOffer offer, IEnumerable<int> semesters)
@@ -306,32 +340,50 @@ public sealed partial class TeacherWindow
 
         save = Button("Änderung speichern", () =>
         {
-            var validation = ChoiceOverview.Validate(draft, catalog, record);
-            if (validation.Status == ReviewStatus.Invalid && force.IsChecked != true)
-                throw new InvalidOperationException("Bitte die Regelverletzungen beheben oder „Trotz Regelverletzung speichern“ ankreuzen.");
-            var text = reason.Text ?? "";
-            session.Save(draft with { OfferVersion = catalog.Version, RuleVersion = ChoiceValidator.Version, Revision = active is null ? 1 : active.Snapshot.Revision + 1, UpdatedAt = DateTimeOffset.UtcNow },
-                active?.Id, RevisionSource.TeacherEdit, text);
-            var closed = false;
-            if (state.RequiresReselection && closeFollowUp.IsChecked == true && validation.Status != ReviewStatus.Invalid) { session.FollowUp(id, false, null, text); closed = true; }
-            Refresh(preserveEditor: true);
-            status.Text = record.Student.SyntheticDisplayName + ": Kurswahl als neuer Stand gespeichert" + (closed ? "; Nachwahl abgeschlossen." : ".")
-                + (validation.Status == ReviewStatus.Invalid ? " Es bestehen weiterhin Regelverletzungen." : "");
-            reload();
+            try
+            {
+                var validation = ChoiceOverview.Validate(draft, catalog, record);
+                if (validation.Status == ReviewStatus.Invalid && force.IsChecked != true)
+                    throw new InvalidOperationException("Bitte die Regelverletzungen beheben oder „Trotz Regelverletzung speichern“ ankreuzen.");
+                var text = reason.Text ?? "";
+                session.Save(draft with { OfferVersion = catalog.Version, RuleVersion = ChoiceValidator.Version, Revision = active is null ? 1 : active.Snapshot.Revision + 1, UpdatedAt = DateTimeOffset.UtcNow },
+                    active?.Id, RevisionSource.TeacherEdit, text);
+                var closed = false;
+                if (state.RequiresReselection && closeFollowUp.IsChecked == true && validation.Status != ReviewStatus.Invalid) { session.FollowUp(id, false, null, text); closed = true; }
+                Refresh(preserveEditor: true);
+                SetStatus(record.Student.SyntheticDisplayName + ": Kurswahl als neuer Stand gespeichert" + (closed ? "; Nachwahl abgeschlossen." : ".")
+                    + (validation.Status == ReviewStatus.Invalid ? " Es bestehen weiterhin Regelverletzungen." : ""),
+                    validation.Status == ReviewStatus.Invalid ? FeedbackKind.Warning : FeedbackKind.Success);
+                reload();
+            }
+            catch (Exception ex)
+            {
+                SetInlineError(editorErrorBox, editorErrorText, ex.Message);
+                if (string.IsNullOrWhiteSpace(reason.Text)) { reason.BorderBrush = Red; reason.Focus(); }
+                throw;
+            }
         }, "Speichert die geänderte Wahl als neuen Stand mit Begründung. Die ursprüngliche Schülerwahl bleibt in der Historie.");
         save.Name = "ChoiceSave";
         var print = Button("Kontrollbogen (PDF) …", () =>
         {
-            if (Changed()) throw new InvalidOperationException("Bitte zuerst die Änderung speichern; gedruckt wird der gespeicherte Stand.");
-            return SavePdf(ControlSheetsPdf([state]), "Kontrollbogen-" + id);
-        }, "Kontrollbogen dieser Person mit Unterschriftenzeile.");
+            try
+            {
+                if (Changed()) throw new InvalidOperationException("Bitte zuerst die Änderung speichern; gedruckt wird der gespeicherte Stand.");
+                return SavePdf(ControlSheetsPdf([state]), "Kontrollbogen-" + id);
+            }
+            catch (Exception ex)
+            {
+                SetInlineError(editorErrorBox, editorErrorText, ex.Message);
+                throw;
+            }
+        }, "Kontrollbogen dieser Person als PDF (ohne Unterschriftenzeile).");
         print.Name = "ChoicePrint";
-        var reset = Button("Verwerfen", () => { draft = original; reason.Text = ""; RenderGrid(); }, "Ungespeicherte Änderungen zurücknehmen.");
+        var reset = Button("Verwerfen", () => { draft = original; reason.Text = ""; reason.ClearValue(BorderBrushProperty); SetInlineError(editorErrorBox, editorErrorText, null); RenderGrid(); }, "Ungespeicherte Änderungen zurücknehmen.");
         reset.Name = "ChoiceReset";
         RenderGrid();
         // Warnings first: red and yellow must be visible without scrolling.
         panel.Children.Add(feedback); panel.Children.Add(gridHost);
-        panel.Children.Add(reason); panel.Children.Add(force); panel.Children.Add(closeFollowUp);
+        panel.Children.Add(reason); panel.Children.Add(force); panel.Children.Add(closeFollowUp); panel.Children.Add(editorErrorBox);
         var buttons = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var button in new[] { Primary(save), reset, print }) { button.Margin = new Thickness(0, 0, 8, 6); buttons.Children.Add(button); }
         panel.Children.Add(buttons);
@@ -360,7 +412,11 @@ public sealed partial class TeacherWindow
             FormatStatus(s.Validation?.Status) + (s.RequiresReselection ? ", Nachwahl" : "") })]);
 
     internal byte[] ControlSheetsPdf(IReadOnlyCollection<TeacherState> states) => PlanningPrint.ControlSheets(
-        states.Select(s => new ControlSheetItem(s.Record, s.Active?.Snapshot, [.. ChoiceOverview.Violations(s.Validation)], [.. ChoiceOverview.Hints(s.Validation)])), session!.Catalog);
+        states.Select(s =>
+        {
+            var guidance = DocumentGuidance.FormatControlSheetMessages(s.Validation, session!.Catalog, s.Active?.Snapshot);
+            return new ControlSheetItem(s.Record, s.Active?.Snapshot, [.. guidance.Violations], [.. guidance.Hints]);
+        }), session!.Catalog);
 
     internal byte[] CourseListsPdf(IReadOnlyCollection<TeacherState> states)
     {
@@ -380,7 +436,12 @@ public sealed partial class TeacherWindow
         {
             var removed = s.Active!.Source == RevisionSource.OfferCancellation
                 ? s.Active.Changes.Where(c => c.Before.Length > 0 && c.After.Length == 0 && catalog.Offers.Any(o => o.Id == c.OfferId)).Select(c => c.OfferId).ToArray() : [];
-            return new ReselectionPrintItem(s.Record, s.Active.Snapshot, removed) { Notes = [.. ChoiceOverview.Violations(s.Validation)] };
+            var guidance = DocumentGuidance.BuildReselection(s.Record, s.Active.Snapshot, catalog, removed);
+            return new ReselectionPrintItem(s.Record, s.Active.Snapshot, removed)
+            {
+                Steps = [.. guidance.Steps.Select(x => new ReselectionStep(x.Heading, x.Text, x.Options))],
+                SummaryNote = guidance.SummaryNote
+            };
         }).ToArray();
         if (items.Length == 0) throw new InvalidOperationException("Unter den angezeigten Personen ist keine Nachwahl offen.");
         return PlanningPrint.Reselections(items, catalog);
@@ -393,8 +454,8 @@ public sealed partial class TeacherWindow
         var path = file?.TryGetLocalPath(); if (path is null) return;
         if (!Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Dateiendung muss .pdf sein.");
         WriteNew(path, pdf);
-        status.Text = "PDF gespeichert: " + path + ". Im PDF-Programm drucken (Strg+P). Enthält personenbezogene Daten – nur intern verwenden.";
+        SetStatus("PDF gespeichert: " + path + ". Im PDF-Programm drucken (Strg+P). Enthält personenbezogene Daten – nur intern verwenden.", FeedbackKind.Success);
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-        catch (Exception ex) { status.Text += " Automatisches Öffnen nicht möglich: " + ex.Message; }
+        catch (Exception ex) { SetStatus((status.Text ?? "") + " Automatisches Öffnen nicht möglich: " + ex.Message, FeedbackKind.Warning); }
     }
 }

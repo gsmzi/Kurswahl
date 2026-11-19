@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using GsmKurswahl.Application;
 using GsmKurswahl.Domain;
 
 namespace GsmKurswahl.TeacherApp;
@@ -10,16 +11,35 @@ public sealed partial class TeacherWindow
 {
     private void ShowElection()
     {
-        Ready(); visiblePage = "wahl";
-        var panel = new StackPanel { Spacing = 12 };
+        Ready(); ClearError(); visiblePage = "wahl";
+        var summary = TeacherDashboardBuilder.Build(store!, session!);
+        var panel = new StackPanel { Spacing = 14 };
         Intro(panel, "Wahl vorbereiten und einsammeln", "Der Ablauf oben führt von der Fachauswahl bis zum Wahleingang. Voraussetzungen und persönliche Dateien werden hier verwaltet.");
+
+        var workflowCard = new StackPanel { Spacing = 10 };
+        workflowCard.Children.Add(Heading("Ablaufschritte"));
+        workflowCard.Children.Add(new TextBlock
+        {
+            Text = $"{summary.Students} Personen im Jahrgang · {summary.Delivered} von {summary.Students} Profilen zugestellt · {summary.Choices} von {summary.Students} Wahlen eingelesen",
+            Foreground = Muted, TextWrapping = TextWrapping.Wrap, FontSize = 13
+        });
         var actions = new WrapPanel { Orientation = Orientation.Horizontal };
-        foreach (var button in new[] { Button("Fachauswahl", () => JumpToWorkflowStep(0)), Button("Schülerliste importieren", () => ShowPage("import")),
-            Button("Schülerbestand", () => ShowPage("people")), Button("Schülerdateien verteilen", () => ShowPage("profiles")),
-            Button("Kurswahlen einsammeln", () => ShowPage("collection")) })
+        foreach (var button in new[] {
+            Button("Fachauswahl", () => JumpToWorkflowStep(0), "Leistungsfächer und optionale Kurse einsehen oder vor Wahleingang bearbeiten."),
+            Button("Schülerliste importieren", () => ShowPage("import"), "Klassen-10-Liste (XLSX/CSV) mit Namen und Vorbildung übernehmen."),
+            Button("Schülerdateien verteilen", () => ShowPage("profiles"), "Persönliche Profile und Fachangebot in die Wahlordner schreiben."),
+            Button("Kurswahlen einsammeln", () => ShowPage("collection"), "Wahleingang prüfen, Konflikte klären und nach Abgabetermin abschließend räumen.") })
         { button.Margin = new Thickness(0, 0, 8, 8); actions.Children.Add(button); }
-        panel.Children.Add(actions);
-        panel.Children.Add(Text("Nach dem Einsammeln läuft alles im Lehrerprogramm: unter „Kurswahlen“ prüfen, ändern und drucken, unter „Kursplanung“ Wahlzahlen ansehen und Kurse streichen."));
+        workflowCard.Children.Add(actions);
+        panel.Children.Add(Surface(workflowCard, 14));
+
+        var peopleCard = new StackPanel { Spacing = 8 };
+        peopleCard.Children.Add(Heading("Einzelne Personen & Sonderfälle"));
+        peopleCard.Children.Add(new TextBlock { Text = "Vorbildung, Wahlordner, Nachwahlen, Einzeländerungen und komplette Änderungshistorie pro Person.", Foreground = Muted, TextWrapping = TextWrapping.Wrap, FontSize = 13 });
+        peopleCard.Children.Add(Button("Schülerbestand", () => ShowPage("people"), "Einzelne Personen öffnen und Stammdaten, Vorbildung oder Historie bearbeiten."));
+        panel.Children.Add(SubtleCard(peopleCard, 14));
+
+        panel.Children.Add(new TextBlock { Text = "Nach dem Einsammeln läuft alles im Lehrerprogramm: unter „Kurswahlen“ prüfen, ändern und drucken, unter „Kursplanung“ Wahlzahlen ansehen und Kurse streichen.", Foreground = Muted, TextWrapping = TextWrapping.Wrap, FontSize = 13 });
         pageHost.Content = Scroll(panel); UpdateVisualNavigation(); UpdateWorkflowProgress();
     }
 

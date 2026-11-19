@@ -35,4 +35,24 @@ public class ControlSheetTests
             File.WriteAllBytes(path, bytes);
         }
     }
+
+    [Fact] public void ControlSheetHandlesTechnicalRuleMessagesAndLongLabelsCleanly()
+    {
+        var catalog = TestData.WorkflowCatalog with
+        {
+            Subjects = [.. TestData.WorkflowCatalog.Subjects.Select(s => s with { Name = s.Id == "GEO" ? "Geographie" : s.Name })]
+        };
+        var ruleOral = new RuleDefinition("PLAN-ORAL", "Mündlich", "Quelle", "Test", "m2-2", ReviewStatus.Invalid);
+        var ruleReq = new RuleDefinition("AGVO-REQUIRED", "Pflicht", "Quelle", "Test", "m2-2", ReviewStatus.Invalid);
+        var ruleTrust = new RuleDefinition("PROFILE-TRUST", "Profil", "Quelle", "Test", "m2-2", ReviewStatus.NeedsReview);
+        var choice = TestData.Choice with { Selections = [TestData.Select(catalog.Offers.Single(o => o.Id == "D-LF"))] };
+        var messages = ImmutableArray.Create(
+            new RuleMessage(ruleTrust, [], [], "Kein verifiziertes persönliches Profil; Profilstatus: Missing", "Klärung"),
+            new RuleMessage(ruleOral, [], [], "PLAN-ORAL: Deutsch, Mathematik und alle drei Aufgabenfelder müssen abgedeckt sein.", "Planen"),
+            new RuleMessage(ruleReq, ["GEO"], [3, 4], "GEO: Pflichtbelegung fehlt.", "Belegen"));
+        var bytes = ControlSheet.Render(choice, catalog, ProfileContext.Missing, new(ReviewStatus.Invalid, messages),
+            Enumerable.Range(1, 4).Select(h => new SemesterSummary(h, 1, 5)), []);
+        Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(bytes.AsSpan(0, 8)));
+        Assert.Contains("%%EOF", Encoding.ASCII.GetString(bytes.AsSpan(Math.Max(0, bytes.Length - 64))));
+    }
 }

@@ -12,7 +12,8 @@ public sealed record StudentImportRow(int Row, StudentRecord? Candidate, string 
 public static class StudentTableImport
 {
     public static readonly string[] Fields = ["studentId", "name", "firstName", "lastName", "folder", "class", "year", "username", "accountId", "home", "italian", "bridge", "imp", "bilingual", "religion", "sport", "languages", "religionPermission", "religionExamPermission", "permanentSport", "departure"];
-    public static ImportTable Csv(string text, char separator = ';')
+    public static ImportTable Csv(string text, char separator = ';') => Table(ReadCsvRows(text, separator));
+    internal static List<ImmutableArray<string>> ReadCsvRows(string text, char separator = ';')
     {
         if (text.Length > 8_000_000) throw new InvalidDataException("Importdatei zu groß.");
         var rows = new List<ImmutableArray<string>>(); var row = new List<string>(); var cell = new StringBuilder(); var quoted = false; var closedQuote = false;
@@ -31,21 +32,22 @@ public static class StudentTableImport
             else if (!quoted && c is '\r' or '\n')
             {
                 if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
-                row.Add(cell.ToString()); cell.Clear(); closedQuote = false; if (row.Any(v => v.Length > 0)) rows.Add([.. row]); row.Clear();
+                row.Add(cell.ToString()); cell.Clear(); closedQuote = false; if (row.Any(v => !string.IsNullOrWhiteSpace(v))) rows.Add([.. row]); row.Clear();
             }
             else cell.Append(c);
         }
         if (quoted) throw new InvalidDataException("Nicht geschlossenes CSV-Anführungszeichen.");
-        if (cell.Length > 0 || row.Count > 0) { row.Add(cell.ToString()); rows.Add([.. row]); }
-        return Table(rows);
+        if (cell.Length > 0 || row.Count > 0) { row.Add(cell.ToString()); if (row.Any(v => !string.IsNullOrWhiteSpace(v))) rows.Add([.. row]); }
+        return rows;
     }
-    public static ImportTable Xlsx(Stream stream)
+    public static ImportTable Xlsx(Stream stream) => Table(ReadXlsxRows(stream));
+    internal static List<ImmutableArray<string>> ReadXlsxRows(Stream stream)
     {
         using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
         if (zip.Entries.Sum(e => e.Length) > 16_000_000) throw new InvalidDataException("XLSX zu groß.");
         XDocument Read(string name)
         {
-            using var input = (zip.GetEntry(name) ?? throw new InvalidDataException("XLSX-Bestandteil fehlt: " + name)).Open();
+            using var input = (zip.Entries.FirstOrDefault(e => e.FullName.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidDataException("XLSX-Bestandteil fehlt: " + name)).Open();
             using var reader = XmlReader.Create(input, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 16_000_000 });
             return XDocument.Load(reader);
         }
@@ -58,7 +60,7 @@ public static class StudentTableImport
         if (target.Contains("..", StringComparison.Ordinal) || (string?)relation.Attribute("TargetMode") == "External") throw new InvalidDataException("Externe XLSX-Verknüpfung abgewiesen.");
         var normalizedTarget = target.TrimStart('/');
         if (!normalizedTarget.StartsWith("xl/", StringComparison.OrdinalIgnoreCase)) normalizedTarget = "xl/" + normalizedTarget;
-        var shared = zip.GetEntry("xl/sharedStrings.xml") is null ? [] : Read("xl/sharedStrings.xml").Descendants(ns + "si").Select(e => string.Concat(e.Descendants(ns + "t").Select(t => t.Value))).ToArray();
+        var shared = zip.Entries.FirstOrDefault(e => e.FullName.Equals("xl/sharedStrings.xml", StringComparison.OrdinalIgnoreCase)) is null ? [] : Read("xl/sharedStrings.xml").Descendants(ns + "si").Select(e => string.Concat(e.Descendants(ns + "t").Select(t => t.Value))).ToArray();
         var rows = new List<ImmutableArray<string>>();
         foreach (var r in Read(normalizedTarget).Descendants(ns + "row"))
         {
@@ -79,9 +81,9 @@ public static class StudentTableImport
                 }
                 cells[index - 1] = text;
             }
-            if (cells.Count > 0) rows.Add([.. Enumerable.Range(0, cells.Keys.Max() + 1).Select(i => cells.GetValueOrDefault(i, ""))]);
+            if (cells.Count > 0 && cells.Values.Any(v => !string.IsNullOrWhiteSpace(v))) rows.Add([.. Enumerable.Range(0, cells.Keys.Max() + 1).Select(i => cells.GetValueOrDefault(i, ""))]);
         }
-        return Table(rows);
+        return rows;
     }
     private static ImportTable Table(List<ImmutableArray<string>> rows)
     {

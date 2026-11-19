@@ -28,11 +28,11 @@ public sealed partial class TeacherWindow
                         sql.SaveCourseAnnotations(basis, next, Actor);
                     workspace!.Update(workspace.Active! with { Catalog = next });
                     session = new TeacherSession(store!, next, Actor);
-                    status.Text = "Kursmarkierung gespeichert. Für Schüleransicht und Schülerausdruck bitte erneut verteilen.";
+                    SetStatus("Kursmarkierung gespeichert. Für Schüleransicht und Schülerausdruck bitte erneut verteilen.", FeedbackKind.Success);
                 }
                 catch (Exception ex)
                 {
-                    status.Text = "Kursmarkierung nicht vollständig gespeichert: " + ex.Message + " Bitte Jahrgang neu öffnen.";
+                    SetStatus("Kursmarkierung nicht vollständig gespeichert: " + ex.Message + " Bitte Jahrgang neu öffnen.", FeedbackKind.Error);
                     school.IsEnabled = topUp.IsEnabled = false;
                 }
             }

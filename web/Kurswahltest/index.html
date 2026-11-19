@@ -31,12 +31,21 @@
 
     <main class="main-body">
       <section class="left-column">
-        <div id="ErrorNotice" class="notice notice-danger hidden" role="alert"></div>
+        <div id="ErrorNotice" class="notice notice-danger notice-bar hidden" role="alert">
+          <span class="notice-icon" aria-hidden="true">⚠</span>
+          <span id="ErrorNoticeText" class="notice-text"></span>
+          <button id="DismissError" type="button" class="notice-dismiss" title="Meldung schließen" aria-label="Fehlermeldung schließen">✕</button>
+        </div>
+        <div id="SuccessNotice" class="notice notice-done notice-bar hidden" role="status">
+          <span id="SuccessNoticeText" class="notice-text"></span>
+          <button id="DismissSuccess" type="button" class="notice-dismiss" title="Hinweis schließen" aria-label="Erfolgsmeldung schließen">✕</button>
+        </div>
         <div class="card">
           <div id="StepContent" class="step-content"></div>
         </div>
         <div class="step-navigation">
           <button id="PreviousStep" type="button" class="btn">Zurück</button>
+          <span id="StepBlockerHint" class="step-blocker-hint hidden"></span>
           <button id="NextStep" type="button" class="btn btn-primary">Weiter</button>
         </div>
       </section>

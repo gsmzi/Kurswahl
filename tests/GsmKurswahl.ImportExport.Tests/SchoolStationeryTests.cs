@@ -20,8 +20,16 @@ public sealed class SchoolStationeryTests
         })] };
         var choice = TestData.Choice with { Selections = [.. catalog.Offers.Where(o => o.Id is "D-LF" or "M-LF" or "E-LF" || o.Type == CourseType.Bf && o.SubjectId is not ("D" or "M" or "E" or "MU")).Select(TestData.Select)], PlannedOralSubjects = ["BIO", "G"] };
         var student = new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Muster, Demo", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
-        var item = new ReselectionPrintItem(student, choice, ["E-LF"]) { Notes = ["Bitte ein neues Leistungsfach wählen."] };
-        var notesOnly = item with { Removed = [], Notes = ["Die Pflichtbelegung in Geschichte muss ergänzt werden."] };
+        var item = new ReselectionPrintItem(student, choice, ["E-LF"])
+        {
+            Steps =
+            [
+                new("Neues Leistungsfach (HJ 1–4)",
+                    "Du brauchst 1 neues Leistungsfach über alle vier Halbjahre.",
+                    "Wählbare Leistungsfächer: Biologie, Chemie, Deutsch, Mathematik.")
+            ]
+        };
+        var notesOnly = item with { Removed = [], Steps = [], Notes = ["Die Pflichtbelegung in Geschichte muss ergänzt werden."] };
         var outputs = new Dictionary<string, byte[]>
         {
             ["Kontrollbogen-Schueler.pdf"] = ControlSheet.Render(choice, catalog,
@@ -42,7 +50,14 @@ public sealed class SchoolStationeryTests
         Assert.Equal(2, xml.Descendants(w + "sectPr").Count());
         Assert.Contains("Die Pflichtbelegung in Geschichte muss ergänzt werden.", xml.ToString());
         Assert.Contains("Koopkurs am GSM", xml.ToString()); Assert.Contains("Aufsetzerkurs", xml.ToString());
-        Assert.Single(xml.Descendants(w + "t"), t => t.Value.Contains("Folgende gewählte Kurse"));
+        Assert.Single(xml.Descendants(w + "t"), t => t.Value.Contains("Folgender gewählter Kurs kann leider nicht angeboten werden:"));
+        Assert.Contains("Warum eine Nachwahl nötig ist", xml.ToString());
+        Assert.Contains("Was du jetzt neu wählen musst", xml.ToString());
+        Assert.Contains("Wählbare Leistungsfächer: Biologie, Chemie, Deutsch, Mathematik.", xml.ToString());
+        Assert.Contains("Unterschrift Schülerin / Schüler", xml.ToString());
+        Assert.DoesNotContain("PLAN-", xml.ToString());
+        Assert.DoesNotContain("AGVO-", xml.ToString());
+        Assert.DoesNotContain("GSM-", xml.ToString());
         Assert.Equal(2, zip.Entries.Count(e => e.FullName.StartsWith("word/gsm-header-")));
         Assert.NotNull(zip.GetEntry("word/media/image1.jpeg"));
         Assert.DoesNotContain(zip.Entries, e => e.FullName.StartsWith("docProps/") || e.FullName.StartsWith("customXml/"));

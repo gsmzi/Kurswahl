@@ -22,7 +22,9 @@ Grundlage ist `GSM_Vorlage_Dokumente.docx`, SHA-256 `12C4F3A64D33556DFFB0058CC01
 
 PDFs werden durch den gemeinsamen `SchoolPaper` offline erzeugt. Das Word-Dokument wird aus der eingebetteten, bereinigten Vorlage erzeugt: ursprünglicher Kopf und Titelkasten werden als wiederholte Abschnittskopfzeilen verwendet. Die obere Textgrenze wird dafür nach unten verlegt; die sichtbare Position des Schulkopfs und die seitlichen Ränder bleiben erhalten. Abschnittsinhalte verwenden Arial 10 pt; PDF-Tabellen 9,5 pt. Die ursprüngliche Fußzeile „Ggf. bitte wenden“ wird durch Seitenzahl und im PDF zusätzlich den Berichtskontext ersetzt. Word-Seitenfelder werden beim Öffnen aktualisiert.
 
-Ressourcenprüfsummen: `SchoolTemplate.docx` SHA-256 `1204D3CB20AB83D86E743C870D70D1DD2803F062A27A8D0A8892442B2B4DC224`; `SchoolLogo.jpeg` SHA-256 `239E9400D9E680022B5BE9263A7CCD51650B47C85EA6D3F5C3C8C372346437B3`.
+Seit 17.11.2026 verwenden alle sechs direkten PDF-Ausgabearten (Schüler-/Lehrerkontrollbogen, Nachwahlbogen, Kursliste, Wahlzahlen und Übersicht) das vom Nutzer bereitgestellte hochauflösende `GSM_Logo.jpg` unverändert als `SchoolLogo.jpeg` (2315 × 816 Pixel statt zuvor 454 × 145 Pixel). `SchoolPaper` berechnet die Höhe aus dem Bildseitenverhältnis; bei 148,54 pt Breite sind das etwa 52,36 pt Höhe und 1122 Bildpunkte pro Zoll. `SKImage.FromEncodedData` erhält den Original-JPEG-Datenstrom im PDF; eine erneute Bitmap-Kodierung hatte bei der Prüfung das Blau verändert. Die separate Word-Arbeitsvorlage bleibt unverändert. Bereits erzeugte PDFs müssen neu exportiert werden.
+
+Ressourcenprüfsummen: `SchoolTemplate.docx` SHA-256 `1204D3CB20AB83D86E743C870D70D1DD2803F062A27A8D0A8892442B2B4DC224`; `SchoolLogo.jpeg` SHA-256 `12DC78B2DFB44D8153EF2E34DD3B24974B42598809DE32AC0C8F351CDD9AD3C2`.
 
 ## Dateivertrag
 

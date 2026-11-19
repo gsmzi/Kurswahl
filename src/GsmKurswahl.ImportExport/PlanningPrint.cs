@@ -12,7 +12,7 @@ public static class PlanningPrint
     private static string TypeLabel(CourseType type) => type switch { CourseType.Lf => "LF", CourseType.Bf => "BF", CourseType.Elective => "Wahlfach", _ => "Seminar" };
     private static string SubjectLabel(OfferCatalog catalog, string id) => catalog.Subjects.FirstOrDefault(x => x.Id == id)?.Name ?? id;
 
-    /// <summary>Control sheets, one pupil per page, in the order supplied. Signed by the pupil; the binding confirmation is the ASV form.</summary>
+    /// <summary>Control sheets, one pupil per page, in the order supplied. Overview only without signature line; binding confirmation comes from Untis.</summary>
     public static byte[] ControlSheets(IEnumerable<ControlSheetItem> items, OfferCatalog catalog)
     {
         var rows = items.ToArray();
@@ -45,11 +45,9 @@ public static class PlanningPrint
             pdf.Paragraph($"Halbjahreskurse insgesamt: {item.Choice.Selections.Sum(s => s.Semesters.Length)}", true);
             pdf.Paragraph("Geplante mündliche Prüfungsfächer (unverbindlich): " + (item.Choice.PlannedOralSubjects.IsEmpty ? "noch nicht geplant"
                 : string.Join(", ", item.Choice.PlannedOralSubjects.Select(o => SubjectLabel(catalog, o)))));
-            if (item.Violations.Length > 0) { pdf.Heading("Noch zu korrigieren"); foreach (var v in item.Violations) pdf.Paragraph("! " + v); }
-            if (item.Hints.Length > 0) { pdf.Heading("Besonderheiten / mit der Oberstufenberatung zu klären"); foreach (var h in item.Hints) pdf.Paragraph("- " + h); }
-            pdf.Ensure(100);
-            pdf.Paragraph("Ich habe die oben aufgeführte Kurswahl geprüft. Die endgültige Bestätigung erfolgt auf dem ASV-Formular.", true);
-            pdf.Signature();
+            if (item.Violations.Length > 0) { pdf.Heading("Noch zu korrigieren"); foreach (var v in item.Violations) pdf.Paragraph("• " + PlainDocumentText.Sanitize(v, catalog)); }
+            if (item.Hints.Length > 0) { pdf.Heading("Mit der Oberstufenberatung klären"); foreach (var h in item.Hints) pdf.Paragraph("• " + PlainDocumentText.Sanitize(h, catalog)); }
+            pdf.Paragraph("Übersicht aus der Lehrerverwaltung (nur zur Information).", true);
         }
         return pdf.Finish();
         static string Mark(CourseSelection s, int h) => s.Semesters.Contains(h) ? "x" : "";
@@ -61,7 +59,7 @@ public static class PlanningPrint
         using var pdf = new SchoolPaper("Kurswahlen - Übersicht", year);
         pdf.Title("Kurswahlen - Übersicht");
         pdf.Paragraph(filter + $"  |  {rows.Length} Personen");
-        pdf.Paragraph("LF = Leistungsfach · BF = Basisfach · mündliche Fächer sind unverbindlich geplant.", true);
+        pdf.Paragraph("LF = Leistungsfach · BF = Basisfach · bili = bilingual · mündliche Fächer sind unverbindlich geplant.", true);
         pdf.Table(["Name", "Kl.", "LF", "Basis- und Wahlfächer", "Mündl.", "Prüfstand"], rows, [100, 32, 80, 175, 50, 78]);
         return pdf.Finish();
     }
@@ -88,7 +86,7 @@ public static class PlanningPrint
         pdf.Title("Kursplanung - Wahlzahlen");
         pdf.Paragraph(source);
         pdf.Paragraph(filter);
-        pdf.Paragraph("GK/Geo: Einzelhalbjahre. Sonst gleiche Zahlen zusammengefasst; KS1/KS2 bei Abweichungen.", true);
+        pdf.Paragraph("LF = Leistungsfach · BF = Basisfach · bili = bilingual · GK/Geographie: Einzelhalbjahre; sonst gleiche Zahlen zusammengefasst, KS1/KS2 bei Abweichungen.", true);
         pdf.Table(["Fach", "LF", "LF bili", "BF", "BF bili", "Wahl"], rows, [170, 45, 48, 112, 65, 75]);
         if (catalog is not null)
         {
@@ -121,34 +119,72 @@ public static class PlanningPrint
         for (var i = 0; i < rows.Length; i++)
         {
             if (i > 0) pdf.StartStudent("Nachwahl - " + rows[i].Remaining.StudentId);
-            WriteReselection(pdf, rows[i].Student, rows[i].Remaining, catalog, rows[i].Removed, rows[i].Notes);
+            WriteReselection(pdf, rows[i], catalog);
         }
         return pdf.Finish();
     }
 
-    private static void WriteReselection(SchoolPaper pdf, StudentRecord student, CourseChoice remaining, OfferCatalog catalog, string[] removed, string[] notes)
+    private static void WriteReselection(SchoolPaper pdf, ReselectionPrintItem item, OfferCatalog catalog)
     {
+        var student = item.Student;
+        var remaining = item.Remaining;
+        var removed = item.Removed;
         pdf.Title("Nachwahl zur Kurswahl");
         pdf.Paragraph(student.Student.SyntheticDisplayName + "  |  Klasse " + student.Student.ClassName);
-        pdf.Heading(removed.Length > 0 ? "Diese gewählten Kurse entfallen" : "Bitte ergänze oder ändere deine Wahl");
-        foreach (var id in removed)
+        if (removed.Length > 0)
         {
-            var offer = catalog.Offers.Single(o => o.Id == id);
-            var type = offer.Type switch { CourseType.Lf => "LF", CourseType.Bf => "BF", CourseType.Elective => "Wahlfach", _ => "Seminarkurs" };
-            pdf.Paragraph((catalog.Subjects.Single(s => s.Id == offer.SubjectId).Name) + " - " + type
-                + (offer.Variant == CourseVariant.Bilingual ? " bilingual" : "") + CourseAnnotations.Suffix(offer));
+            pdf.Heading("Warum eine Nachwahl nötig ist");
+            pdf.Paragraph(removed.Length == 1
+                ? "Folgender gewählter Kurs kann leider nicht angeboten werden:"
+                : "Folgende gewählte Kurse können leider nicht angeboten werden:");
+            foreach (var id in removed)
+            {
+                var offer = catalog.Offers.Single(o => o.Id == id);
+                pdf.Paragraph("• " + PlainDocumentText.FormatOfferFull(offer, catalog));
+            }
         }
-        foreach (var note in notes) pdf.Paragraph("- " + note);
-        pdf.Paragraph("Bitte trage deine Nachwahl oder Umwahl unten ein und gib diesen Bogen unterschrieben bei der Oberstufenberatung ab. Die neue Wahl wird anschließend geprüft.");
+        else
+        {
+            pdf.Heading("Warum eine Nachwahl oder Korrektur nötig ist");
+            pdf.Paragraph("Deine bisherige Kurswahl ist noch nicht vollständig oder enthält noch offene Punkte, die angepasst werden müssen.");
+        }
+
+        if (item.Steps.Length > 0)
+        {
+            pdf.Heading(removed.Length > 0 ? "Was du jetzt neu wählen musst" : "Was du jetzt ergänzen oder korrigieren musst");
+            foreach (var step in item.Steps)
+                pdf.Bullet(step.Heading, step.Text, step.Options);
+        }
+        else if (item.Notes.Length > 0)
+        {
+            pdf.Heading(removed.Length > 0 ? "Was du jetzt neu wählen musst" : "Was du jetzt ergänzen oder korrigieren musst");
+            foreach (var note in item.Notes)
+                pdf.Paragraph("• " + PlainDocumentText.Sanitize(note, catalog));
+        }
+        else if (!string.IsNullOrWhiteSpace(item.SummaryNote))
+        {
+            pdf.Heading("Hinweis zu deiner verbleibenden Wahl");
+            pdf.Paragraph(item.SummaryNote);
+        }
+
+        pdf.Paragraph("Bitte trage deine Nachwahl (und ggf. weitere Umwahlen) unten ein und gib diesen Bogen unterschrieben bei der Oberstufenberatung ab. Die neue Wahl wird anschließend geprüft.");
         pdf.Heading("Deine verbleibenden Kurse");
-        var rows = remaining.Selections.OrderBy(s => s.Type).ThenBy(s => s.SubjectId).Select(s => new[] {
-            catalog.Subjects.Single(x => x.Id == s.SubjectId).Name + (s.Variant == CourseVariant.Bilingual ? " bilingual" : "") + CourseAnnotations.Suffix(catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId)),
-            s.Type switch { CourseType.Lf => "LF", CourseType.Bf => "BF", CourseType.Elective => "Wahlfach", _ => "Seminar" },
-            string.Join(", ", s.Semesters.Select(h => "HJ " + h)) }).ToArray();
-        pdf.Table(["Fach / Variante", "Kursart", "Belegung"], rows, [255, 65, 195]);
-        pdf.Ensure(220);
+        var rows = remaining.Selections
+            .OrderBy(s => s.Type)
+            .ThenBy(s => SubjectLabel(catalog, s.SubjectId), StringComparer.CurrentCulture)
+            .Select(s => new[]
+            {
+                SubjectLabel(catalog, s.SubjectId) + (s.Variant == CourseVariant.Bilingual ? " bilingual" : "") + CourseAnnotations.Suffix(catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId)),
+                PlainDocumentText.FormatCourseTypeFull(s.Type),
+                PlainDocumentText.FormatSemesters(s.Semesters)
+            }).ToArray();
+        pdf.Table(["Fach und Hinweise", "Kursart", "Belegung"], rows, [235, 95, 185]);
+        pdf.Paragraph("Bisher geplante mündliche Prüfungsfächer (unverbindlich): " + (remaining.PlannedOralSubjects.IsEmpty
+            ? "noch nicht geplant"
+            : string.Join(", ", remaining.PlannedOralSubjects.Select(o => SubjectLabel(catalog, o)))), true);
+        pdf.Ensure(195);
         pdf.Heading("Nachwahl und weitere Umwahlen");
-        pdf.Paragraph("Neu gewähltes Fach / Kursart / Halbjahre; bei Umwahl auch das bisherige Fach nennen.", true);
+        pdf.Paragraph("Neu gewähltes Fach, Kursart (Leistungsfach/Basisfach/Wahlfach) und Halbjahre; bei einer Umwahl bitte auch das bisherige Fach angeben.", true);
         pdf.BlankLines(3);
         pdf.Paragraph("Die endgültige Belegbarkeit wird durch die Oberstufenberatung geprüft.", true);
         pdf.Signature();

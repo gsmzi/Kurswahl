@@ -2,34 +2,17 @@
 
 Stand 28.10.2026. Funktionaler Ausbau vom Nutzer ausdrücklich beauftragt. Ausschließlich synthetischer Erprobungsbetrieb; die fachliche Freigabe für Abitur 2029 bleibt offen. Keine ASV-Schreibschnittstelle, keine automatische Schulnetzverteilung.
 
-## Allgemeiner Abgleich
+## ASV-Abgleich („zz Kursstufe Fächerwahl“) und Schülerdaten-Quelle (Aktualisierung 19.11.2026)
 
-Unter **Abgleich / Abschluss** eine CSV (UTF-8, Semikolon) oder XLSX (genau ein Blatt, nur Werte) auswählen. Sechs Spalten frei zuordnen:
+Die frühere Seite „Abgleich / Abschluss“ wurde auf Wunsch des Nutzers zu **ASV-Abgleich** entschlackt: Sie dient ausschließlich der schnellen **Deckungsgleichheitsprüfung** zwischen dem Lehrerbestand und dem ASV-BW-Export **`zz Kursstufe Fächerwahl`** (`.xlsx` direkt aus `Datei → Verwaltung → Exportformatbibliothek → Schüler → zz Kursstufe Fächerwahl` oder als `.csv`, UTF-8 bzw. Windows-1252/Latin-1, Komma, Semikolon oder Tabulator). Im Lehrerbestand werden dabei keine Wahlen oder Revisionen verändert; die früheren Bedienelemente für manuelle Übertragungs-Abhaklisten und doppelte Sicherungs-Buttons wurden aus der UI entfernt (Jahrgangssicherung liegt weiterhin unter *Einstellungen* und den Netzwechsel-Expandern; DB-Schema 3/4 mit `transfer_receipts` bleibt rückwärtskompatibel erhalten).
 
-| Zielfeld | Inhalt |
-| --- | --- |
-| studentId | Stabile, eindeutige synthetische demo-ID; keine Namensheuristik |
-| year | Abiturjahrgang des geöffneten Bestands |
-| subject | Exakte Fachkennung aus dem Katalog |
-| type | Lf, Bf, Elective oder Seminar |
-| variant | Normal oder Bilingual, ausdrücklich erforderlich |
-| semester | Eine Zahl 1–4 |
+Der Adapter `AsvCourseChoiceImport` liest das ASV-Format (inklusive leerer erster Spaltenüberschrift für die Klasse, `Name mit Vornamen`, `ASV-ID`, `Fächer Kursstufe` mit Paaren `Fach [WST];Code`) und übersetzt die ASV-Kürzel (`MUS`→`MU`, `WI`→`W`, `REV`→`ER`, `RRK`→`KR`, `SPO`→`SP`, `PSYCH`→`PSY`), Halbjahre (`X`/`Z` belegt, `-` nicht belegt), Leistungsfächer (`-L-` / `1..3`) sowie geplante mündliche Prüfungsfächer (`m1`/`m2`, nicht `z-P-...`). Da ASV-BW im Kurswahlexport nicht zwischen normal und bilingual unterscheidet, wertet der Abgleich intern `Biologie bilingual` gegen `BIO` in ASV als deckungsgleich und weist dies mit einem Hinweis aus. Unbekannte ASV-Fächer werden als Abweichung gemeldet; fehlende `ASV-ID`s erscheinen als `InvalidIdentity` ohne Namensheuristik. Abweichungen lassen sich filtern (Standard: *Nur Abweichungen & Auffälligkeiten*), nach XLSX/CSV exportieren und per Sprungbutton direkt unter *Kurswahlen* öffnen. Der frühere allgemeine Vertrag `choice-table-v1` (`ChoiceTableImport` / `ChoiceReconciliation.Confirm`) bleibt auf Anwendungsebene kompatibel erhalten.
 
-Eine Zeile entspricht einem Halbjahreskurs. Dies ist der allgemeine Vertrag `choice-table-v1`, **kein behauptetes ASV-Exportformat**. Der konkrete ASV-Adapter benötigt weiterhin eine anonymisierte Musterdatei und ihre Feldsemantik. Abweichende ASV-Werte müssen vorläufig in diesen allgemeinen Vertrag übersetzt werden; keine automatische Interpretation.
+Für den vorhergehenden Klasse-10-Schülerimport empfiehlt der Importdialog das ASV-BW-Exportformat `zz Exportformat für paedML als XLSX` / `… als CSV` (oder eine schuleigene Kopie mit Vorbildungsspalten), damit die **dauerhafte 36-stellige `ASV-ID`** von Beginn an identisch vorliegt; `StudentColumnMatcher` erkennt entsprechende deutsche/ASV-Spaltenüberschriften automatisch (im Erprobungsstand gelten im Schülerimport weiterhin `demo-`-IDs).
 
-Vor der Vorschau bestätigen, dass für jede enthaltene Person die vollständige Belegung vorliegt. Die Software kann Vollständigkeit nicht aus fehlenden Zeilen erschließen. Ein fehlendes Fach bei einer enthaltenen Person bedeutet eine vorgeschlagene Entfernung; eine vollständig fehlende Person bedeutet keine Änderung. Eine vollständig leere Wahl kann mit diesem Zeilenformat nicht importiert werden. Fehlerhafte Zeilen, doppelte Belegungen, unbekannte Fach-/Kursart-/Variantenkombinationen und falsche Jahrgänge verwerfen die gesamte Vorschau. Es gibt keinen stillen Teilimport.
+## Exporte und Datenbankschema 3/4 (Historie)
 
-Der Vergleich zeigt `Identical`, `Changed`, `OnlyInternal`, `OnlyExternal` und `InvalidIdentity`. Identische Belegungen erzeugen keine Revision. Neue Personen bleiben unübernehmbar, bis ihre Stammdaten über den vorhandenen Schülerimport angelegt und geprüft wurden; danach den Abgleich neu laden. Namen werden niemals zur automatischen Zusammenführung benutzt.
-
-Bei Abweichungen erscheinen interne/externe Belegung und Ergebnisse des gemeinsamen Regelkerns auf Basis der **aktuellen geschützten Vorbildung**. Nach Häkchen und Änderungsgrund ersetzt die Einzelübernahme die vollständige Belegung. Mündliche Planung bleibt erhalten und wird erneut geprüft; die Wahl bleibt Entwurf. Auch ungültige oder fachlich offene Wahlen können zur dokumentierten Klärung übernommen werden, ohne Grünstatus oder Abgabe zu erzeugen. Schülerdateien werden nicht verändert. Jede Übernahme erzeugt eine append-only Lehrerrevision mit Quelle `AsvReconciliation`, Quelldateiname, SHA-256, Spaltenmapping und vollständigem Snapshot. Änderungen an Quelle, Stammdaten, aktiver Revision oder Katalog seit Vorschau verhindern die Übernahme. Keine Sammelübernahme implementiert: jede Abweichung wird einzeln bestätigt.
-
-## Exporte und manuelle Übertragungsvermerke
-
-CSV/XLSX-Belegungslisten nach Schüler-ID/Klasse sowie offenen Prüf-/Nachwahlfällen filtern. Die Liste enthält stabile Fachkennungen, Kursart, Variante und Halbjahr sowie Verwaltungsrevision und Prüfstatus. Keine Vorbildungsdaten, Konten oder Home-Pfade. Abgleich nach Konfliktart filtern und exportieren. In der Kursplanung können die angezeigten Nachfragezahlen einschließlich Planungsstand/Szenario und Abgängerfilter als CSV/XLSX exportiert werden; der bestehende PDF-Druck bleibt verfügbar. Schüler-Kontrollbögen und Nachwahlbögen nutzen die vorhandenen PDF-Funktionen.
-
-Exportschreiben erfolgt über eine temporäre Datei im Zielverzeichnis; vorhandene Ziele werden nicht überschrieben. CSV schützt vor Formelinterpretation; XLSX schreibt ausschließlich Textzellen, keine Formeln oder externen Verknüpfungen. Exportlisten sind Arbeitsunterlagen, keine Rechtsfreigabe. Die Belegungsliste enthält nur Personen mit vorhandenen Halbjahresbelegungen; die Übertragungs-/Ausnahmeliste führt auch Personen ohne Wahl.
-
-**Übertragungsvermerke** ausdrücklich aktivieren: Datenbankschema 2 → 3 (vorher Kursplanung aktivieren und sichern). Kein automatisches Upgrade beim Start. Schema 3 ergänzt ausschließlich eine append-only Tabelle `transfer_receipts`; ältere Programme lehnen diesen Bestand ab. Vermerksschema 1 bindet manuelle Eingabe oder Wiederöffnung an Schüler-ID, Wahlrevision, Stammdatenversion, Angebots-/Regelversion, Bearbeiter, Zeitpunkt und Pflichtnotiz. Nach Änderung wird der alte Vermerk `veraltet`. `manuell_uebertragen` bestätigt ausschließlich die menschlich protokollierte Eingabe, niemals ASV-Inhalt, fachliche Gültigkeit oder eine automatische Übermittlung. Prüfstatus bleibt separat sichtbar. Liste und Ausnahmen nach CSV/XLSX exportierbar.
+CSV/XLSX-Belegungslisten unter *Kurswahlen*/*Kursplanung* und die gefilterte Differenzliste unter *ASV-Abgleich* bleiben als Arbeitsunterlagen verfügbar. Exportschreiben erfolgt über eine temporäre Datei im Zielverzeichnis; CSV schützt vor Formelinterpretation und XLSX schreibt ausschließlich Textzellen. Datenbankschema 3/4 (mit der Tabelle `transfer_receipts`) bleibt aus Kompatibilitätsgründen erhalten, wird in der UI jedoch nicht mehr über eine separate Abhak-Tabelle bespielt.
 
 ## Sicherung und Wiederherstellung
 
