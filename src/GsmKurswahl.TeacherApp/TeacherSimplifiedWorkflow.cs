@@ -34,6 +34,12 @@ public sealed partial class TeacherWindow
     private void ShowImportPreview()
     {
         importResults.Children.Clear();
+        if (importFormatNotice is { } notice)
+            importResults.Children.Add(new Border
+            {
+                Name = "ImportFormatNotice", Background = Brush.Parse("#EAF3EA"), BorderBrush = Brush.Parse("#4F8A4F"), BorderThickness = new Thickness(4, 1, 1, 1), CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 8),
+                Child = new TextBlock { Text = notice, TextWrapping = TextWrapping.Wrap }
+            });
         var selected = new List<(CheckBox Box, StudentRecord Candidate, int? Version)>();
         var existingStudents = store!.Students();
         var rowsToRender = new List<Border>();

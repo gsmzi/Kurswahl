@@ -12,7 +12,7 @@ public sealed class ImportColumnPicker : StackPanel
     private readonly Dictionary<string, ComboBox> columns = [];
     private static readonly (string Field, string Label, string Help)[] Fields =
     [
-        ("studentId", "Schüler-ID *", "Dauerhafte 36-stellige ASV-ID aus der ASV-BW-Exportformatbibliothek (z. B. über „zz Exportformat für paedML“, passend zu „zz Kursstufe Fächerwahl“). Im aktuellen Erprobungsbetrieb nur synthetische demo-IDs (z. B. demo-001)."),
+        ("studentId", "Schüler-ID *", "Dauerhafte 36-stellige ASV-ID (Spalte „ASV-ID“ im ASV-Exportformat „GSM Export für Kurswahl“, passend zu „zz Kursstufe Fächerwahl“). Im aktuellen Erprobungsbetrieb nur synthetische demo-IDs (z. B. demo-001)."),
         ("firstName", "Vorname *", "Zusammen mit Nachname für den Standardordner Nachname.Vorname."),
         ("lastName", "Nachname *", "Zusammen mit Vorname für den Standardordner Nachname.Vorname."),
         ("folder", "Abweichender Schülerordner (optional)", "Nur der Ordnername innerhalb der Klasse, z. B. Muster.Demo2. Überschreibt Nachname.Vorname."),

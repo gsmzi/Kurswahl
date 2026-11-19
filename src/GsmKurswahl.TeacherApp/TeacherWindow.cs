@@ -36,6 +36,7 @@ public sealed partial class TeacherWindow : Window
     private ImportTable? table;
     private ImportOrigin? importOrigin;
     private ImmutableArray<StudentImportRow> importRows = [];
+    private string? importFormatNotice;
     private readonly StackPanel importResults = new() { Spacing = 5 };
     private ImmutableArray<CollectionPreview> collections = [];
     private readonly StackPanel collectionResults = new() { Spacing = 5 };
@@ -117,7 +118,7 @@ public sealed partial class TeacherWindow : Window
             "Revision – jeder gespeicherte Stand einer Wahl. Nichts wird überschrieben; Wiederherstellen legt einen neuen Stand an."));
         panel.Children.Add(Help("Verwaltungsnetz und pädagogisches Netz (Transportdatei)",
             "Schülerordner sind meist nur im pädagogischen Netz erreichbar, die Verwaltung arbeitet im Verwaltungsnetz. Vor dem Wechsel den Jahrgang als Transportdatei (.gsm-transfer) speichern und im anderen Netz über „Transportdatei öffnen …“ laden. Danach nur noch mit dem geöffneten Stand weiterarbeiten – es gibt keine automatische Zusammenführung zweier Stände."));
-        panel.Children.Add(Help("Dateiübersicht: Inhalt, Herkunft und Verwendung", "Schülerliste (.xlsx / .csv)\nEine Tabelle aus Ihrer vorbereiteten Klassen-10-Liste bzw. aus ASV-BW (Exportformatbibliothek → Schüler → „zz Exportformat für paedML als XLSX“ / „… als CSV“ bzw. eine schuleigene Kopie davon mit der dauerhaften 36-stelligen ASV-ID). Unter Wahl → Schülerliste importieren.\n\nFachangebot (.json), z. B. fachangebot-demo.json\nBeschreibt Fächer, Kursarten und Halbjahre eines Jahrgangs. Wird beim Anlegen eines Jahrgangs automatisch geladen und beim Verteilen in jeden Schülerordner kopiert.\n\nVerwaltungsdatei (.db), z. B. verwaltung.db\nSpeichert den Lehrerbestand mit Änderungen und Historie lokal. Wird automatisch angelegt und geöffnet.\n\nPersönliches Profil (profil.json)\nDas Lehrerprogramm erzeugt diese Datei aus den geprüften Voraussetzungen und legt sie beim Verteilen in den Wahlordner. Keine Schülerliste und keine Kurswahl.\n\nKurswahl (aktuell.json)\nWird vom Schülerprogramm gespeichert. Das Lehrerprogramm liest sie automatisch aus dem bestätigten Wahlordner.\n\nKontrollbogen (.pdf)\nLesbare Übersicht zur Kurswahl. Zum Ansehen und Prüfen (ohne Unterschriftenzeile); kein Importformat.\n\nTransportdatei (.gsm-transfer)\nKompletter Jahrgang für den Wechsel zwischen Verwaltungs- und pädagogischem Netz bzw. als Sicherung.\n\nASV-Kurswahl-Export („zz Kursstufe Fächerwahl“)\nUnter ASV-Abgleich als .xlsx oder .csv direkt einlesbar, um Deckungsgleichheit von Kursen, Halbjahren und geplanten mündlichen Prüfungsfächern zu prüfen."));
+        panel.Children.Add(Help("Dateiübersicht: Inhalt, Herkunft und Verwendung", "Schülerliste (.xlsx / .csv)\nEine Tabelle aus Ihrer vorbereiteten Klassen-10-Liste bzw. aus ASV-BW über das schuleigene Exportformat „GSM Export für Kurswahl“ (ASV-ID, Familienname, Rufname, Klasse, Klassengruppe, Profil, Unterrichtsfächer; wird automatisch erkannt und umgerechnet). Unter Wahl → Schülerliste importieren.\n\nFachangebot (.json), z. B. fachangebot-demo.json\nBeschreibt Fächer, Kursarten und Halbjahre eines Jahrgangs. Wird beim Anlegen eines Jahrgangs automatisch geladen und beim Verteilen in jeden Schülerordner kopiert.\n\nVerwaltungsdatei (.db), z. B. verwaltung.db\nSpeichert den Lehrerbestand mit Änderungen und Historie lokal. Wird automatisch angelegt und geöffnet.\n\nPersönliches Profil (profil.json)\nDas Lehrerprogramm erzeugt diese Datei aus den geprüften Voraussetzungen und legt sie beim Verteilen in den Wahlordner. Keine Schülerliste und keine Kurswahl.\n\nKurswahl (aktuell.json)\nWird vom Schülerprogramm gespeichert. Das Lehrerprogramm liest sie automatisch aus dem bestätigten Wahlordner.\n\nKontrollbogen (.pdf)\nLesbare Übersicht zur Kurswahl. Zum Ansehen und Prüfen (ohne Unterschriftenzeile); kein Importformat.\n\nTransportdatei (.gsm-transfer)\nKompletter Jahrgang für den Wechsel zwischen Verwaltungs- und pädagogischem Netz bzw. als Sicherung.\n\nASV-Kurswahl-Export („zz Kursstufe Fächerwahl“)\nUnter ASV-Abgleich als .xlsx oder .csv direkt einlesbar, um Deckungsgleichheit von Kursen, Halbjahren und geplanten mündlichen Prüfungsfächern zu prüfen."));
         panel.Children.Add(Help("Mit welchen Testdateien kann ich beginnen?", "Im Projektordner samples liegen:\n• fachangebot-demo.json: wird beim Anlegen eines Jahrgangs automatisch als Vorlage geladen.\n• klasse10-demo.csv: unter Schülerliste importieren laden; enthält zwei erfundene Personen.\n• schueler-demo.json: Beispiel für eine Kurswahl. Beim Einsammeln erwartet das Programm den Namen aktuell.json im bestätigten Wahlordner.\n• profil-demo-unsigned.json: Beispiel für ein persönliches Schülerprofil."));
         panel.Children.Add(Help("Nur für die Einrichtung: Programmeinstellungen", "appsettings.json im Schülerprogramm enthält die Programmeinstellungen (Speicherort, Katalogpfad). Diese Datei wird nicht als Schülerliste importiert."));
         return panel;
@@ -549,18 +550,30 @@ public sealed partial class TeacherWindow : Window
     }
     private void BuildImport()
     {
-        Intro(importPanel, "Schüler und Vorbildung aus einer Tabelle übernehmen", "Laden Sie die Klassen-10-Liste mit Namen, Klassen und persönlichen Voraussetzungen. Passende Spaltenüberschriften werden automatisch zugeordnet. Prüfen Sie die Vorschau: Fehlerfreie Zeilen sind vorausgewählt und werden mit einem Klick übernommen. Ein erneuter Import überschreibt keine Korrekturen und keine Wahlen.");
-        importPanel.Children.Add(Help("Welche Tabelle kann ich verwenden? (ASV-BW-Empfehlung)", "Empfohlene ASV-BW-Quelle:\n• Pfad in ASV-BW: Datei → Verwaltung → Exportformatbibliothek → Datenbereich „Schüler“ → „zz Exportformat für paedML als XLSX“ (oder „… als CSV“).\n• Dieses Format liefert Klasse, Nachname, Vornamen und die dauerhafte 36-stellige ASV-ID – genau dieselbe ID wie im späteren Kurswahl-Export „zz Kursstufe Fächerwahl“. Für Vorbildung (Fremdsprachen, Religion/Ethik, Profil) am besten eine Kopie dieses Formats in ASV-BW anlegen und die Spalten ergänzen.\n• Wichtig: Nicht die schuljahresbezogene ID aus der normalen Listenansicht verwenden, sondern immer die dauerhafte ASV-ID aus der Exportformatbibliothek.\n\nDateiformat & Erprobungsbetrieb:\n• Excel (.xlsx): genau ein Tabellenblatt mit einer Kopfzeile und festen Werten (Formeln vorher als Werte speichern).\n• CSV (.csv): Texttabelle mit Kopfzeile, Semikolon als Trennzeichen und UTF-8.\n• Im aktuellen Erprobungsstand sind nur synthetische demo-IDs zugelassen (z. B. samples/klasse10-demo.csv). Profil-, Angebots- und Kurswahldateien (.json) gehören nicht in diesen Import."));
+        Intro(importPanel, "Schüler und Vorbildung aus ASV-BW übernehmen", $"Laden Sie den ASV-BW-Export „{AsvStudentImport.FormatName}“ der Klassen 10. Das Programm erkennt dieses Format automatisch und rechnet Profil, Religion/Ethik, Fremdsprachen, Brückenkurs und bilingualen Zug um. Prüfen Sie die Vorschau: Fehlerfreie Zeilen sind vorausgewählt und werden mit einem Klick übernommen. Ein erneuter Import überschreibt keine Korrekturen und keine Wahlen.");
+        importPanel.Children.Add(Help($"So erstellen Sie die Schülerliste in ASV-BW („{AsvStudentImport.FormatName}“)",
+            $"1. In ASV-BW das schuleigene Exportformat „{AsvStudentImport.FormatName}“ verwenden (unter „Exportformate verwalten“, Format „Excel“, 1. Zeile enthält Feldnamen).\n" +
+            "2. Die Schülerinnen und Schüler der Klassen 10 auswählen und exportieren.\n" +
+            "3. Die Excel-Datei hier unter „1 · ASV-Export auswählen“ laden. Der Abiturjahrgang wird aus dem geöffneten Jahrgang übernommen.\n\n" +
+            "Spalten des Formats und ihre Übernahme:\n" +
+            "• ASV-ID (Skriptfeld): dauerhafte 36-stellige ASV-ID – dieselbe ID wie im späteren Kurswahl-Export „zz Kursstufe Fächerwahl“.\n" +
+            "• Familienname, Rufname, Klasse: Name und Schülerordner Klasse/Familienname.Rufname.\n" +
+            "• Klassengruppe: „bili“ = durchgängig bilingual, „reg“ = nicht bilingual.\n" +
+            "• Profil: „I“ = Italienisch-Profil, „IMP“ = IMP, „NWT“ = keins von beiden.\n" +
+            $"• Unterrichtsfächer: REV → ER, RRK → KR, ETH → ETH; Fremdsprachen E, F, L, I, GR als Sprachlaufbahn; „{AsvStudentImport.BridgeCourseCode}“ = Informatik-Brückenkurs besucht, fehlt das Kürzel, gilt „nein“.\n\n" +
+            "Leere Felder bleiben „unbekannt“. Mehrere Religions-/Ethikkürzel bei einer Person werden nicht geraten, sondern als Fehler in der Vorschau gezeigt. Sportbefreiungen und Freigaben führt dieses Format nicht; sie bleiben unbekannt und lassen sich in den Schülerdetails nachtragen.\n\n" +
+            "Andere Tabellen: Eine eigene Excel- oder CSV-Liste (Semikolon, UTF-8, genau ein Tabellenblatt, keine Formeln) kann über die Spaltenzuordnung unter 2 übernommen werden.\n" +
+            "Erprobungsbetrieb: Im aktuellen Stand sind nur synthetische demo-IDs zugelassen (z. B. samples/klasse10-demo.csv); echte ASV-IDs werden erst mit der Produktivfreigabe angenommen."));
         var mappingStack = new StackPanel { Spacing = 8 };
         mappingStack.Children.Add(Text("2 · Spalten zuordnen (nur nötig, wenn Überschriften nicht erkannt wurden): Wählen Sie rechts die passende Spalte Ihrer Tabelle. * = Pflichtfeld. Nicht zugeordnete Voraussetzungen bleiben „Unbekannt“; ein fehlender Abgängerstatus gilt als aktiv."));
         mappingStack.Children.Add(Help("Was bedeuten die Angaben?", "Schüler-ID: eindeutige Kennung einer Person. Windows-Benutzername: ihr Schulkonto (optional). Persönlicher Wahlordner: enthält später Profil und Kurswahl; ohne Angabe wird Klasse/Nachname.Vorname verwendet.\n\nVoraussetzungen wie IMP oder bilingual: ja/nein; leer bedeutet unbekannt. Sportbefreiung: z. B. 1,2 für die betroffenen Halbjahre, „keine“ für bestätigte Nichtbefreiung. Sprachen: Fachkürzel wie E,F. Religion/Ethik: ETH, ER oder KR.\n\nWeitere Erläuterungen erscheinen, wenn Sie mit der Maus über ein Feld fahren. Unbekannte Angaben sind weder erfüllt noch falsch."));
         mappingStack.Children.Add(mapping);
         mappingStack.Children.Add(Button("3 · Vorschau aktualisieren", () =>
         {
-            Ready(); if (table is null || importOrigin is null) throw new InvalidOperationException("Bitte zuerst unter 1 eine Schülerliste auswählen.");
+            Ready(); if (table is null || importOrigin is null) throw new InvalidOperationException("Bitte zuerst unter 1 den ASV-Export bzw. eine Schülerliste auswählen.");
             var map = mapping.Read();
             var mappingHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", map.OrderBy(p => p.Key).Select(p => p.Key + "=" + p.Value)))));
-            importRows = StudentTableImport.Preview(table, map, importOrigin with { MappingVersion = "m3-table-v1:" + mappingHash }, Actor); importResults.Children.Clear();
+            importRows = StudentTableImport.Preview(table, map, importOrigin with { MappingVersion = importOrigin.MappingVersion.Split(':')[0] + ":" + mappingHash }, Actor); importResults.Children.Clear();
             ShowImportPreview();
             SetStatus("Importvorschau aktualisiert.", FeedbackKind.Info);
         }, "Nach einer geänderten Spaltenzuordnung die Vorschau neu berechnen. Fehlerfreie Zeilen sind für die gemeinsame Übernahme vorausgewählt."));
@@ -572,21 +585,29 @@ public sealed partial class TeacherWindow : Window
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Content = mappingStack
         };
-        importPanel.Children.Add(Primary(Button("1 · Schülerliste auswählen (.xlsx / .csv) …", async () =>
+        importPanel.Children.Add(Primary(Button($"1 · ASV-Export „{AsvStudentImport.FormatName}“ auswählen (.xlsx / .csv) …", async () =>
         {
-            Ready(); var path = await Pick("Schülerliste mit Personen und Vorbildung auswählen", "Schülerlisten (Excel oder CSV)", "*.xlsx", "*.csv"); if (path is null) return;
+            Ready(); var path = await Pick($"ASV-Export „{AsvStudentImport.FormatName}“ (Klassen 10) auswählen", "ASV-Export bzw. Schülerliste (Excel oder CSV)", "*.xlsx", "*.csv"); if (path is null) return;
             if (Path.GetExtension(path).ToLowerInvariant() is not (".csv" or ".xlsx")) throw new ArgumentException("Bitte eine Schülerliste als .xlsx oder .csv auswählen. Kurswahlen werden unter „Kurswahlen einsammeln“ gelesen.");
             if (new FileInfo(path).Length > 16_000_000) throw new InvalidDataException("Importdatei überschreitet 16 MB.");
             var bytes = await File.ReadAllBytesAsync(path);
             table = Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ? StudentTableImport.Xlsx(new MemoryStream(bytes)) : StudentTableImport.Csv(Encoding.UTF8.GetString(bytes));
-            importOrigin = new(Path.GetFileName(path), Convert.ToHexString(SHA256.HashData(bytes)), "m3-table-v1", DateTimeOffset.UtcNow, Actor);
+            var mappingVersion = "m3-table-v1"; importFormatNotice = null;
+            if (AsvStudentImport.Detect(table))
+            {
+                var year = session?.Catalog.GraduationYear ?? throw new InvalidOperationException("Bitte zuerst einen Jahrgang öffnen.");
+                var rawRows = table.Rows.Length;
+                table = AsvStudentImport.Convert(table, year); mappingVersion = AsvStudentImport.MappingVersion;
+                importFormatNotice = $"ASV-Format „{AsvStudentImport.FormatName}“ erkannt: {rawRows} Zeilen, Abiturjahrgang {year}. Profil, Religion/Ethik, Fremdsprachen, Brückenkurs und bilingualer Zug wurden aus den ASV-Kürzeln umgerechnet.";
+            }
+            importOrigin = new(Path.GetFileName(path), Convert.ToHexString(SHA256.HashData(bytes)), mappingVersion, DateTimeOffset.UtcNow, Actor);
             mapping.Load(table);
             importRows = []; importResults.Children.Clear();
             try
             {
                 var map = mapping.Read();
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", map.OrderBy(p => p.Key).Select(p => p.Key + "=" + p.Value)))));
-                importRows = StudentTableImport.Preview(table, map, importOrigin with { MappingVersion = "m3-table-v1:" + hash }, Actor);
+                importRows = StudentTableImport.Preview(table, map, importOrigin with { MappingVersion = importOrigin.MappingVersion.Split(':')[0] + ":" + hash }, Actor);
                 importMappingExpander.IsExpanded = false;
                 ShowImportPreview();
                 SetStatus("Liste geladen. Vorschau prüfen; Spaltenzuordnung nur bei Bedarf anpassen.", FeedbackKind.Info);
@@ -601,7 +622,7 @@ public sealed partial class TeacherWindow : Window
                 });
                 SetStatus("Bitte Spalten zuordnen (Bereich „2 · Spaltenzuordnung prüfen / anpassen“): " + ex.Message, FeedbackKind.Warning);
             }
-        }, "Öffnet eine Excel- oder CSV-Tabelle. Das Laden allein verändert noch keine Stammdaten.")));
+        }, $"Öffnet den ASV-Export „{AsvStudentImport.FormatName}“ oder eine andere Schülerliste (Excel/CSV). Das Laden allein verändert noch keine Stammdaten.")));
         importPanel.Children.Add(importMappingExpander);
         importPanel.Children.Add(importResults);
     }

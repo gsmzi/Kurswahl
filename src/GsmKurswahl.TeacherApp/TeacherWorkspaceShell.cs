@@ -109,7 +109,7 @@ public sealed partial class TeacherWindow
         activeAsvComparison = null; distributionRoot.Text = ""; deliveryPreview.Children.Clear();
         collections = []; conflictSelection.Clear(); dismissedConflicts.Clear(); conflict.IsChecked = false; collectionResults.Children.Clear(); detail.Children.Clear();
         if (conflictSection is not null) conflictSection.IsVisible = false;
-        importRows = []; importOrigin = null; table = null; mapping.Clear(); importResults.Children.Clear();
+        importRows = []; importOrigin = null; table = null; importFormatNotice = null; mapping.Clear(); importResults.Children.Clear();
         var year = workspace?.Active;
         if (year is null) { ShowNewYear(); return; }
         try { store = workspace!.OpenActive(); }
