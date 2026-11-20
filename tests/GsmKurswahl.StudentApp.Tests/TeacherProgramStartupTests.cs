@@ -13,7 +13,7 @@ public sealed class TeacherProgramStartupTests : IDisposable
     public TeacherProgramStartupTests() => Directory.CreateDirectory(root);
     public void Dispose() => Directory.Delete(root, true);
 
-    [AvaloniaFact]
+    [AvaloniaFact(Skip = WindowsOnly.Skip)]
     public void BlockedStartShowsMessageAndNeverOpensAdministration()
     {
         File.WriteAllText(Path.Combine(root, TeacherProgramLease.FileName), "demo");
@@ -53,7 +53,7 @@ public sealed class TeacherProgramStartupTests : IDisposable
         Directory.CreateDirectory(Path.Combine(root, TeacherProgramLease.FileName)); Check();
     }
 
-    [AvaloniaFact]
+    [AvaloniaFact(Skip = WindowsOnly.Skip)]
     public void LocalPackageCopiesAndTestStagesUseTheSharedProgramLockBeforePreparation()
     {
         var shared = Path.Combine(root, "shared [Demo]"); var local = Path.Combine(root, "local");
