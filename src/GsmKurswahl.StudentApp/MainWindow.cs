@@ -120,8 +120,8 @@ public sealed class MainWindow : Window
             Name = "SchoolLogo",
             Source = schoolLogo,
             Height = 46,
-            Width = Math.Round(46 * SchoolAssets.LogoAspectRatio),
-            Stretch = Stretch.Uniform,
+            Width = 46 * SchoolAssets.LogoAspectRatio,
+            Stretch = Stretch.Fill,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Right
         };

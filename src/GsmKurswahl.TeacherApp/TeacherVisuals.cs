@@ -199,8 +199,8 @@ public sealed partial class TeacherWindow
             Name = "SchoolLogo",
             Source = schoolLogo,
             Height = 48,
-            Width = Math.Round(48 * SchoolAssets.LogoAspectRatio),
-            Stretch = Stretch.Uniform,
+            Width = 48 * SchoolAssets.LogoAspectRatio,
+            Stretch = Stretch.Fill,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Right
         };
