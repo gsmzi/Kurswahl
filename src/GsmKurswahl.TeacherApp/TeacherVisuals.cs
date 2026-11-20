@@ -3,25 +3,33 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Markup.Xaml.Styling;
 using GsmKurswahl.Application;
 using GsmKurswahl.Domain;
+using GsmKurswahl.ImportExport;
 
 namespace GsmKurswahl.TeacherApp;
 
 public sealed partial class TeacherWindow
 {
-    private static readonly IBrush Ink = Brush.Parse("#203448");
-    private static readonly IBrush Muted = Brush.Parse("#526476");
-    private static readonly IBrush Accent = Brush.Parse("#176B68");
-    private static readonly IBrush SoftAccent = Brush.Parse("#E2F1EE");
-    private static readonly IBrush Line = Brush.Parse("#DAE3E9");
+    private static readonly IBrush Ink = Brush.Parse("#1B2038");
+    private static readonly IBrush Muted = Brush.Parse("#5A6075");
+    private static readonly IBrush Accent = Brush.Parse("#1E287D");
+    private static readonly IBrush SoftAccent = Brush.Parse("#EAEBF7");
+    private static readonly IBrush HighlightAccent = Brush.Parse("#F4F5FB");
+    private static readonly IBrush Line = Brush.Parse("#D5D7DF");
+    private static readonly IBrush RowAlt = Brush.Parse("#F4F5F9");
+    private static readonly IBrush SuccessInk = Brush.Parse("#2B6B2F");
+    private static readonly IBrush SuccessBorder = Brush.Parse("#3B6D11");
+    private static readonly IBrush SuccessSoft = Brush.Parse("#E8F4EA");
     private enum FeedbackKind { Info, Success, Warning, Error }
     private readonly StackPanel workflowProgress = new() { Name = "WorkflowProgress", Spacing = 10 };
     private readonly TextBlock sectionLabel = new() { FontSize = 12, Foreground = Muted, FontWeight = FontWeight.SemiBold };
     private readonly Button yearSwitchButton = new() { Content = "Jahrgang wechseln / neu …", Name = "SwitchYearHeader", Padding = new Thickness(10, 4), MinHeight = 28, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock statusIcon = new() { Text = "ℹ", FontSize = 14, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+    private Bitmap? schoolLogo;
     private Border statusBanner = null!;
     private FeedbackKind feedbackKind = FeedbackKind.Info;
     private bool updatingFeedback;
@@ -131,21 +139,21 @@ public sealed partial class TeacherWindow
         {
             FeedbackKind.Error => Brush.Parse("#FCEBEB"),
             FeedbackKind.Warning => Brush.Parse("#FAEEDA"),
-            FeedbackKind.Success => Brush.Parse("#E6F4EA"),
-            _ => Brush.Parse("#EDF2F6")
+            FeedbackKind.Success => SuccessSoft,
+            _ => Brush.Parse("#EEF0F8")
         };
         statusBanner.BorderBrush = feedbackKind switch
         {
             FeedbackKind.Error => Brush.Parse("#A32D2D"),
             FeedbackKind.Warning => Brush.Parse("#C48723"),
-            FeedbackKind.Success => Accent,
+            FeedbackKind.Success => SuccessBorder,
             _ => Line
         };
         status.Foreground = feedbackKind switch
         {
             FeedbackKind.Error => Brush.Parse("#8C1D1D"),
             FeedbackKind.Warning => Brush.Parse("#785311"),
-            FeedbackKind.Success => Brush.Parse("#13544E"),
+            FeedbackKind.Success => SuccessInk,
             _ => Ink
         };
         statusIcon.Text = feedbackKind switch
@@ -161,12 +169,18 @@ public sealed partial class TeacherWindow
     private void BuildVisualShell()
     {
         RequestedThemeVariant = ThemeVariant.Light;
-        Background = Brush.Parse("#F3F6F8"); Foreground = Ink; FontSize = 14;
+        Background = Brush.Parse("#F3F4F8"); Foreground = Ink; FontSize = 14;
         Styles.Add(new StyleInclude(new Uri("avares://GsmKurswahl.TeacherApp/")) { Source = new Uri("avares://GsmKurswahl.TeacherApp/TeacherStyles.axaml") });
-        var root = new DockPanel { Margin = new Thickness(28, 20) };
-        var header = new StackPanel { Spacing = 14 };
+        using (var logoStream = SchoolAssets.OpenLogoStream())
+            schoolLogo = new Bitmap(logoStream);
+
+        var outer = new DockPanel();
+        var topBarStack = new StackPanel();
+        topBarStack.Children.Add(new Border { Height = 4, Background = Accent });
+
+        var headerInner = new StackPanel { Spacing = 10, Margin = new Thickness(28, 12, 28, 10) };
         var brand = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        var titles = new StackPanel { Spacing = 4 };
+        var titles = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center };
         titles.Children.Add(new TextBlock { Text = "GSM  /  KURSWAHL · LEHRERVERWALTUNG", FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Accent, LetterSpacing = 1.4 });
         var headingRow = new WrapPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         heading.Margin = new Thickness(0, 0, 14, 0);
@@ -176,14 +190,39 @@ public sealed partial class TeacherWindow
         headingRow.Children.Add(yearSwitchButton);
         titles.Children.Add(headingRow);
         brand.Children.Add(titles);
+
         var badge = new Border { Background = Brush.Parse("#FFF1D9"), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 6), VerticalAlignment = VerticalAlignment.Center,
             Child = new TextBlock { Text = "Erprobungsbetrieb", Foreground = Brush.Parse("#785311"), FontSize = 12, FontWeight = FontWeight.SemiBold } };
         ToolTip.SetTip(badge, "Nur synthetische Daten. Fachliche Freigabe offen; keine verbindliche Abgabe.");
-        Grid.SetColumn(badge, 1); brand.Children.Add(badge); header.Children.Add(brand);
-        header.Children.Add(navigation);
-        header.Children.Add(workflowProgress);
-        header.Margin = new Thickness(0, 0, 0, 12);
-        DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
+        var logoImage = new Image
+        {
+            Name = "SchoolLogo",
+            Source = schoolLogo,
+            Height = 48,
+            Width = Math.Round(48 * SchoolAssets.LogoAspectRatio),
+            Stretch = Stretch.Uniform,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        RenderOptions.SetBitmapInterpolationMode(logoImage, BitmapInterpolationMode.HighQuality);
+        AutomationProperties.SetName(logoImage, "Schullogo Gymnasium bei St. Michael Schwäbisch Hall");
+        ToolTip.SetTip(logoImage, "Gymnasium bei St. Michael Schwäbisch Hall");
+        var brandRight = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) };
+        brandRight.Children.Add(badge);
+        brandRight.Children.Add(new Border { Width = 1, Height = 36, Background = Line, VerticalAlignment = VerticalAlignment.Center });
+        brandRight.Children.Add(logoImage);
+        Grid.SetColumn(brandRight, 1); brand.Children.Add(brandRight);
+
+        headerInner.Children.Add(brand);
+        headerInner.Children.Add(new Border { Height = 1, Background = Brush.Parse("#ECEEF3") });
+        headerInner.Children.Add(navigation);
+        topBarStack.Children.Add(headerInner);
+        var topBar = new Border { Background = Brushes.White, BorderBrush = Line, BorderThickness = new Thickness(0, 0, 0, 1), Child = topBarStack };
+        DockPanel.SetDock(topBar, Dock.Top); outer.Children.Add(topBar);
+
+        var root = new DockPanel { Margin = new Thickness(28, 14, 28, 16) };
+        workflowProgress.Margin = new Thickness(0, 0, 0, 12);
+        DockPanel.SetDock(workflowProgress, Dock.Top); root.Children.Add(workflowProgress);
 
         status.FontSize = 13; status.Foreground = Ink; status.FontWeight = FontWeight.Medium;
         status.VerticalAlignment = VerticalAlignment.Center;
@@ -203,7 +242,7 @@ public sealed partial class TeacherWindow
         statusBanner = new Border
         {
             Name = "AlertBanner",
-            Background = Brush.Parse("#EDF2F6"), BorderBrush = Line, BorderThickness = new Thickness(4, 1, 1, 1),
+            Background = Brush.Parse("#EEF0F8"), BorderBrush = Line, BorderThickness = new Thickness(4, 1, 1, 1),
             CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 8), Margin = new Thickness(8, 0, 8, 10),
             Child = alertGrid
         };
@@ -230,7 +269,9 @@ public sealed partial class TeacherWindow
         DockPanel.SetDock(busyPanel, Dock.Top); content.Children.Add(busyPanel);
         DockPanel.SetDock(statusBanner, Dock.Top); content.Children.Add(statusBanner);
         content.Children.Add(pageHost);
-        root.Children.Add(Surface(content, 20)); Content = root;
+        root.Children.Add(Surface(content, 20));
+        outer.Children.Add(root);
+        Content = outer;
     }
     private static Border Surface(Control content, double padding = 16) => new()
     {
@@ -238,7 +279,7 @@ public sealed partial class TeacherWindow
     };
     private static Border SubtleCard(Control content, double padding = 12) => new()
     {
-        Background = Brush.Parse("#F8FAFC"), BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(padding), Child = content
+        Background = Brush.Parse("#F7F8FB"), BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(padding), Child = content
     };
     private static Border InlineErrorBox(string name, out TextBlock text)
     {
@@ -265,7 +306,7 @@ public sealed partial class TeacherWindow
         sectionLabel.Text = visiblePage switch
         {
             "offer" => "EINRICHTUNG  /  FACHANGEBOT", "import" => "SCHÜLERLISTE  /  IMPORT & ABGLEICH",
-            "profiles" => "SCHÜLERDATEIEN  /  VERTEILUNG", "collection" => "KURSWAHLEN  /  EINGANG & KONFLIKTE",
+            "profiles" => "SCHÜLERDATEIEN  /  VERTEILUNG  (PÄDAGOGISCHES NETZ)", "collection" => "KURSWAHLEN  /  EINGANG & KONFLIKTE  (PÄDAGOGISCHES NETZ)",
             "wahl" => "WAHL / VORBEREITEN & EINSAMMELN", "results" => "KURSWAHLEN / PRÜFEN, ÄNDERN, DRUCKEN", "people" => "WAHL / SCHÜLERBESTAND", "settings" => "EINSTELLUNGEN", "help" => "HILFE & DATEIEN",
             "planning" => "KURSPLANUNG / SZENARIEN & ANALYSE", "manage" => "JAHRGANG VERWALTEN", "catalog" => "FACHANGEBOT", "new" => "WILLKOMMEN", "asv" => "ASV-ABGLEICH", _ => "JAHRGANGSÜBERSICHT"
         };
@@ -293,8 +334,8 @@ public sealed partial class TeacherWindow
         var setup = active?.Step;
         var stage = setup switch { YearSetupStep.Offer => 0, YearSetupStep.Import => 1, YearSetupStep.Mapping or YearSetupStep.Review => 2, _ => -1 };
         var distributed = summary is { Students: > 0 } && summary.Delivered == summary.Students;
-        string[] titles = ["Fächer auswählen", "Schülerliste importieren", "Dateien verteilen", "Wahlen einsammeln"];
-        string[] descriptions = ["Leistungsfachangebot festlegen", "Liste gemeinsam übernehmen", "Laufwerk wählen und zustellen", "Wahleingang und Konflikte prüfen"];
+        string[] titles = ["Fächer auswählen", "Schülerliste importieren", "Dateien verteilen (päd. Netz)", "Wahlen einsammeln (päd. Netz)"];
+        string[] descriptions = ["Leistungsfachangebot festlegen (Verwaltungsnetz)", "Liste gemeinsam übernehmen (Verwaltungsnetz)", "Ins pädagogische Netz wechseln, Laufwerk wählen und zustellen", "Im pädagogischen Netz einsammeln und danach Rück-Transportdatei sichern"];
         var strip = new Grid { ColumnDefinitions = new ColumnDefinitions("*,16,*,16,*,16,*") };
         for (var i = 0; i < 4; i++)
         {
@@ -314,12 +355,12 @@ public sealed partial class TeacherWindow
             var caption = new StackPanel { Spacing = 3 };
             caption.Children.Add(new TextBlock { Text = titles[i], FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap, Foreground = viewing || current ? Accent : Ink });
             caption.Children.Add(new TextBlock { Name = "WorkflowState" + i, Text = state, FontSize = 12, Foreground = viewing || current || complete ? Accent : Muted });
-            var number = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = current || viewing ? Accent : complete ? SoftAccent : Brush.Parse("#EDF1F4"), VerticalAlignment = VerticalAlignment.Top,
+            var number = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = current || viewing ? Accent : complete ? SoftAccent : Brush.Parse("#ECEEF4"), VerticalAlignment = VerticalAlignment.Top,
                 Child = new TextBlock { Text = complete && !current ? "✓" : (i + 1).ToString(), Foreground = current || viewing ? Brushes.White : complete ? Accent : Muted, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("42,*") }; row.Children.Add(number); Grid.SetColumn(caption, 1); row.Children.Add(caption);
             var tile = Surface(row, 12); tile.Name = "WorkflowStep" + i;
             tile.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
-            tile.Background = viewing ? SoftAccent : current ? Brush.Parse("#F0F8F6") : Brushes.White;
+            tile.Background = viewing ? SoftAccent : current ? HighlightAccent : Brushes.White;
             tile.BorderBrush = viewing || current ? Accent : Line;
             tile.BorderThickness = new Thickness(viewing ? 2 : 1);
             tile.PointerPressed += (_, _) => JumpToWorkflowStep(stepIndex);

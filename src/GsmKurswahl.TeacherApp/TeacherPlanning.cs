@@ -157,7 +157,7 @@ public sealed partial class TeacherWindow
                 var row = CompactLine(columns, [Text(student.Student.SyntheticDisplayName), Text(student.Student.ClassName),
                     Text(string.Join(", ", change.RemovedOffers.Select(OfferLabel))), Text(PlanningPresentation.Choices(change.Choice, true)), Text(PlanningPresentation.Choices(change.Choice, false))]);
                 ToolTip.SetTip(row, string.Join("\n", change.Validation.Messages.Select(m => m.Explanation)));
-                impact.Children.Add(new Border { Child = row, Background = rowIndex++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White });
+                impact.Children.Add(new Border { Child = row, Background = rowIndex++ % 2 == 0 ? RowAlt : Brushes.White });
             }
             if (preview.Restoring) impact.Children.Add(Text("Die Wiederherstellung betrifft das Angebot. Entfernte Schülerwünsche werden nicht automatisch eingetragen; eine Wahl kann anschließend im Schülerbestand aus ihrer Historie wiederhergestellt werden."));
         }
@@ -319,7 +319,7 @@ public sealed partial class TeacherWindow
                    "Format „1:… 2:…“ schlüsselt einzelne Halbjahre auf. Bestätigte Abgänger sind ausgeschlossen.",
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12,
-            Foreground = Brush.Parse("#1E3A5F")
+            Foreground = Accent
         });
         legendContent.Children.Add(new TextBlock
         {
@@ -330,7 +330,7 @@ public sealed partial class TeacherWindow
         });
         var legendBox = new Border
         {
-            Background = Brush.Parse("#EBF2F7"),
+            Background = SoftAccent,
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(10, 8),
             Child = legendContent
@@ -403,7 +403,7 @@ public sealed partial class TeacherWindow
             var row = CompactLine(columns, [label, Cell(CourseType.Lf, CourseVariant.Normal), Cell(CourseType.Lf, CourseVariant.Bilingual),
                 Cell(CourseType.Bf, CourseVariant.Normal), Cell(CourseType.Bf, CourseVariant.Bilingual), Cell(CourseType.Elective, CourseVariant.Normal, true)]);
             blocks[split && index >= (subjects.Length + 1) / 2 ? 1 : 0].Children.Add(new Border { Name = "PlanningSubject_" + subject.Id,
-                Background = index++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White, Child = row });
+                Background = index++ % 2 == 0 ? RowAlt : Brushes.White, Child = row });
         }
         panel.Children.Add(matrix);
         var combinations = new StackPanel { Spacing = 2 };

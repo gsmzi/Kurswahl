@@ -4,11 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GSM-Kurswahl | Testversion für zu Hause</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23ffffff'/%3E%3Cpolygon points='2,2 28,2 10,20 2,20' fill='%231E287D'/%3E%3Cpolygon points='30,4 30,30 12,30 12,22' fill='%23BCBDBF'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div id="AppShell" class="app-shell">
-    <header class="app-header">
+  <header class="brand-bar">
+    <div class="app-header">
       <div id="WindowHeading" class="title-block">
         <div class="title-line">
           <h1>GSM-Kurswahl</h1>
@@ -25,7 +26,14 @@
         <button id="SaveButton" type="button" class="btn">Entwurf speichern</button>
         <button id="ResetButton" type="button" class="btn">Neu beginnen</button>
       </div>
-    </header>
+      <div class="brand-logo-wrap">
+        <span class="header-divider" aria-hidden="true"></span>
+        <img id="SchoolLogo" class="school-logo" src="./school-logo.jpg" alt="Gymnasium bei St. Michael Schwäbisch Hall" width="130" height="46" />
+      </div>
+    </div>
+  </header>
+
+  <div id="AppShell" class="app-shell">
 
     <nav id="Stepper" class="stepper" aria-label="Wahlschritte"></nav>
 

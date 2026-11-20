@@ -30,7 +30,7 @@ internal sealed class SchoolPaper : IDisposable
         muted = new() { Typeface = regularFace, TextSize = 8, IsAntialias = true, Color = new SKColor(80, 80, 80) };
         line = new() { Color = new SKColor(170, 170, 170), StrokeWidth = .5f };
         fill = new() { Color = new SKColor(240, 240, 240) };
-        using var source = typeof(SchoolPaper).Assembly.GetManifestResourceStream("GsmKurswahl.ImportExport.Assets.SchoolLogo.jpeg")!;
+        using var source = SchoolAssets.OpenLogoStream();
         // Keep the original JPEG encoding: bitmap re-encoding changes this logo's blue in Skia PDFs.
         logo = SKImage.FromEncodedData(source);
         NewPage();

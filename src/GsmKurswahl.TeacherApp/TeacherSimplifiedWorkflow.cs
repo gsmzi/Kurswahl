@@ -37,7 +37,7 @@ public sealed partial class TeacherWindow
         if (importFormatNotice is { } notice)
             importResults.Children.Add(new Border
             {
-                Name = "ImportFormatNotice", Background = Brush.Parse("#EAF3EA"), BorderBrush = Brush.Parse("#4F8A4F"), BorderThickness = new Thickness(4, 1, 1, 1), CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 8),
+                Name = "ImportFormatNotice", Background = SuccessSoft, BorderBrush = SuccessBorder, BorderThickness = new Thickness(4, 1, 1, 1), CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 8),
                 Child = new TextBlock { Text = notice, TextWrapping = TextWrapping.Wrap }
             });
         var selected = new List<(CheckBox Box, StudentRecord Candidate, int? Version)>();
@@ -99,15 +99,15 @@ public sealed partial class TeacherWindow
             doneStack.Children.Add(new TextBlock
             {
                 Text = $"✓ {changed} Schüler übernommen/aktualisiert · {unchanged} unverändert · {failures.Count} nicht übernommen. Wahlen und Historien bleiben erhalten.",
-                FontWeight = FontWeight.SemiBold, Foreground = Brush.Parse("#13544E"), TextWrapping = TextWrapping.Wrap
+                FontWeight = FontWeight.SemiBold, Foreground = SuccessInk, TextWrapping = TextWrapping.Wrap
             });
             if (CurrentStudents().Any())
             {
-                var nextBtn = Primary(Button("Weiter: Schülerdateien verteilen →", () => JumpToWorkflowStep(2)));
+                var nextBtn = Primary(Button("Weiter: Ins pädagogische Netz wechseln & verteilen →", () => JumpToWorkflowStep(2)));
                 nextBtn.Name = "ImportGoToDistribution";
                 doneStack.Children.Add(nextBtn);
             }
-            importResults.Children.Add(new Border { Background = Brush.Parse("#E6F4EA"), BorderBrush = Accent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12), Child = doneStack });
+            importResults.Children.Add(new Border { Background = SuccessSoft, BorderBrush = SuccessBorder, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12), Child = doneStack });
             if (failures.Count > 0)
             {
                 var failStack = new StackPanel { Spacing = 3 };
@@ -141,7 +141,8 @@ public sealed partial class TeacherWindow
     }
     private void BuildSimpleDistribution()
     {
-        Intro(profilePanel, "3 · Schülerdateien verteilen", "Grundverzeichnis wählen: darunter Klasse und Nachname.Vorname. Abweichende Ordner können in der Schülerliste stehen. Alle Personen werden gemeinsam geprüft und verteilt.");
+        Intro(profilePanel, "3 · Schülerdateien verteilen (im pädagogischen Netz)", "Die Verteilung auf die Schülerordner muss im pädagogischen Netz erfolgen. Falls Sie sich noch im Verwaltungsnetz befinden, erstellen Sie hier zuerst das Paket inkl. Programm (.zip). Im pädagogischen Netz Grundverzeichnis wählen (darunter Klasse und Nachname.Vorname), Ziele prüfen und verteilen.");
+        profilePanel.Children.Add(NetworkTransferHint(false));
         var box = new StackPanel { Spacing = 10 };
         var rootRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         distributionRoot.Margin = new Thickness(0, 0, 8, 0);
@@ -225,12 +226,12 @@ public sealed partial class TeacherWindow
             resultCard.Children.Add(new TextBlock
             {
                 Text = $"{count} von {records.Length} Schülerdateien verteilt.",
-                FontWeight = FontWeight.SemiBold, Foreground = issueReports.Count == 0 && count == records.Length ? Brush.Parse("#13544E") : Brush.Parse("#785311")
+                FontWeight = FontWeight.SemiBold, Foreground = issueReports.Count == 0 && count == records.Length ? SuccessInk : Brush.Parse("#785311")
             });
             deliveryPreview.Children.Add(new Border
             {
-                Background = issueReports.Count == 0 && count == records.Length ? Brush.Parse("#E6F4EA") : Brush.Parse("#FAEEDA"),
-                BorderBrush = issueReports.Count == 0 && count == records.Length ? Accent : Brush.Parse("#C48723"),
+                Background = issueReports.Count == 0 && count == records.Length ? SuccessSoft : Brush.Parse("#FAEEDA"),
+                BorderBrush = issueReports.Count == 0 && count == records.Length ? SuccessBorder : Brush.Parse("#C48723"),
                 BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12), Child = resultCard
             });
             if (issueReports.Count > 0)
@@ -280,6 +281,11 @@ public sealed partial class TeacherWindow
     {
         var directory = workspace?.Active?.StudentProgramDirectory;
         if (string.IsNullOrWhiteSpace(directory)) directory = SchoolPresets().StudentProgramDirectory;
+        if (string.IsNullOrWhiteSpace(directory) && transferPackageDirectory is not null)
+        {
+            var bundled = Path.Combine(transferPackageDirectory, PedagogicalTransferPackage.StudentFolderName);
+            if (Directory.Exists(bundled)) directory = bundled;
+        }
         return directory ?? "";
     }
     // Runs off the UI thread: no control access here. The store is not used concurrently, because the window is

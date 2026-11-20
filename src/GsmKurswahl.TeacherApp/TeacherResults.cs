@@ -14,7 +14,7 @@ public sealed partial class TeacherWindow
         Ready(); ClearError(); visiblePage = "wahl";
         var summary = TeacherDashboardBuilder.Build(store!, session!);
         var panel = new StackPanel { Spacing = 14 };
-        Intro(panel, "Wahl vorbereiten und einsammeln", "Der Ablauf oben führt von der Fachauswahl bis zum Wahleingang. Voraussetzungen und persönliche Dateien werden hier verwaltet.");
+        Intro(panel, "Wahl vorbereiten und einsammeln", "Der Ablauf oben führt von der Fachauswahl (Verwaltungsnetz) über das Verteilen und Einsammeln im pädagogischen Netz bis zur Auswertung zurück im Verwaltungsnetz.");
 
         var workflowCard = new StackPanel { Spacing = 10 };
         workflowCard.Children.Add(Heading("Ablaufschritte"));
@@ -25,10 +25,10 @@ public sealed partial class TeacherWindow
         });
         var actions = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var button in new[] {
-            Button("Fachauswahl", () => JumpToWorkflowStep(0), "Leistungsfächer und optionale Kurse einsehen oder vor Wahleingang bearbeiten."),
-            Button("Schülerliste importieren", () => ShowPage("import"), "Klassen-10-Liste (XLSX/CSV) mit Namen und Vorbildung übernehmen."),
-            Button("Schülerdateien verteilen", () => ShowPage("profiles"), "Persönliche Profile und Fachangebot in die Wahlordner schreiben."),
-            Button("Kurswahlen einsammeln", () => ShowPage("collection"), "Wahleingang prüfen, Konflikte klären und nach Abgabetermin abschließend räumen.") })
+            Button("Fachauswahl", () => JumpToWorkflowStep(0), "Leistungsfächer und optionale Kurse einsehen oder vor Wahleingang im Verwaltungsnetz bearbeiten."),
+            Button("Schülerliste importieren", () => ShowPage("import"), "Klassen-10-Liste (XLSX/CSV) mit Namen und Vorbildung im Verwaltungsnetz übernehmen."),
+            Button("Schülerdateien verteilen", () => ShowPage("profiles"), "Muss im pädagogischen Netz erfolgen: dort Paket inkl. Programm entpacken, persönliche Profile und Fachangebot in die Wahlordner schreiben."),
+            Button("Kurswahlen einsammeln", () => ShowPage("collection"), "Im pädagogischen Netz Wahleingang prüfen, Konflikte klären, nach Abgabetermin räumen und Transportdatei zurück ins Verwaltungsnetz speichern.") })
         { button.Margin = new Thickness(0, 0, 8, 8); actions.Children.Add(button); }
         workflowCard.Children.Add(actions);
         panel.Children.Add(Surface(workflowCard, 14));

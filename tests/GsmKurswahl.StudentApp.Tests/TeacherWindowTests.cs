@@ -1,7 +1,9 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Headless;
 using Avalonia.LogicalTree;
+using Avalonia.VisualTree;
 using GsmKurswahl.TeacherApp;
 using GsmKurswahl.ImportExport;
 using GsmKurswahl.AdministrationStorage;
@@ -101,9 +103,19 @@ public class TeacherWindowTests
             Directory.CreateDirectory(directory); window.UpdateLayout(); AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             using var bitmap = window.CaptureRenderedFrame(); Assert.NotNull(bitmap); bitmap.Save(Path.Combine(directory, name + ".png"));
         }
+        void AssertLogoFits()
+        {
+            var logo = window.GetLogicalDescendants().OfType<Image>().Single(i => i.Name == "SchoolLogo");
+            Assert.True(logo.IsVisible);
+            Assert.True(logo.Bounds.Width > 100 && logo.Bounds.Height > 35);
+            var origin = logo.TranslatePoint(default, window);
+            Assert.NotNull(origin);
+            Assert.True(origin.Value.X >= 0 && origin.Value.X + logo.Bounds.Width <= window.ClientSize.Width + 1);
+        }
         try
         {
             window.Show(); window.UpdateLayout();
+            AssertLogoFits();
             Assert.Equal("Aktueller Schritt", State(0)); Assert.Equal("Noch offen", State(2)); Capture("teacher-offer");
             Click("Fachangebot bestätigen · weiter zur Schülerliste");
             Assert.Equal("Erledigt", State(0)); Assert.Equal("Aktueller Schritt", State(1)); Capture("teacher-import");
@@ -116,6 +128,7 @@ public class TeacherWindowTests
             Click("Später verteilen · Übersicht öffnen");
             Assert.False(window.GetLogicalDescendants().OfType<StackPanel>().Single(p => p.Name == "WorkflowProgress").IsVisible); Capture("teacher-dashboard"); Click("Wahl"); Assert.Equal("Zustellungen offen", State(2));
             window.Width = 900; window.Height = 600; window.UpdateLayout(); Capture("teacher-compact");
+            AssertLogoFits();
             var strip = window.GetLogicalDescendants().OfType<StackPanel>().Single(p => p.Name == "WorkflowProgress");
             var steps = strip.GetLogicalDescendants().OfType<Border>().Where(b => b.Name?.StartsWith("WorkflowStep") == true).ToArray();
             Assert.Equal(4, steps.Length);
@@ -582,6 +595,111 @@ public class TeacherWindowTests
         {
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
             window.Close();
+            try { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); } catch { }
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void PedagogicalNetworkFlowShowsHintsCreatesBundleAndReopensPackageWorkspace()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-paed-flow-" + Guid.NewGuid());
+        var sourceRoot = Path.Combine(root, "source");
+        TeacherWindow? sourceWindow = null;
+        TeacherWindow? pkgWindow = null;
+        TeacherWindow? reopenedWindow = null;
+        try
+        {
+            var workspace = new TeacherWorkspace(sourceRoot);
+            workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
+            workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
+            using (var db = workspace.OpenActive())
+            {
+                db.SaveStudent(new(SchemaVersions.StudentRecord,
+                    new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown),
+                    "", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            }
+
+            sourceWindow = new TeacherWindow(sourceRoot) { Width = 1400, Height = 900 };
+            sourceWindow.Show();
+            sourceWindow.UpdateLayout();
+
+            IEnumerable<T> AllIn<T>(TeacherWindow w) where T : Control => w.GetLogicalDescendants().OfType<T>().Distinct();
+            T NamedIn<T>(TeacherWindow w, string name) where T : Control => AllIn<T>(w).Single(c => c.Name == name);
+            void ClickIn(TeacherWindow w, string label)
+            {
+                AllIn<Button>(w).Single(b => b.Content?.ToString() == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                w.UpdateLayout();
+            }
+
+            ClickIn(sourceWindow, "Wahl");
+            ClickIn(sourceWindow, "Schülerdateien verteilen");
+            Assert.Contains(AllIn<TextBlock>(sourceWindow), t => t.Text?.Contains("im pädagogischen Netz") == true);
+            Assert.True(NamedIn<Expander>(sourceWindow, "TransferOutExpander").IsExpanded);
+            Assert.Contains(AllIn<Button>(sourceWindow), b => b.Name == "ExportTransferBundle");
+            Assert.Contains(AllIn<Button>(sourceWindow), b => b.Content?.ToString() == "Stand für pädagogisches Netz speichern …");
+
+            ClickIn(sourceWindow, "Wahl");
+            ClickIn(sourceWindow, "Kurswahlen einsammeln");
+            var cleanupHint = NamedIn<Border>(sourceWindow, "PostCollectionCleanupHint");
+            Assert.Contains(cleanupHint.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text?.Contains("löschen") == true);
+            var backExpander = NamedIn<Expander>(sourceWindow, "TransferBackExpander");
+            Assert.Contains(backExpander.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text?.Contains("löschen") == true);
+
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            sourceWindow.Close();
+            sourceWindow = null;
+            try { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); } catch { }
+
+            var teacherDir = Path.Combine(root, "TeacherApp");
+            Directory.CreateDirectory(teacherDir);
+            File.WriteAllText(Path.Combine(teacherDir, "GsmKurswahl.TeacherApp.exe"), "synthetic-exe");
+            File.WriteAllText(Path.Combine(teacherDir, TeacherProgramLease.FileName), "held");
+
+            var studentDir = Path.Combine(root, "StudentApp");
+            Directory.CreateDirectory(studentDir);
+            File.WriteAllText(Path.Combine(studentDir, "GsmKurswahl.StudentApp.exe"), "synthetic-student");
+            File.WriteAllText(Path.Combine(studentDir, "hostfxr.dll"), "synthetic-hostfxr");
+            File.WriteAllText(Path.Combine(studentDir, "GsmKurswahl.StudentApp.runtimeconfig.json"),
+                """{"runtimeOptions":{"includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"10.0.14"}]}}""");
+
+            var pkgZip = Path.Combine(root, "paket.zip");
+            using (var db = new TeacherWorkspace(sourceRoot).OpenActive())
+            {
+                PedagogicalTransferPackage.Export(new TeacherWorkspace(sourceRoot).Active!, db, pkgZip, teacherDir, studentDir);
+            }
+
+            var extracted = Path.Combine(root, "extracted");
+            System.IO.Compression.ZipFile.ExtractToDirectory(pkgZip, extracted);
+            var pkgWorkspaceRoot = Path.Combine(extracted, PedagogicalTransferPackage.WorkspaceFolderName);
+
+            pkgWindow = new TeacherWindow(pkgWorkspaceRoot, extracted) { Width = 1400, Height = 900 };
+            pkgWindow.Show();
+            pkgWindow.UpdateLayout();
+            Assert.Contains(AllIn<TextBlock>(pkgWindow), t => t.Text == "Transportstand prüfen");
+
+            ClickIn(pkgWindow, "Transportstand übernehmen und öffnen");
+            Assert.True(File.Exists(Path.Combine(pkgWorkspaceRoot, "verwaltung.db")));
+            Assert.Contains(AllIn<TextBlock>(pkgWindow), t => t.Text?.Contains("3 · Schülerdateien verteilen (im pädagogischen Netz)") == true);
+            Assert.False(NamedIn<Expander>(pkgWindow, "TransferOutExpander").IsExpanded);
+
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            pkgWindow.Close();
+            pkgWindow = null;
+            try { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); } catch { }
+
+            reopenedWindow = new TeacherWindow(pkgWorkspaceRoot, extracted) { Width = 1400, Height = 900 };
+            reopenedWindow.Show();
+            reopenedWindow.UpdateLayout();
+            Assert.Contains(AllIn<TextBlock>(reopenedWindow), t => t.Text == "Ihr aktueller Jahrgang");
+            Assert.DoesNotContain(AllIn<TextBlock>(reopenedWindow), t => t.Text == "Transportstand prüfen");
+        }
+        finally
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            sourceWindow?.Close();
+            pkgWindow?.Close();
+            reopenedWindow?.Close();
             try { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); } catch { }
             if (Directory.Exists(root)) Directory.Delete(root, true);
         }

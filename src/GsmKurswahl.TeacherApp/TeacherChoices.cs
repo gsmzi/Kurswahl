@@ -138,7 +138,7 @@ public sealed partial class TeacherWindow
                     ? [name, Text(record.Student.ClassName), Text(lf), count, review, departure]
                     : [name, Text(record.Student.ClassName), Text(lf), Text(choice is null ? "" : PlanningPresentation.Choices(choice, false, session!.Catalog).Replace(" · ", ", ")), count,
                         Text(choice is null ? "" : string.Join(", ", choice.PlannedOralSubjects)), review, departure];
-                rows.Children.Add(new Border { Background = id == choiceSelectedId ? Brush.Parse("#E2F1EE") : index++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White, Child = CompactLine(columns, cells) });
+                rows.Children.Add(new Border { Background = id == choiceSelectedId ? SoftAccent : index++ % 2 == 0 ? RowAlt : Brushes.White, Child = CompactLine(columns, cells) });
             }
             if (shown.Length == 0) rows.Children.Add(new TextBlock { Text = "Keine Person passt zu diesen Filtern.", Foreground = Muted, Margin = new Thickness(8, 12) });
         }

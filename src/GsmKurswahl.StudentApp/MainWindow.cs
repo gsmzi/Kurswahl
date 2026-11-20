@@ -1,15 +1,20 @@
 using System.Collections.Immutable;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using GsmKurswahl.Application;
 using GsmKurswahl.Domain;
+using GsmKurswahl.ImportExport;
 using GsmKurswahl.Rules;
 
 namespace GsmKurswahl.StudentApp;
@@ -18,13 +23,14 @@ namespace GsmKurswahl.StudentApp;
 // All decisions come from StudentSession/ChoiceWorkflow; this class only arranges and forwards them.
 public sealed class MainWindow : Window
 {
-    private static readonly IBrush Page = Brush("#F4F6FA"), Card = Brushes.White, Line = Brush("#DDE1E8"),
-        Muted = Brush("#5F5E5A"), Accent = Brush("#185FA5"), AccentSoft = Brush("#E6F1FB"),
-        Done = Brush("#3B6D11"), DoneSoft = Brush("#EAF3DE"), Warn = Brush("#854F0B"), WarnSoft = Brush("#FAEEDA"),
-        Danger = Brush("#A32D2D"), LfFill = Brush("#534AB7"), BfFill = Brush("#9FE1CB"), OtherFill = Brush("#F5C4B3"), Empty = Brush("#EEF0F4");
+    private static readonly IBrush Page = Brush("#F3F4F8"), Card = Brushes.White, Line = Brush("#D5D7DF"),
+        Ink = Brush("#1B2038"), Muted = Brush("#5A6075"), Accent = Brush("#1E287D"), AccentSoft = Brush("#EAEBF7"),
+        Done = Brush("#2D6A2E"), DoneSoft = Brush("#EAF3DE"), Warn = Brush("#854F0B"), WarnSoft = Brush("#FAEEDA"),
+        Danger = Brush("#A32D2D"), LfFill = Brush("#1E287D"), BfFill = Brush("#8FA6D4"), OtherFill = Brush("#D8A866"), Empty = Brush("#ECEEF3");
     private static readonly string[] StepNames = ["Leistungsfächer", "Prüfungsfächer", "Pflichtbereiche", "Weitere Kurse", "Überblick"];
 
     private readonly StudentSession session;
+    private readonly Bitmap schoolLogo;
     private readonly WrapPanel stepper = new();
     private readonly StackPanel content = new() { Spacing = 12 };
     private readonly ScrollViewer stepScroll = new();
@@ -38,7 +44,7 @@ public sealed class MainWindow : Window
     private readonly Border stateBadge = Pill("", WarnSoft, Warn);
     private readonly Border hoursWarning = Notice("", WarnSoft, Warn);
     private readonly Button previous = new() { Content = "_Zurück", Name = "PreviousStep" };
-    private readonly Button next = new() { Content = "_Weiter", Name = "NextStep", Background = Accent, Foreground = Brushes.White };
+    private readonly Button next = new() { Content = "_Weiter", Name = "NextStep" };
     private readonly Button save = new() { Content = "Entwurf _speichern", Name = "SaveButton" };
     private readonly Button load = new() { Content = "Entwurf _laden", Name = "LoadButton" };
     private readonly CheckBox autosave = new() { Content = "Automatisch zwischenspeichern", IsChecked = true };
@@ -54,6 +60,8 @@ public sealed class MainWindow : Window
     public MainWindow(StudentSession session, string filePath, string account)
     {
         this.session = session;
+        using (var logoStream = SchoolAssets.OpenLogoStream())
+            schoolLogo = new Bitmap(logoStream);
         technicalDetails = $"Datei: {filePath} · Betriebssystemkonto: {account} (keine bestätigte Schulzuordnung)";
         prerequisiteExpander = new Expander
         {
@@ -67,13 +75,19 @@ public sealed class MainWindow : Window
             : "GSM-Kurswahl | Schülerprogramm · Demo";
         Width = 1440; Height = 900; MinWidth = 900; MinHeight = 600;
         WindowState = WindowState.Maximized;
+        RequestedThemeVariant = ThemeVariant.Light;
         Background = Page;
-        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"), Margin = new Thickness(20), MaxWidth = 1760 };
+        Foreground = Ink;
+        Styles.Add(new StyleInclude(new Uri("avares://GsmKurswahl.StudentApp/")) { Source = new Uri("avares://GsmKurswahl.StudentApp/StudentStyles.axaml") });
+        next.Classes.Add("primary");
 
-        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), RowDefinitions = new RowDefinitions("Auto,Auto"), Margin = new Thickness(0, 0, 0, 12) };
-        var title = new StackPanel { Spacing = 2 };
+        var outer = new DockPanel();
+        var topBarStack = new StackPanel();
+        topBarStack.Children.Add(new Border { Height = 4, Background = Accent });
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), RowDefinitions = new RowDefinitions("Auto,Auto"), MaxWidth = 1760, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(20, 10) };
+        var title = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
         var titleLine = new WrapPanel();
-        titleLine.Children.Add(Text("GSM-Kurswahl", 26, FontWeight.Bold));
+        titleLine.Children.Add(Text("GSM-Kurswahl", 24, FontWeight.Bold, Accent));
         var badge = stateBadge; badge.Name = "StateBadge";
         badge.VerticalAlignment = VerticalAlignment.Center;
         badge.Margin = new Thickness(12, 4, 0, 4);
@@ -100,20 +114,46 @@ public sealed class MainWindow : Window
         title.Name = "WindowHeading";
         toolbar.Children.Add(autosave); toolbar.Children.Add(load); toolbar.Children.Add(save);
         Grid.SetColumn(toolbar, 1); header.Children.Add(toolbar);
-        root.Children.Add(header);
+
+        var logoImage = new Image
+        {
+            Name = "SchoolLogo",
+            Source = schoolLogo,
+            Height = 46,
+            Width = Math.Round(46 * SchoolAssets.LogoAspectRatio),
+            Stretch = Stretch.Uniform,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        RenderOptions.SetBitmapInterpolationMode(logoImage, BitmapInterpolationMode.HighQuality);
+        AutomationProperties.SetName(logoImage, "Schullogo Gymnasium bei St. Michael Schwäbisch Hall");
+        ToolTip.SetTip(logoImage, "Gymnasium bei St. Michael Schwäbisch Hall");
+        var headerDivider = new Border { Width = 1, Height = 36, Background = Line, VerticalAlignment = VerticalAlignment.Center };
+        var logoBox = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(14, 0, 0, 0) };
+        logoBox.Children.Add(headerDivider);
+        logoBox.Children.Add(logoImage);
+        Grid.SetColumn(logoBox, 2); header.Children.Add(logoBox);
+
+        topBarStack.Children.Add(header);
+        var topBar = new Border { Background = Card, BorderBrush = Line, BorderThickness = new Thickness(0, 0, 0, 1), Child = topBarStack };
+        DockPanel.SetDock(topBar, Dock.Top); outer.Children.Add(topBar);
+
         void AdaptHeader()
         {
-            var compact = ClientSize.Width < 1150;
+            var compact = ClientSize.Width < 1360;
             Grid.SetColumnSpan(title, compact ? 2 : 1);
             Grid.SetRow(toolbar, compact ? 1 : 0);
             Grid.SetColumn(toolbar, compact ? 0 : 1);
-            Grid.SetColumnSpan(toolbar, compact ? 2 : 1);
-            toolbar.Margin = new Thickness(0, compact ? 8 : 0, 0, 0);
+            Grid.SetColumnSpan(toolbar, compact ? 3 : 1);
+            toolbar.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+            toolbar.Margin = new Thickness(0, compact ? 8 : 0, compact ? 0 : 14, 0);
+            headerDivider.IsVisible = !compact;
         }
         SizeChanged += (_, _) => AdaptHeader();
         AdaptHeader();
 
-        Grid.SetRow(stepper, 1); stepper.Margin = new Thickness(0, 0, 0, 12); root.Children.Add(stepper);
+        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), Margin = new Thickness(20, 12, 20, 16), MaxWidth = 1760 };
+        root.Children.Add(stepper); stepper.Margin = new Thickness(0, 0, 0, 12);
 
         var body = new Grid { ColumnDefinitions = new ColumnDefinitions("3*,2*") };
         var left = new DockPanel();
@@ -125,7 +165,8 @@ public sealed class MainWindow : Window
 
         error.Foreground = Danger; error.Name = "ErrorText"; error.VerticalAlignment = VerticalAlignment.Center;
         var errorIcon = new TextBlock { Text = "⚠", FontWeight = FontWeight.Bold, Foreground = Danger, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-        var dismissError = new Button { Name = "DismissError", Content = "✕", Padding = new Thickness(6, 2), MinHeight = 24, MinWidth = 24, Background = Brushes.Transparent, BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        var dismissError = new Button { Name = "DismissError", Content = "✕", MinHeight = 24, MinWidth = 24, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        dismissError.Classes.Add("dismiss");
         ToolTip.SetTip(dismissError, "Meldung ausblenden");
         dismissError.Click += (_, _) => { error.Text = ""; errorNotice.IsVisible = false; };
         var errorGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
@@ -136,7 +177,8 @@ public sealed class MainWindow : Window
         DockPanel.SetDock(errorNotice, Dock.Top); left.Children.Add(errorNotice);
 
         successText.Name = "SuccessText"; successText.VerticalAlignment = VerticalAlignment.Center;
-        var dismissSuccess = new Button { Name = "DismissSuccess", Content = "✕", Padding = new Thickness(6, 2), MinHeight = 24, MinWidth = 24, Background = Brushes.Transparent, BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        var dismissSuccess = new Button { Name = "DismissSuccess", Content = "✕", MinHeight = 24, MinWidth = 24, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        dismissSuccess.Classes.Add("dismiss");
         ToolTip.SetTip(dismissSuccess, "Meldung ausblenden");
         dismissSuccess.Click += (_, _) => ClearSuccess();
         var successGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -151,7 +193,7 @@ public sealed class MainWindow : Window
         body.Children.Add(left);
         var right = Panel(new ScrollViewer { Content = plan });
         Grid.SetColumn(right, 1); body.Children.Add(right);
-        Grid.SetRow(body, 2); root.Children.Add(body);
+        Grid.SetRow(body, 1); root.Children.Add(body);
 
         var footer = new StackPanel { Spacing = 3, Margin = new Thickness(0, 10, 0, 0) };
         hoursWarning.Name = "HoursWarning";
@@ -159,8 +201,9 @@ public sealed class MainWindow : Window
         fileStatus.Name = "FileStatus";
         footer.Children.Add(fileStatus);
         footer.Children.Add(prerequisiteExpander);
-        Grid.SetRow(footer, 3); root.Children.Add(footer);
-        Content = root;
+        Grid.SetRow(footer, 2); root.Children.Add(footer);
+        outer.Children.Add(root);
+        Content = outer;
 
         previous.Click += (_, _) => Edit(session.PreviousStep);
         next.Click += (_, _) => Edit(() => { expandedTask = null; session.NextStep(); });
@@ -196,7 +239,7 @@ public sealed class MainWindow : Window
             try { if (await ConfirmClose()) { closeConfirmed = true; Close(); } }
             finally { closePromptOpen = false; }
         };
-        Closed += (_, _) => { timer.Stop(); session.Changed -= Refresh; };
+        Closed += (_, _) => { timer.Stop(); session.Changed -= Refresh; schoolLogo.Dispose(); };
         Refresh();
     }
 
@@ -298,7 +341,8 @@ public sealed class MainWindow : Window
                 });
                 continue;
             }
-            var button = new Button { Name = "Step_" + i, Content = text, Background = DoneSoft, Foreground = Done, Margin = new Thickness(0, 0, 6, 4) };
+            var button = new Button { Name = "Step_" + i, Content = text, Margin = new Thickness(0, 0, 6, 4) };
+            button.Classes.Add("step-done");
             ToolTip.SetTip(button, $"Zurück zu Schritt {step}");
             button.Click += (_, _) => Edit(() => { expandedTask = null; session.GoToStep(step); });
             stepper.Children.Add(button);
@@ -342,7 +386,7 @@ public sealed class MainWindow : Window
 
         static Border GroupCard(StackPanel body) => new()
         {
-            Background = Brush("#F8FAFC"), BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 10), Child = body
+            Background = Brush("#F7F8FB"), BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 10), Child = body
         };
 
         var langGroup = new StackPanel { Spacing = 6 };
@@ -733,9 +777,10 @@ public sealed class MainWindow : Window
                     var target = row.Step;
                     var button = new Button
                     {
-                        Name = "Plan_" + i, Content = label, Background = Brushes.Transparent, Padding = new Thickness(2, 1),
+                        Name = "Plan_" + i, Content = label,
                         HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left
                     };
+                    button.Classes.Add("plan-jump");
                     button.Click += (_, _) => Edit(() => { expandedTask = null; session.GoToStep(target); });
                     ToolTip.SetTip(button, row.IssueText is { Length: > 0 } ? $"{row.IssueText}\n\nKlicken, um zu Schritt {target} zu springen." : $"Zu Schritt {target} springen");
                     jump = button;
@@ -875,7 +920,8 @@ public sealed class MainWindow : Window
 
     private async Task<bool> Confirm(string message)
     {
-        var dialog = new Window { Title = "Entwurf schützen", Width = 480, Height = 220, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Title = "Entwurf schützen", Width = 480, Height = 220, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, RequestedThemeVariant = ThemeVariant.Light, Background = Brushes.White, Foreground = Ink };
+        dialog.Styles.Add(new StyleInclude(new Uri("avares://GsmKurswahl.StudentApp/")) { Source = new Uri("avares://GsmKurswahl.StudentApp/StudentStyles.axaml") });
         var panel = new StackPanel { Margin = new Thickness(22), Spacing = 18 };
         panel.Children.Add(Text(message, 16));
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
@@ -888,13 +934,15 @@ public sealed class MainWindow : Window
     private async Task<bool> ConfirmClose()
     {
         if (session.LoadFailed) return await Confirm("Ungespeicherte Änderungen verwerfen und schließen?");
-        var dialog = new Window { Title = "Entwurf schützen", Width = 540, Height = 220, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Title = "Entwurf schützen", Width = 540, Height = 220, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, RequestedThemeVariant = ThemeVariant.Light, Background = Brushes.White, Foreground = Ink };
+        dialog.Styles.Add(new StyleInclude(new Uri("avares://GsmKurswahl.StudentApp/")) { Source = new Uri("avares://GsmKurswahl.StudentApp/StudentStyles.axaml") });
         var panel = new StackPanel { Margin = new Thickness(22), Spacing = 18 };
         panel.Children.Add(Text("Du hast ungespeicherte Änderungen. Möchtest du vor dem Schließen speichern?", 16));
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = new Button { Content = "Abbrechen" };
         var discard = new Button { Content = "Änderungen verwerfen" };
-        var saveClose = new Button { Content = "Speichern und schließen", Background = Accent, Foreground = Brushes.White, FontWeight = FontWeight.SemiBold };
+        var saveClose = new Button { Content = "Speichern und schließen" };
+        saveClose.Classes.Add("primary");
         cancel.Click += (_, _) => dialog.Close(false);
         discard.Click += (_, _) => dialog.Close(true);
         saveClose.Click += async (_, _) =>

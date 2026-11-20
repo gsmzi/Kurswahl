@@ -98,10 +98,10 @@ public sealed partial class TeacherWindow : Window
         foreach (var step in new[] {
             "1 · Neuen Abiturjahrgang anlegen – oben neben dem Jahrgang auf „Jahrgang wechseln / neu …“ klicken.",
             "2 · Leistungsfächer auswählen, die in diesem Jahrgang angeboten werden.",
-            "3 · Schülerliste (Excel/CSV aus Klasse 10) einlesen: Namen, Klassen und Vorbildung.",
-            "4 · Schülerdateien verteilen: Das Programm legt jedem Schüler sein persönliches Profil und das Fachangebot in den Wahlordner.",
-            "5 · Schüler wählen im Schülerprogramm. Das Lehrerprogramm sammelt die Wahlen bei geöffneter App automatisch ein.",
-            "6 · Abschließend einsammeln. Ab dann läuft alles im Lehrerprogramm: unter „Kurswahlen“ prüfen, filtern, ändern, Abgänger markieren und drucken.",
+            "3 · Schülerliste (Excel/CSV aus Klasse 10) im Verwaltungsnetz einlesen: Namen, Klassen und Vorbildung.",
+            "4 · Wechsel ins pädagogische Netz & Schülerdateien verteilen: Im Verwaltungsnetz ein Paket inkl. Programm (.zip) speichern, im pädagogischen Netz vollständig lokal entpacken, über „Lehrerprogramm starten.cmd“ öffnen und Profile + Fachangebot auf das Schülerlaufwerk verteilen.",
+            "5 · Schüler wählen im pädagogischen Netz im Schülerprogramm. Das dortige Lehrerprogramm sammelt die Wahlen automatisch ein.",
+            "6 · Im pädagogischen Netz abschließend einsammeln, Rück-Transportdatei (.gsm-transfer) für das Verwaltungsnetz sichern und dort öffnen. Sobald die Datei sicher im Verwaltungsnetz angekommen und geöffnet ist, Programm und Arbeitsstand im pädagogischen Netz vollständig löschen. Ab dann läuft alles wieder im Verwaltungsnetz (unter „Kurswahlen“ prüfen, filtern, ändern, Abgänger markieren und drucken).",
             "7 · Kursplanung: Wahlzahlen ansehen; kommt ein Kurs nicht zustande, über das ✕ neben der Wahlzahl streichen. Nachwahl unter „Kurswahlen“ direkt eintragen oder Nachwahlbögen drucken.",
             "8 · ASV-Abgleich: Den ASV-BW-Export „zz Kursstufe Fächerwahl“ einlesen und auf Deckungsgleichheit mit dem Lehrerbestand prüfen." })
         {
@@ -116,8 +116,8 @@ public sealed partial class TeacherWindow : Window
             "Abgänger – Voraussichtliche Abgänger können in der Kursplanung ausgeblendet werden; bestätigte Abgänger zählen nie zur Planung. Ihre Wahl bleibt gespeichert.\n" +
             "Profil – kleine Datei mit den bestätigten Voraussetzungen einer Person (z. B. IMP, bilingual). Das Schülerprogramm zeigt damit die passenden Fächer an.\n" +
             "Revision – jeder gespeicherte Stand einer Wahl. Nichts wird überschrieben; Wiederherstellen legt einen neuen Stand an."));
-        panel.Children.Add(Help("Verwaltungsnetz und pädagogisches Netz (Transportdatei)",
-            "Schülerordner sind meist nur im pädagogischen Netz erreichbar, die Verwaltung arbeitet im Verwaltungsnetz. Vor dem Wechsel den Jahrgang als Transportdatei (.gsm-transfer) speichern und im anderen Netz über „Transportdatei öffnen …“ laden. Danach nur noch mit dem geöffneten Stand weiterarbeiten – es gibt keine automatische Zusammenführung zweier Stände."));
+        panel.Children.Add(Help("Verwaltungsnetz und pädagogisches Netz (Paket inkl. Programm & Transportdatei)",
+            "Schülerordner sind meist nur im pädagogischen Netz erreichbar, dort ist das Lehrerprogramm im Allgemeinen nicht mehr vorhanden. Vor dem Wechsel ins pädagogische Netz im Verwaltungsnetz unter „Schülerdateien verteilen“ ein Paket inkl. Programm (.zip) erstellen (oder falls das Programm dort schon liegt, nur eine Transportdatei). Im pädagogischen Netz das ZIP lokal entpacken, „Lehrerprogramm starten.cmd“ öffnen, den Transportstand übernehmen, verteilen und einsammeln.\n\nNach dem abschließenden Einsammeln unter „Kurswahlen einsammeln“ den „Stand für Verwaltungsnetz speichern …“ (.gsm-transfer) und im Verwaltungsnetz öffnen. Sobald die Transportdatei dort sicher angekommen und geöffnet ist, das Lehrerprogramm im pädagogischen Netz schließen und den gesamten entpackten Paketordner samt Arbeitsstand und ZIP-Datei im pädagogischen Netz vollständig löschen. Es gibt keine automatische Zusammenführung zweier Stände."));
         panel.Children.Add(Help("Dateiübersicht: Inhalt, Herkunft und Verwendung", "Schülerliste (.xlsx / .csv)\nEine Tabelle aus Ihrer vorbereiteten Klassen-10-Liste bzw. aus ASV-BW über das schuleigene Exportformat „GSM Export für Kurswahl“ (ASV-ID, Familienname, Rufname, Klasse, Klassengruppe, Profil, Unterrichtsfächer; wird automatisch erkannt und umgerechnet). Unter Wahl → Schülerliste importieren.\n\nFachangebot (.json), z. B. fachangebot-demo.json\nBeschreibt Fächer, Kursarten und Halbjahre eines Jahrgangs. Wird beim Anlegen eines Jahrgangs automatisch geladen und beim Verteilen in jeden Schülerordner kopiert.\n\nVerwaltungsdatei (.db), z. B. verwaltung.db\nSpeichert den Lehrerbestand mit Änderungen und Historie lokal. Wird automatisch angelegt und geöffnet.\n\nPersönliches Profil (profil.json)\nDas Lehrerprogramm erzeugt diese Datei aus den geprüften Voraussetzungen und legt sie beim Verteilen in den Wahlordner. Keine Schülerliste und keine Kurswahl.\n\nKurswahl (aktuell.json)\nWird vom Schülerprogramm gespeichert. Das Lehrerprogramm liest sie automatisch aus dem bestätigten Wahlordner.\n\nKontrollbogen (.pdf)\nLesbare Übersicht zur Kurswahl. Zum Ansehen und Prüfen (ohne Unterschriftenzeile); kein Importformat.\n\nTransportdatei (.gsm-transfer)\nKompletter Jahrgang für den Wechsel zwischen Verwaltungs- und pädagogischem Netz bzw. als Sicherung.\n\nASV-Kurswahl-Export („zz Kursstufe Fächerwahl“)\nUnter ASV-Abgleich als .xlsx oder .csv direkt einlesbar, um Deckungsgleichheit von Kursen, Halbjahren und geplanten mündlichen Prüfungsfächern zu prüfen."));
         panel.Children.Add(Help("Mit welchen Testdateien kann ich beginnen?", "Im Projektordner samples liegen:\n• fachangebot-demo.json: wird beim Anlegen eines Jahrgangs automatisch als Vorlage geladen.\n• klasse10-demo.csv: unter Schülerliste importieren laden; enthält zwei erfundene Personen.\n• schueler-demo.json: Beispiel für eine Kurswahl. Beim Einsammeln erwartet das Programm den Namen aktuell.json im bestätigten Wahlordner.\n• profil-demo-unsigned.json: Beispiel für ein persönliches Schülerprofil."));
         panel.Children.Add(Help("Nur für die Einrichtung: Programmeinstellungen", "appsettings.json im Schülerprogramm enthält die Programmeinstellungen (Speicherort, Katalogpfad). Diese Datei wird nicht als Schülerliste importiert."));
@@ -157,7 +157,7 @@ public sealed partial class TeacherWindow : Window
             var notes = string.Join(" · ", new[] { state.RequiresReselection ? "Nachwahl offen" : "", religion?.Note ?? "", state.Record.Student.Departure == DepartureStatus.Active ? "" : "Abgänger: " + FormatDeparture(state.Record.Student.Departure), state.Record.MappingConfirmed ? "" : "Ordner nicht bestätigt" }.Where(s => s.Length > 0));
             var open = Compact(Button("Öffnen", () => ShowStudent(state), "Stammdaten, Vorbildung, Kurswahl und Historie dieser Person rechts anzeigen."));
             var selected = state.Record.Student.ExternalStudentId == selectedStudentId && personEditor.IsExpanded;
-            roster.Children.Add(new Border { Background = selected ? Brush.Parse("#F0F8F6") : Brushes.Transparent, BorderBrush = selected ? Accent : Brushes.Transparent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6),
+            roster.Children.Add(new Border { Background = selected ? HighlightAccent : Brushes.Transparent, BorderBrush = selected ? Accent : Brushes.Transparent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6),
                 Child = TableLine(state.Record.Student.SyntheticDisplayName, state.Record.Student.ClassName, FormatStatus(state.Validation?.Status), notes, open) });
         }
         if (shownCount == 0)
@@ -696,7 +696,6 @@ public sealed partial class TeacherWindow : Window
             report.Text = string.Join(Environment.NewLine, store.DistributionLog().Reverse().Select(e => $"{e.At.LocalDateTime:g} · {names.GetValueOrDefault(e.StudentId, e.StudentId)} · Profilversion {e.ProfileRevision} · {DistributionText(e.Status)} · {e.Detail}"));
         }, "Zeigt alle Zustellversuche, die neuesten zuerst.")); advanced.Children.Add(report);
         profilePanel.Children.Add(new Expander { Header = "Einzelfälle: Profile einzeln erstellen/zustellen und Verteilungsbericht", Content = advanced, HorizontalAlignment = HorizontalAlignment.Stretch });
-        profilePanel.Children.Add(NetworkTransferHint(false));
     }
     internal static string DistributionText(string status) => status switch
     {
@@ -796,13 +795,21 @@ public sealed partial class TeacherWindow : Window
                 collectionResults.Children.Clear();
                 foreach (var r in results.OrderBy(r => r.Status == "geräumt"))
                     collectionResults.Children.Add(TableLine(names.GetValueOrDefault(r.StudentId, r.StudentId), r.StudentId, r.Status, r.Detail));
-                SetStatus($"Abschließendes Einsammeln: {results.Count(r => r.Status == "geräumt")} von {results.Count} Wahlordnern geräumt; übrige siehe Liste.", FeedbackKind.Success);
+                if (transferBackExpander is not null) transferBackExpander.IsExpanded = true;
+                SetStatus($"Abschließendes Einsammeln: {results.Count(r => r.Status == "geräumt")} von {results.Count} Wahlordnern geräumt; übrige siehe Liste. Bitte unten die Rück-Transportdatei für das Verwaltungsnetz sichern und nach sicherer Ankunft das Programm im pädagogischen Netz löschen.", FeedbackKind.Success);
             }
             catch (Exception ex) { SetInlineError(finalErrorBox, finalErrorText, ex.Message); throw; }
         }, "Liest zuerst alle neuen Wahlen ein; vorher können Sie jederzeit den Zwischenstand unter „Kurswahlen“ ansehen. Nach dem abschließenden Einsammeln liest das Programm die Ordner dieser Personen nicht mehr ein – Änderungen erfolgen dann nur noch im Lehrerprogramm. Danach werden je Person aktuell.json, Sicherung, Profil, Fachangebot und das verteilte Schülerprogramm entfernt – erst nachdem alle Dateien byte-genau im Lehrerbestand archiviert sind. Ordner mit offenem Konflikt oder nicht eingesammelter Wahl bleiben unverändert.");
         finalCollection.Name = "FinalCollection";
+        var cleanupHint = new Border
+        {
+            Name = "PostCollectionCleanupHint",
+            Background = SoftAccent, BorderBrush = Accent, BorderThickness = new Thickness(4, 1, 1, 1),
+            CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 8),
+            Child = Text("Nach Beendigung des Einsammelns im pädagogischen Netz:\n1. Unten über „Stand für Verwaltungsnetz speichern …“ eine .gsm-transfer-Datei erzeugen und ins Verwaltungsnetz übertragen.\n2. Transportdatei im Verwaltungsnetz öffnen und prüfen.\n3. Sobald die Transportdatei sicher im Verwaltungsnetz angekommen und geöffnet ist, dieses Lehrerprogramm im pädagogischen Netz schließen und den gesamten entpackten Paketordner (samt Programm und lokalem Arbeitsstand) sowie die ZIP-Datei vollständig löschen.")
+        };
         finalStack.Children.Add(Help("Was passiert beim abschließenden Einsammeln?", "Nach dem Abgabetermin räumt das Programm die Wahlordner: Jede Datei wird vorher vollständig mit Prüfsumme im Lehrerbestand archiviert, erst dann gelöscht. Entfernt wird nur, was nachweislich eingesammelt ist; bei offenem Konflikt zuerst übernehmen oder verwerfen. Programmdateien werden nur gelöscht, wenn sie unverändert aus der eigenen Verteilung stammen. Startet eine Person das Programm danach erneut, entsteht eine neue Datei, die wie gewohnt eingesammelt wird."));
-        finalStack.Children.Add(finalConfirm); finalStack.Children.Add(finalErrorBox); finalStack.Children.Add(finalCollection);
+        finalStack.Children.Add(finalConfirm); finalStack.Children.Add(finalErrorBox); finalStack.Children.Add(finalCollection); finalStack.Children.Add(cleanupHint);
         collectionPanel.Children.Add(new Expander
         {
             Name = "FinalCollectionExpander",
@@ -826,7 +833,7 @@ public sealed partial class TeacherWindow : Window
         foreach (var offer in session.Catalog.Offers.OrderBy(o => SubjectName(o.SubjectId), StringComparer.CurrentCulture).ThenBy(o => o.Type))
         {
             var hours = string.Join(", ", offer.Schedule.Select(h => $"HJ {h.Semester}: {h.WeeklyHours} h"));
-            catalogPanel.Children.Add(new Border { Background = index++ % 2 == 0 ? Brush.Parse("#F1F5F7") : Brushes.White,
+            catalogPanel.Children.Add(new Border { Background = index++ % 2 == 0 ? RowAlt : Brushes.White,
                 Child = CompactLine(columns, [Text(SubjectName(offer.SubjectId) + CourseAnnotations.Suffix(offer)), Text(FormatCourseType(offer.Type)), Text(FormatVariant(offer.Variant)), Text(FormatOfferStatus(offer.Status)), Text(hours)]) });
         }
         catalogPanel.Children.Add(Button("Fachangebot als Datei speichern …", ExportCurrentCatalog, "Nur für Sonderfälle, z. B. eine zentrale Schülerinstallation. Beim normalen Verteilen wird das Fachangebot automatisch mitkopiert."));

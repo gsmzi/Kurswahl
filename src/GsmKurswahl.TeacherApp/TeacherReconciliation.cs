@@ -157,7 +157,7 @@ public sealed partial class TeacherWindow
         asvResultsHost.Children.Add(new Border
         {
             Background = allGreen ? GreenSoft : (changed > 0 || invalid > 0 ? RedSoft : YellowSoft),
-            BorderBrush = allGreen ? Accent : (changed > 0 || invalid > 0 ? Red : Brush.Parse("#C48723")),
+            BorderBrush = allGreen ? SuccessBorder : (changed > 0 || invalid > 0 ? Red : Brush.Parse("#C48723")),
             BorderThickness = new Thickness(4, 1, 1, 1),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(12, 10),

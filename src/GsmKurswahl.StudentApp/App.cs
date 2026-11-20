@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using GsmKurswahl.Application;
 using GsmKurswahl.Storage;
@@ -9,7 +11,13 @@ namespace GsmKurswahl.StudentApp;
 
 public sealed class App : Avalonia.Application
 {
-    public override void Initialize() => Styles.Add(new FluentTheme());
+    public override void Initialize()
+    {
+        RequestedThemeVariant = ThemeVariant.Light;
+        var theme = new FluentTheme();
+        theme.Palettes[ThemeVariant.Light] = new ColorPaletteResources { Accent = Color.Parse("#1E287D") };
+        Styles.Add(theme);
+    }
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -51,7 +59,10 @@ public sealed class App : Avalonia.Application
                 desktop.MainWindow = new Window
                 {
                     Title = "GSM-Kurswahl – Konfiguration prüfen", Width = 700, Height = 300,
-                    Content = new TextBlock { Margin = new Thickness(24), TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    RequestedThemeVariant = ThemeVariant.Light,
+                    Background = Brushes.White,
+                    Foreground = new SolidColorBrush(Color.Parse("#1B2038")),
+                    Content = new TextBlock { Margin = new Thickness(24), TextWrapping = TextWrapping.Wrap,
                         Text = "Der persönliche Wahlordner konnte nicht geladen werden. Bitte starte das Programm über die Startdatei in deinem Kurswahl-Ordner. Klappt das nicht, wende dich an die Oberstufenberatung. Es wurden keine Wahldateien verändert.\n\nTechnischer Hinweis: Start mit --wahlordner und dem zugeordneten Ordner oder GSM_KURSWAHL_HOME; dort müssen profil.json und fachangebot.json liegen.\n\n" + ex.Message }
                 };
             }

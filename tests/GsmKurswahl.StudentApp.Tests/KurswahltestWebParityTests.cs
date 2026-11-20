@@ -32,8 +32,18 @@ public class KurswahltestWebParityTests
     {
         var repo = FindRepoRoot();
         var webDir = Path.Combine(repo, "web", "Kurswahltest");
-        foreach (var file in new[] { "index.html", "styles.css", "kurswahltest.js", "catalog.js", "fachangebot.json", ".nojekyll" })
+        foreach (var file in new[] { "index.html", "styles.css", "kurswahltest.js", "catalog.js", "fachangebot.json", "school-logo.jpg", ".nojekyll" })
             Assert.True(File.Exists(Path.Combine(webDir, file)), $"Webdatei fehlt: {file}");
+
+        var sourceLogo = File.ReadAllBytes(Path.Combine(repo, "src", "GsmKurswahl.ImportExport", "Assets", "SchoolLogo.jpeg"));
+        var webLogo = File.ReadAllBytes(Path.Combine(webDir, "school-logo.jpg"));
+        Assert.Equal(sourceLogo, webLogo);
+
+        var indexHtml = File.ReadAllText(Path.Combine(webDir, "index.html"), Encoding.UTF8);
+        Assert.Contains("school-logo.jpg", indexHtml);
+
+        var stylesCss = File.ReadAllText(Path.Combine(webDir, "styles.css"), Encoding.UTF8);
+        Assert.Contains("--accent: #1E287D;", stylesCss);
 
         var demoBytes = File.ReadAllBytes(Path.Combine(repo, "samples", "fachangebot-demo.json"));
         var webBytes = File.ReadAllBytes(Path.Combine(webDir, "fachangebot.json"));

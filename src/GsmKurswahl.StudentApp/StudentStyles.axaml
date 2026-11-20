@@ -1,0 +1,67 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Button">
+    <Setter Property="Background" Value="#FFFFFF" />
+    <Setter Property="BorderBrush" Value="#D5D7DF" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="#1B2038" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#F3F4F8" />
+    <Setter Property="BorderBrush" Value="#BCBDBF" />
+  </Style>
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="#1E287D" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="#1E287D" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#171F63" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="#171F63" />
+  </Style>
+  <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#11174D" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="#11174D" />
+  </Style>
+  <Style Selector="Button.primary:disabled">
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+  <Style Selector="Button.step-done">
+    <Setter Property="Background" Value="#EAF3DE" />
+    <Setter Property="BorderBrush" Value="#C7DEAE" />
+    <Setter Property="Foreground" Value="#2D6A2E" />
+  </Style>
+  <Style Selector="Button.step-done:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#DCECC8" />
+    <Setter Property="BorderBrush" Value="#A9CC88" />
+    <Setter Property="Foreground" Value="#2D6A2E" />
+  </Style>
+  <Style Selector="Button.plan-jump">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="2,1" />
+  </Style>
+  <Style Selector="Button.plan-jump:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#F3F4F8" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.dismiss">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="6,2" />
+  </Style>
+  <Style Selector="Button.dismiss:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#E8EAF2" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="ProgressBar">
+    <Setter Property="Foreground" Value="#1E287D" />
+    <Setter Property="Background" Value="#ECEEF3" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+</Styles>

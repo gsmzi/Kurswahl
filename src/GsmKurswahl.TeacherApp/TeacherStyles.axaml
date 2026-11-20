@@ -1,35 +1,53 @@
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Style Selector="Button">
-    <Setter Property="Background" Value="#F3F6F8" />
-    <Setter Property="BorderBrush" Value="#DAE3E9" />
+    <Setter Property="Background" Value="#F3F4F8" />
+    <Setter Property="BorderBrush" Value="#D5D7DF" />
+    <Setter Property="Foreground" Value="#1B2038" />
     <Setter Property="Padding" Value="16,10" />
     <Setter Property="MinHeight" Value="40" />
     <Setter Property="CornerRadius" Value="8" />
     <Setter Property="FontWeight" Value="Medium" />
   </Style>
+  <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#E8EAF2" />
+    <Setter Property="BorderBrush" Value="#BCBDBF" />
+  </Style>
   <Style Selector="Button.primary">
-    <Setter Property="Background" Value="#176B68" />
+    <Setter Property="Background" Value="#1E287D" />
     <Setter Property="Foreground" Value="White" />
-    <Setter Property="BorderBrush" Value="#176B68" />
+    <Setter Property="BorderBrush" Value="#1E287D" />
   </Style>
   <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#105350" />
+    <Setter Property="Background" Value="#171F63" />
     <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="#171F63" />
   </Style>
   <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#0B413F" />
+    <Setter Property="Background" Value="#11174D" />
     <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="#11174D" />
+  </Style>
+  <Style Selector="Button.primary:disabled">
+    <Setter Property="Opacity" Value="0.45" />
   </Style>
   <Style Selector="Button.nav">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Foreground" Value="#526476" />
+    <Setter Property="Foreground" Value="#5A6075" />
     <Setter Property="Padding" Value="14,8" />
   </Style>
+  <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#F3F4F8" />
+    <Setter Property="Foreground" Value="#1E287D" />
+  </Style>
   <Style Selector="Button.nav.selected">
-    <Setter Property="Background" Value="#E2F1EE" />
-    <Setter Property="Foreground" Value="#105350" />
+    <Setter Property="Background" Value="#EAEBF7" />
+    <Setter Property="Foreground" Value="#1E287D" />
     <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.nav.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#DDE0F2" />
+    <Setter Property="Foreground" Value="#1E287D" />
   </Style>
   <Style Selector="Button.compact">
     <Setter Property="Padding" Value="10,5" />
@@ -51,5 +69,9 @@
   </Style>
   <Style Selector="Expander">
     <Setter Property="Margin" Value="0,4" />
+  </Style>
+  <Style Selector="ProgressBar">
+    <Setter Property="Foreground" Value="#1E287D" />
+    <Setter Property="Background" Value="#ECEEF3" />
   </Style>
 </Styles>

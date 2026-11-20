@@ -29,7 +29,13 @@ public static class TestAppBuilder
 }
 public sealed class TestApp : Avalonia.Application
 {
-    public override void Initialize() => Styles.Add(new FluentTheme());
+    public override void Initialize()
+    {
+        RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var theme = new FluentTheme();
+        theme.Palettes[Avalonia.Styling.ThemeVariant.Light] = new ColorPaletteResources { Accent = Color.Parse("#1E287D") };
+        Styles.Add(theme);
+    }
 }
 
 public class WindowTests
@@ -237,6 +243,8 @@ public class WindowTests
             var exportButton = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ControlSheetButton");
             Assert.True(exportButton.IsEnabled);
             Assert.NotEqual(Color.Parse("#185FA5"), (exportButton.Background as ISolidColorBrush)?.Color);
+            Assert.NotEqual(Color.Parse("#1E287D"), (exportButton.Background as ISolidColorBrush)?.Color);
+            Assert.DoesNotContain("primary", exportButton.Classes);
         }
         finally { if (session.IsDirty) await session.SaveAsync(); window.Close(); }
     }
@@ -263,12 +271,27 @@ public class WindowTests
             }
             var heading = Area(Find("WindowHeading"));
             var toolbar = Area(Find("FileToolbar"));
+            var logo = Assert.IsType<Image>(Find("SchoolLogo"));
+            var logoArea = Area(logo);
+            Assert.True(logo.IsVisible);
+            Assert.True(logoArea.Width > 100 && logoArea.Height > 35);
             Assert.False(heading.Intersects(toolbar));
-            foreach (var name in new[] { "SaveButton", "LoadButton", "PreviousStep", "NextStep", "Step_5", "Prerequisites" })
+            Assert.False(heading.Intersects(logoArea));
+            Assert.False(toolbar.Intersects(logoArea));
+            foreach (var name in new[] { "SchoolLogo", "SaveButton", "LoadButton", "PreviousStep", "NextStep", "Step_5", "Prerequisites" })
             {
                 var area = Area(Find(name));
                 Assert.True(area.Width > 0 && area.Height > 0, name);
                 Assert.True(area.Left >= 0 && area.Top >= 0 && area.Right <= window.ClientSize.Width + 1 && area.Bottom <= window.ClientSize.Height + 1, name);
+            }
+            if (Environment.GetEnvironmentVariable("GSM_UI_SCREENSHOTS") is { Length: > 0 } directory)
+            {
+                Directory.CreateDirectory(directory);
+                window.UpdateLayout();
+                AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+                using var bitmap = window.CaptureRenderedFrame();
+                Assert.NotNull(bitmap);
+                bitmap.Save(Path.Combine(directory, $"student-{width}x{height}.png"));
             }
         }
         finally { window.Close(); }

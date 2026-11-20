@@ -13,13 +13,14 @@ namespace GsmKurswahl.TeacherApp;
 public sealed partial class TeacherWindow
 {
     private readonly string? explicitWorkspaceRoot;
+    private readonly string? transferPackageDirectory;
     private TeacherWorkspace? workspace;
     private readonly ContentControl pageHost = new();
     private readonly StackPanel navigation = new() { Orientation = Orientation.Horizontal, Spacing = 6 };
     private readonly StackPanel dashboardPanel = new() { Spacing = 16 };
     private readonly StackPanel managePanel = new() { Spacing = 12 };
     private readonly StackPanel settingsPanel = new() { Spacing = 12 };
-    private readonly TextBlock heading = new() { FontSize = 28, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock heading = new() { FontSize = 26, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock rosterCount = new() { Name = "RosterCount", FontSize = 12, Foreground = Muted };
     private readonly Button rosterResetFilter = new() { Name = "PeopleResetFilters", Content = "Filter zurücksetzen", IsEnabled = false };
     private Control peopleView = null!;
@@ -30,10 +31,11 @@ public sealed partial class TeacherWindow
     private Control settingsView = null!, manageView = null!, catalogView = null!;
     private string visiblePage = "start";
 
-    // Tests pass an isolated root; production remembers a local administrative directory.
-    public TeacherWindow(string? workspaceRoot = null)
+    // Tests pass an isolated root; package launches preselect the bundled transfer folder; production remembers a local directory.
+    public TeacherWindow(string? workspaceRoot = null, string? packageDirectory = null)
     {
         explicitWorkspaceRoot = workspaceRoot;
+        transferPackageDirectory = string.IsNullOrWhiteSpace(packageDirectory) ? null : Path.GetFullPath(packageDirectory);
         Title = "GSM-Kurswahl | Lehrerverwaltung · M5"; Width = 1400; Height = 900; MinWidth = 900; MinHeight = 600;
         BuildVisualShell();
         // Split view: list on the left, the selected person on the right (no small bottom drawer).
@@ -67,7 +69,7 @@ public sealed partial class TeacherWindow
         Opened += async (_, _) => { LoadWorkspace(); collectionTimer.Start(); await CollectAutomatically(); };
         // Closing would dispose the store under running background file work.
         Closing += (_, e) => { if (busy) { e.Cancel = true; SetStatus("Bitte warten: Die Verteilung läuft noch. Das Fenster lässt sich danach schließen.", FeedbackKind.Warning); } };
-        Closed += (_, _) => { collectionTimer.Stop(); store?.Dispose(); store = null; session = null; };
+        Closed += (_, _) => { collectionTimer.Stop(); store?.Dispose(); store = null; session = null; schoolLogo?.Dispose(); schoolLogo = null; };
     }
     private void LoadWorkspace()
     {
@@ -75,6 +77,17 @@ public sealed partial class TeacherWindow
         {
             var root = explicitWorkspaceRoot ?? new TeacherWorkspaceLocation(TeacherWorkspace.DefaultRoot).Load();
             workspace = new TeacherWorkspace(root);
+            if (workspace.Active is null && transferPackageDirectory is not null)
+            {
+                if (PedagogicalTransferPackage.FindSingleTransferFile(transferPackageDirectory) is { } transferFile)
+                {
+                    ShowTransferPreview(transferFile, workspace.Root);
+                    return;
+                }
+                OpenActiveYear();
+                SetStatus("Im Paketordner „Transfer“ wurde keine eindeutige .gsm-transfer-Datei gefunden. Bitte Transportdatei manuell öffnen.", FeedbackKind.Warning);
+                return;
+            }
             OpenActiveYear();
         }
         catch (Exception ex) { ShowStartupError(ex); }
@@ -88,6 +101,8 @@ public sealed partial class TeacherWindow
         var panel = new StackPanel { Spacing = 14 };
         Intro(panel, "Gespeicherte Daten bleiben erhalten", ex.Message);
         panel.Children.Add(Text("Prüfen Sie Speicherort und Zugriffsrechte. Ein fehlender oder beschädigter Bestand wird nicht automatisch neu angelegt."));
+        if (transferPackageDirectory is not null)
+            panel.Children.Add(Text("Hinweis für das pädagogische Netz: Entpacken Sie das ZIP-Paket vollständig in einen lokalen Ordner (nicht direkt im ZIP und nicht auf einem Netzlaufwerk als Arbeitsstand öffnen)."));
         var actions = new WrapPanel { Orientation = Orientation.Horizontal };
         var retry = Primary(Button("Erneut versuchen", LoadWorkspace)); retry.Margin = new Thickness(0, 0, 8, 6);
         actions.Children.Add(retry);
@@ -399,10 +414,10 @@ public sealed partial class TeacherWindow
             action = "Kurswahlen prüfen und ändern"; target = "results";
         }
         else if (summary.Students == 0) { next = "Für diesen Jahrgang fehlen noch Schüler."; action = "Schülerliste importieren"; target = "import"; }
-        else if (summary.UnconfirmedMappings > 0) { next = $"{summary.UnconfirmedMappings} Ordnerzuordnungen müssen noch geprüft werden."; action = "Schülerdateien verteilen"; target = "profiles"; }
-        else if (summary.ProfilesToIssue > 0) { next = $"Für {summary.ProfilesToIssue} Personen fehlen aktuelle Profile."; action = "Schülerprofile bereitstellen"; target = "profiles"; }
-        else if (summary.ProfilesToDeliver > 0) { next = $"{summary.ProfilesToDeliver} Profile sind noch zuzustellen oder erneut zu verteilen."; action = "Zustellung bearbeiten"; target = "profiles"; }
-        else if (summary.Choices < summary.Students) { next = $"Für {summary.Students - summary.Choices} Personen wurde noch keine Kurswahl eingelesen."; action = "Kurswahlen einsammeln"; target = "collection"; }
+        else if (summary.UnconfirmedMappings > 0) { next = $"{summary.UnconfirmedMappings} Ordnerzuordnungen müssen im pädagogischen Netz geprüft und verteilt werden."; action = "Schülerdateien verteilen"; target = "profiles"; }
+        else if (summary.ProfilesToIssue > 0) { next = $"Für {summary.ProfilesToIssue} Personen fehlen aktuelle Profile (Verteilung erfolgt im pädagogischen Netz)."; action = "Schülerprofile bereitstellen"; target = "profiles"; }
+        else if (summary.ProfilesToDeliver > 0) { next = $"{summary.ProfilesToDeliver} Profile sind noch im pädagogischen Netz zuzustellen oder erneut zu verteilen."; action = "Zustellung bearbeiten"; target = "profiles"; }
+        else if (summary.Choices < summary.Students) { next = $"Für {summary.Students - summary.Choices} Personen wurde noch keine Kurswahl im pädagogischen Netz eingelesen."; action = "Kurswahlen einsammeln"; target = "collection"; }
         else { next = "Die Kurswahlen liegen vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot."; action = "Kurswahlen prüfen und ändern"; target = "results"; }
         var primary = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         var guidance = new StackPanel { Spacing = 6, Margin = new Thickness(0, 0, 20, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -410,7 +425,7 @@ public sealed partial class TeacherWindow
         guidance.Children.Add(Text(next)); primary.Children.Add(guidance);
         var nextButton = Primary(Button(action, () => ShowPage(target))); nextButton.Name = "NextTask"; nextButton.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(nextButton, 1); primary.Children.Add(nextButton);
-        var nextCard = Surface(primary, 18); nextCard.Background = Brush.Parse("#F0F8F6"); nextCard.BorderBrush = Accent; dashboardPanel.Children.Add(nextCard);
+        var nextCard = Surface(primary, 18); nextCard.Background = HighlightAccent; nextCard.BorderBrush = Accent; dashboardPanel.Children.Add(nextCard);
         dashboardPanel.Children.Add(SummaryCards(summary));
         dashboardPanel.Children.Add(new TextBlock { Text = $"{summary.Reselections} Nachwahlen · Neue Kurswahlen werden bei geöffneter App alle 60 Sekunden eingelesen. Kacheln oben anklicken zum Öffnen.", Foreground = Muted, TextWrapping = TextWrapping.Wrap });
         dashboardPanel.Children.Add(new TextBlock { Text = "Weitere Aufgaben", FontWeight = FontWeight.SemiBold });
@@ -484,12 +499,19 @@ public sealed partial class TeacherWindow
 
         var transferStack = new StackPanel { Spacing = 8 };
         transferStack.Children.Add(Heading("Netzwechsel & Sicherung"));
-        transferStack.Children.Add(new TextBlock { Text = "Überträgt den kompletten Jahrgang sicher zwischen Verwaltungs- und pädagogischem Netz oder legt eine Komplettsicherung an.", Foreground = Muted, TextWrapping = TextWrapping.Wrap, FontSize = 13 });
+        transferStack.Children.Add(new TextBlock { Text = "Überträgt den kompletten Jahrgang sicher zwischen Verwaltungs- und pädagogischem Netz oder erstellt ein komplettes Paket inkl. Programm für das pädagogische Netz.", Foreground = Muted, TextWrapping = TextWrapping.Wrap, FontSize = 13 });
         var transferButtons = new WrapPanel { Orientation = Orientation.Horizontal };
-        var openTransfer = Button("Transportdatei öffnen …", ImportTransfer); openTransfer.Margin = new Thickness(0, 0, 8, 6);
-        transferButtons.Children.Add(openTransfer);
         if (store is SqliteAdministrationStore && session is not null)
-            transferButtons.Children.Add(Button("Jahrgang sichern …", ExportTransfer));
+        {
+            var pkgBtn = Primary(Button("Paket für pädagogisches Netz speichern (.zip) …", ExportPedagogicalPackage));
+            pkgBtn.Margin = new Thickness(0, 0, 8, 6);
+            transferButtons.Children.Add(pkgBtn);
+            var saveBtn = Button("Jahrgang sichern …", () => ExportTransfer());
+            saveBtn.Margin = new Thickness(0, 0, 8, 6);
+            transferButtons.Children.Add(saveBtn);
+        }
+        var openTransfer = Button("Transportdatei öffnen …", ImportTransfer); openTransfer.Margin = new Thickness(0, 0, 0, 6);
+        transferButtons.Children.Add(openTransfer);
         transferStack.Children.Add(transferButtons);
         settingsPanel.Children.Add(SubtleCard(transferStack, 14));
 

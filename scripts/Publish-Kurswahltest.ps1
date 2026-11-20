@@ -21,11 +21,16 @@ if ($null -eq $catalogObj.schemaVersion -or [string]::IsNullOrWhiteSpace($catalo
 
 $targetJson = Join-Path $webDir 'fachangebot.json'
 $targetJs = Join-Path $webDir 'catalog.js'
+$logoSource = Join-Path $repo 'src/GsmKurswahl.ImportExport/Assets/SchoolLogo.jpeg'
+if (-not (Test-Path -LiteralPath $logoSource)) {
+    throw "Schullogo nicht gefunden: $logoSource"
+}
+Copy-Item -LiteralPath $logoSource -Destination (Join-Path $webDir 'school-logo.jpg') -Force
 [IO.File]::WriteAllText($targetJson, $catalogText, $utf8NoBom)
 [IO.File]::WriteAllText($targetJs, "window.GSM_DEFAULT_CATALOG = " + $catalogText.Trim() + ";`n", $utf8NoBom)
 
 New-Item -ItemType Directory -Path $resolvedOutput -Force | Out-Null
-foreach ($file in @('index.html', 'styles.css', 'kurswahltest.js', 'catalog.js', 'fachangebot.json', '.nojekyll')) {
+foreach ($file in @('index.html', 'styles.css', 'kurswahltest.js', 'catalog.js', 'fachangebot.json', 'school-logo.jpg', '.nojekyll')) {
     $src = Join-Path $webDir $file
     if (-not (Test-Path -LiteralPath $src)) {
         throw "Webdatei fehlt: $src"

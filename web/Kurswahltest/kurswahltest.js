@@ -2296,10 +2296,20 @@
         className: "print-banner",
         textContent: "UNVERBINDLICHE TESTVERSION FÜR ZU HAUSE (SELBSTAUSKUNFT) – NICHT ZUR ABGABE IN DER SCHULE"
       }));
-      printSheetEl.appendChild(el("h1", { textContent: "GSM-Kurswahl · Kontrollbogen (Testversion)" }));
-      printSheetEl.appendChild(el("p", {
-        textContent: `Abitur ${session.catalog.graduationYear} · Stand ${new Date().toLocaleString("de-DE")} · Fachangebot ${session.choice.offerVersion}`
-      }));
+      printSheetEl.appendChild(el("div", { className: "print-header" }, [
+        el("div", {}, [
+          el("h1", { textContent: "GSM-Kurswahl · Kontrollbogen (Testversion)" }),
+          el("p", {
+            style: "margin: 0;",
+            textContent: `Abitur ${session.catalog.graduationYear} · Stand ${new Date().toLocaleString("de-DE")} · Fachangebot ${session.choice.offerVersion}`
+          })
+        ]),
+        el("img", {
+          className: "print-logo",
+          src: "./school-logo.jpg",
+          alt: "Gymnasium bei St. Michael Schwäbisch Hall"
+        })
+      ]));
 
       printSheetEl.appendChild(el("h2", { textContent: "Angegebene Vorinfos (Selbstauskunft)" }));
       const prereqTable = el("table", { className: "print-table" });

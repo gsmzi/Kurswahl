@@ -1,21 +1,24 @@
 :root {
-  --page: #F4F6FA;
+  --page: #F3F4F8;
   --card: #FFFFFF;
-  --line: #DDE1E8;
-  --text: #1A1A1A;
-  --muted: #5F5E5A;
-  --accent: #185FA5;
-  --accent-soft: #E6F1FB;
-  --done: #3B6D11;
+  --line: #D5D7DF;
+  --silver: #BCBDBF;
+  --text: #1B2038;
+  --muted: #5A6075;
+  --accent: #1E287D;
+  --accent-hover: #171F63;
+  --accent-pressed: #11174D;
+  --accent-soft: #EAEBF7;
+  --done: #2D6A2E;
   --done-soft: #EAF3DE;
   --warn: #854F0B;
   --warn-soft: #FAEEDA;
   --danger: #A32D2D;
   --danger-soft: #FCEBEB;
-  --lf-fill: #534AB7;
-  --bf-fill: #9FE1CB;
-  --other-fill: #F5C4B3;
-  --empty: #EEF0F4;
+  --lf-fill: #1E287D;
+  --bf-fill: #8FA6D4;
+  --other-fill: #D8A866;
+  --empty: #ECEEF3;
 }
 
 * {
@@ -32,21 +35,29 @@ html, body {
   line-height: 1.4;
 }
 
+.brand-bar {
+  background: var(--card);
+  border-top: 4px solid var(--accent);
+  border-bottom: 1px solid var(--line);
+}
+
 .app-shell {
   max-width: 1760px;
   margin: 0 auto;
-  padding: 20px;
-  min-height: 100vh;
+  padding: 14px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .app-header {
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: 10px 20px;
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: start;
-  gap: 8px 16px;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px 14px;
 }
 
 .title-block {
@@ -64,9 +75,10 @@ html, body {
 
 .title-line h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1.2;
+  color: var(--accent);
 }
 
 .subtitle {
@@ -81,6 +93,27 @@ html, body {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.brand-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-self: end;
+}
+
+.header-divider {
+  width: 1px;
+  height: 36px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+
+.school-logo {
+  display: block;
+  width: 130px;
+  height: 46px;
+  object-fit: contain;
 }
 
 .checkbox-inline {
@@ -434,7 +467,8 @@ html, body {
 }
 
 .btn:hover:not(:disabled) {
-  background: #F0F2F6;
+  background: var(--page);
+  border-color: var(--silver);
 }
 
 .btn:disabled {
@@ -450,7 +484,13 @@ html, body {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #144F8A;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  background: var(--accent-pressed);
+  border-color: var(--accent-pressed);
 }
 
 .step-navigation {
@@ -730,12 +770,21 @@ details.expander-lg summary {
   display: none;
 }
 
-@media (max-width: 1150px) {
+@media (max-width: 1360px) {
   .app-header {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr auto;
   }
   .toolbar {
+    grid-column: 1 / -1;
+    grid-row: 2;
     justify-content: flex-start;
+  }
+  .brand-logo-wrap {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .header-divider {
+    display: none;
   }
 }
 
@@ -745,10 +794,29 @@ details.expander-lg summary {
   }
 }
 
+@media (max-width: 680px) {
+  .app-header {
+    grid-template-columns: 1fr;
+  }
+  .brand-logo-wrap {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+  .toolbar {
+    grid-row: 3;
+  }
+  .school-logo {
+    width: 112px;
+    height: 40px;
+  }
+}
+
 @media print {
   body {
     background: #FFFFFF;
   }
+  .brand-bar,
   .app-shell,
   .modal-backdrop {
     display: none !important;
@@ -758,6 +826,20 @@ details.expander-lg summary {
     padding: 12mm;
     color: #000000;
     font-size: 11pt;
+  }
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16pt;
+    border-bottom: 1.5pt solid var(--accent);
+    padding-bottom: 8pt;
+    margin-bottom: 10pt;
+  }
+  .print-logo {
+    width: 118pt;
+    height: auto;
+    flex-shrink: 0;
   }
   .print-banner {
     border: 1.5pt solid #854F0B;
@@ -770,11 +852,12 @@ details.expander-lg summary {
   .print-sheet h1 {
     font-size: 18pt;
     margin: 0 0 4pt;
+    color: var(--accent);
   }
   .print-sheet h2 {
     font-size: 12pt;
     margin: 12pt 0 4pt;
-    border-bottom: 1pt solid #CCCCCC;
+    border-bottom: 1pt solid var(--silver);
     padding-bottom: 2pt;
   }
   .print-table {
@@ -790,6 +873,6 @@ details.expander-lg summary {
     text-align: left;
   }
   .print-table th {
-    background: #F4F6FA;
+    background: var(--page);
   }
 }
