@@ -24,10 +24,14 @@ public sealed partial class TeacherWindow
     private readonly StackPanel deliveryPreview = new() { Spacing = 4 };
     private readonly List<(CheckBox Box, CollectionPreview Preview)> conflictSelection = [];
     private readonly HashSet<string> dismissedConflicts = [];
-    private static Grid TableLine(string name, string classroom, string state, string notes, Control? action = null)
+    private sealed record FolderOption(string? Path)
+    {
+        public override string ToString() => Path is null ? "Ordner auswählen …" : System.IO.Path.GetFileName(Path);
+    }
+    private static Grid TableLine(string name, string classroom, string state, string notes, Control? action = null, Control? notesControl = null, Control? stateControl = null)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("2*,80,*,2*,100"), Margin = new Thickness(8, 8) };
-        Control[] cells = [Text(name), Text(classroom), Text(state), Text(notes), action ?? Text("")];
+        Control[] cells = [Text(name), Text(classroom), stateControl ?? Text(state), notesControl ?? Text(notes), action ?? Text("")];
         for (var i = 0; i < cells.Length; i++) { Grid.SetColumn(cells[i], i); grid.Children.Add(cells[i]); }
         return grid;
     }
@@ -141,11 +145,15 @@ public sealed partial class TeacherWindow
     }
     private void BuildSimpleDistribution()
     {
-        Intro(profilePanel, "3 · Schülerdateien verteilen (im pädagogischen Netz)", "Die Verteilung auf die Schülerordner muss im pädagogischen Netz erfolgen. Falls Sie sich noch im Verwaltungsnetz befinden, erstellen Sie hier zuerst das Paket inkl. Programm (.zip). Im pädagogischen Netz Grundverzeichnis wählen (darunter Klasse und Nachname.Vorname), Ziele prüfen und verteilen.");
+        Intro(profilePanel, "3 · Schülerdateien verteilen (im pädagogischen Netz)", "Falls Sie noch im Verwaltungsnetz sind, erstellen Sie zuerst das Paket inkl. Programm (.zip). Im pädagogischen Netz prüfen Sie das vorgegebene Grundverzeichnis der Klassenordner oder wählen ein anderes.");
         profilePanel.Children.Add(NetworkTransferHint(false));
         var box = new StackPanel { Spacing = 10 };
         var rootRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         distributionRoot.Margin = new Thickness(0, 0, 8, 0);
+        distributionRoot.PropertyChanged += (_, change) =>
+        {
+            if (change.Property == TextBox.TextProperty) deliveryPreview.Children.Clear();
+        };
         rootRow.Children.Add(distributionRoot);
         var browse = Button("Laufwerk / Grundverzeichnis auswählen …", async () =>
         {
@@ -165,46 +173,64 @@ public sealed partial class TeacherWindow
     private void PrepareDelivery()
     {
         Ready(); deliveryPreview.Children.Clear();
-        var prepared = new List<StudentRecord>();
+        var root = distributionRoot.Text?.Trim() ?? "";
         var records = CurrentStudents();
-        var paths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var rows = new List<(bool IsError, Border Row)>();
-        foreach (var record in records)
+        var prepared = new List<(StudentRecord Record, CheckBox? Review)>();
+        var manual = new List<(StudentRecord Record, ComboBox Picker, FolderOption[] Options, TextBlock State)>();
+        var noFolder = new FolderOption(Path: null);
+        var rows = new List<(int Order, Border Row)>();
+        foreach (var target in StudentDirectories.PreviewDistribution(root, records))
         {
-            try { paths.Add(record.Student.ExternalStudentId, StudentDirectories.Resolve(distributionRoot.Text ?? "", record.HomeDirectory)); }
-            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+            var record = target.Student;
+            if (target.Path is null)
             {
-                rows.Add((true, new Border { Background = Brush.Parse("#FCEBEB"), Child = TableLine(record.Student.SyntheticDisplayName, record.Student.ClassName, "Offen", ex.Message) }));
+                Control? notes = null;
+                var state = Text("Offen");
+                if (target.AvailableFolders.Length > 0)
+                {
+                    var picker = new ComboBox { Name = "ChooseFolder_" + record.Student.ExternalStudentId, HorizontalAlignment = HorizontalAlignment.Stretch };
+                    Avalonia.Automation.AutomationProperties.SetName(picker, "Freien Ordner für " + record.Student.SyntheticDisplayName + " auswählen");
+                    manual.Add((record, picker, target.AvailableFolders.Select(p => new FolderOption(p)).ToArray(), state));
+                    notes = new StackPanel { Spacing = 4, Children = { Text(target.Detail), picker } };
+                }
+                rows.Add((0, new Border
+                {
+                    Background = Brush.Parse("#FCEBEB"),
+                    Child = TableLine(record.Student.SyntheticDisplayName, record.Student.ClassName, "Offen", target.Detail, notesControl: notes, stateControl: state)
+                }));
+                continue;
             }
-        }
-        foreach (var record in records.Where(r => paths.ContainsKey(r.Student.ExternalStudentId)))
-        {
-            var path = paths[record.Student.ExternalStudentId];
-            var error = paths.Values.Count(p => string.Equals(path, p, StringComparison.OrdinalIgnoreCase)) > 1 ? "Ordner mehreren Personen zugeordnet" : "";
-            rows.Add((error.Length > 0, new Border
+            CheckBox? review = null;
+            if (target.RequiresReview)
             {
-                Background = error.Length > 0 ? Brush.Parse("#FCEBEB") : Brushes.Transparent,
-                Child = TableLine(record.Student.SyntheticDisplayName, record.Student.ClassName, error.Length == 0 ? "Bereit" : "Offen", error.Length == 0 ? path : error)
+                review = new CheckBox { Name = "ConfirmFolder_" + record.Student.ExternalStudentId };
+                Avalonia.Automation.AutomationProperties.SetName(review, "Ordner für " + record.Student.SyntheticDisplayName + " bestätigt");
+                ToolTip.SetTip(review, "Nur ankreuzen, wenn der vorgeschlagene Ordner zu dieser Person gehört.");
+            }
+            rows.Add((target.RequiresReview ? 1 : 2, new Border
+            {
+                Background = target.RequiresReview ? Brush.Parse("#FAEEDA") : Brushes.Transparent,
+                Child = TableLine(record.Student.SyntheticDisplayName, record.Student.ClassName, target.RequiresReview ? "Vorschlag" : "Bereit", target.Path, review)
             }));
-            if (error.Length == 0) prepared.Add(record with { HomeDirectory = path });
+            prepared.Add((record with { HomeDirectory = target.Path }, review));
         }
-        var openCount = records.Length - prepared.Count;
         var headerCard = new StackPanel { Spacing = 8 };
-        headerCard.Children.Add(new TextBlock
-        {
-            Text = $"Verteilungsprüfung: {prepared.Count} bereit · {openCount} offen",
-            FontWeight = FontWeight.SemiBold, Foreground = openCount > 0 ? Brush.Parse("#785311") : Ink
-        });
-        headerCard.Children.Add(Text("Mit der gemeinsamen Bestätigung bestätigen Sie die angezeigten Ordnerzuordnungen. Offene Zeilen bleiben unbearbeitet."));
-        headerCard.Children.Add(Primary(Button($"{prepared.Count} Zuordnungen bestätigen und Schülerdateien verteilen", async () =>
+        var summary = new TextBlock { FontWeight = FontWeight.SemiBold };
+        headerCard.Children.Add(summary);
+        headerCard.Children.Add(Text("Prüfen Sie die Zielpfade vor der Sammelbestätigung. Haken Sie passende Namensvorschläge einzeln an. Bei offenen Zeilen können Sie einen freien Ordner derselben Klasse auswählen."));
+        var distribute = Primary(Button("", async () =>
         {
             Ready();
-            if (prepared.Count == 0) throw new InvalidOperationException("Keine verteilbaren Schüler. Hinweise in der Tabelle prüfen.");
-            if (prepared.Any(r => store!.Students().Single(s => s.Student.ExternalStudentId == r.Student.ExternalStudentId).Version != r.Version)) throw new InvalidOperationException("Schülerbestand geändert. Ziele erneut prüfen.");
+            var selected = SelectedTargets();
+            if (selected.Length == 0) throw new InvalidOperationException("Keine verteilbaren Schüler. Hinweise in der Tabelle prüfen.");
+            if (!string.Equals(root, distributionRoot.Text?.Trim() ?? "", StringComparison.Ordinal)
+                || !CurrentStudents().Select(r => (r.Student.ExternalStudentId, r.Version))
+                    .SequenceEqual(records.Select(r => (r.Student.ExternalStudentId, r.Version))))
+                throw new InvalidOperationException("Grundverzeichnis oder Schülerbestand geändert. Ziele erneut prüfen.");
             var service = new ProfileDistribution(store!); var okReports = new List<string>(); var issueReports = new List<string>(); var count = 0;
             // Everything the background work needs is read from controls here, on the UI thread.
-            var root = distributionRoot.Text ?? ""; var actorName = Actor; var catalog = DistributedCatalog(); var programDirectory = EffectiveProgramDirectory();
-            await RunWithProgress(prepared.Count, async report =>
+            var actorName = Actor; var catalog = DistributedCatalog(); var programDirectory = EffectiveProgramDirectory();
+            await RunWithProgress(selected.Length, async report =>
             {
                 StudentProgramSource? program = null;
                 if (programDirectory.Length > 0)
@@ -213,10 +239,10 @@ public sealed partial class TeacherWindow
                     try { program = await Task.Run(() => StudentProgramSource.Load(programDirectory)); }
                     catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException) { issueReports.Add("Schülerprogramm nicht mitverteilt: " + ex.Message); }
                 }
-                for (var i = 0; i < prepared.Count; i++)
+                for (var i = 0; i < selected.Length; i++)
                 {
-                    var record = prepared[i];
-                    report(i, $"{i + 1} von {prepared.Count}: {record.Student.SyntheticDisplayName}");
+                    var record = selected[i];
+                    report(i, $"{i + 1} von {selected.Length}: {record.Student.SyntheticDisplayName}");
                     var (line, delivered) = await Task.Run(() => DistributeOne(service, record, root, actorName, catalog, program));
                     if (delivered) { count++; okReports.Add(line); } else issueReports.Add(line);
                 }
@@ -249,15 +275,54 @@ public sealed partial class TeacherWindow
             }
             if (count == records.Length && workspace!.Active!.Step != YearSetupStep.Complete) SetStep(YearSetupStep.Complete);
             Refresh();
-            var allReports = issueReports.Concat(okReports).ToArray();
             SetStatus($"{count} von {records.Length} Schülerdateien verteilt." + (issueReports.Count > 0 ? " " + string.Join(" · ", issueReports) : ""),
                 issueReports.Count > 0 || count < records.Length ? FeedbackKind.Warning : FeedbackKind.Success);
             await CollectAutomatically();
-        })));
+        }));
+        headerCard.Children.Add(distribute);
         deliveryPreview.Children.Add(SubtleCard(headerCard, 12));
-        deliveryPreview.Children.Add(new Border { Background = SoftAccent, Child = TableLine("Name", "Klasse", "Status", "Zielordner / Hinweis") });
-        foreach (var entry in rows.OrderByDescending(r => r.IsError)) deliveryPreview.Children.Add(entry.Row);
-        SetStatus($"Verteilungsprüfung: {prepared.Count} bereit, {openCount} offen.", openCount > 0 ? FeedbackKind.Warning : FeedbackKind.Info);
+        deliveryPreview.Children.Add(new Border { Background = SoftAccent, Child = TableLine("Name", "Klasse", "Status", "Zielordner / Hinweis", Text("Bestätigt")) });
+        foreach (var entry in rows.OrderBy(r => r.Order)) deliveryPreview.Children.Add(entry.Row);
+
+        StudentRecord[] SelectedTargets() => prepared.Where(p => p.Review is null || p.Review.IsChecked == true).Select(p => p.Record)
+            .Concat(manual.Where(m => m.Picker.SelectedItem is FolderOption { Path: not null })
+                .Select(m => m.Record with { HomeDirectory = ((FolderOption)m.Picker.SelectedItem!).Path! }))
+            .ToArray();
+        var updatingChoices = false;
+        void UpdateSummary()
+        {
+            if (updatingChoices) return;
+            updatingChoices = true;
+            try
+            {
+                var selected = SelectedTargets();
+                var used = selected.Select(r => r.HomeDirectory).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (var (record, review) in prepared)
+                    if (review is not null) review.IsEnabled = review.IsChecked == true || !used.Contains(record.HomeDirectory);
+                foreach (var (_, picker, options, state) in manual)
+                {
+                    var current = picker.SelectedItem as FolderOption ?? noFolder;
+                    state.Text = current.Path is null ? "Offen" : "Ausgewählt";
+                    ToolTip.SetTip(picker, current.Path);
+                    var available = options.Where(o => o == current || !used.Contains(o.Path!)).Prepend(noFolder).ToArray();
+                    if (picker.ItemsSource is FolderOption[] existing && existing.SequenceEqual(available)) continue;
+                    picker.ItemsSource = available;
+                    picker.SelectedItem = current;
+                }
+                var openCount = records.Length - selected.Length;
+                summary.Text = $"Verteilungsprüfung: {selected.Length} bereit · {openCount} offen";
+                summary.Foreground = openCount > 0 ? Brush.Parse("#785311") : Ink;
+                distribute.Content = $"{selected.Length} Zuordnungen bestätigen und Schülerdateien verteilen";
+                distribute.IsEnabled = selected.Length > 0;
+                SetStatus(summary.Text, openCount > 0 ? FeedbackKind.Warning : FeedbackKind.Info);
+            }
+            finally { updatingChoices = false; }
+        }
+        foreach (var (_, review) in prepared)
+            if (review is not null) review.IsCheckedChanged += (_, _) => UpdateSummary();
+        foreach (var (_, picker, _, _) in manual)
+            picker.SelectionChanged += (_, _) => UpdateSummary();
+        UpdateSummary();
     }
     private void RenderCollectionStatus(int importedCount, IReadOnlyList<string> messages)
     {

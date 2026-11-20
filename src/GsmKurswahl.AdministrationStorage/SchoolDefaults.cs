@@ -5,7 +5,7 @@ namespace GsmKurswahl.AdministrationStorage;
 
 /// <summary>
 /// Optional school presets next to the teacher program (schulvorgaben.json): the drive/base folder with the class
-/// folders and the published pupil program. Kept out of the repository because it names concrete school paths.
+/// folders and the published pupil program. The checked-in GSM presets are included in published releases.
 /// Missing file means no presets; a malformed or unknown file is reported and never rewritten.
 /// </summary>
 public sealed record SchoolDefaults(int SchemaVersion, string DistributionRoot, string StudentProgramDirectory)

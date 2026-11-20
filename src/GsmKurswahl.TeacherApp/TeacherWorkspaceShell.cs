@@ -114,7 +114,13 @@ public sealed partial class TeacherWindow
     // A test stage brings its own file, so it can never preselect the real school drive.
     private SchoolDefaults SchoolPresets()
     {
-        try { return SchoolDefaults.Load(explicitWorkspaceRoot is not null && File.Exists(Path.Combine(explicitWorkspaceRoot, SchoolDefaults.FileName)) ? explicitWorkspaceRoot : AppContext.BaseDirectory); }
+        var programDirectory = transferPackageDirectory is null
+            ? AppContext.BaseDirectory
+            : Path.Combine(transferPackageDirectory, PedagogicalTransferPackage.TeacherFolderName);
+        var directory = explicitWorkspaceRoot is not null && File.Exists(Path.Combine(explicitWorkspaceRoot, SchoolDefaults.FileName))
+            ? explicitWorkspaceRoot
+            : programDirectory;
+        try { return SchoolDefaults.Load(directory); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
         { SetStatus(SchoolDefaults.FileName + " nicht verwendet: " + ex.Message, FeedbackKind.Warning); return SchoolDefaults.None; }
     }
@@ -141,8 +147,9 @@ public sealed partial class TeacherWindow
         session = new TeacherSession(store, year.Catalog, year.Actor);
         heading.Text = "Abitur " + year.Catalog.GraduationYear;
         SetStatus("Aktueller Stand geladen. Bestätigte Änderungen werden automatisch gespeichert.", FeedbackKind.Info);
-        var roots = CurrentStudents().Where(s => Path.IsPathFullyQualified(s.HomeDirectory))
-            .Select(s => Path.GetDirectoryName(Path.GetDirectoryName(s.HomeDirectory))).Where(p => p is not null).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var roots = CurrentStudents().Where(s => s.MappingConfirmed && Path.IsPathFullyQualified(s.HomeDirectory))
+            .Select(s => Path.GetDirectoryName(Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(s.HomeDirectory))))
+            .Where(p => p is not null).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         distributionRoot.Text = roots.Length == 1 ? roots[0] : SchoolPresets().DistributionRoot;
         Refresh(); RebuildNavigation(); ShowCurrentStep();
     }

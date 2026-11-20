@@ -261,8 +261,10 @@ public static class PedagogicalTransferPackage
         sb.AppendLine("   (nicht direkt aus dem ZIP starten und keinen reinen Netzlaufwerk-Ordner als Arbeitsstand verwenden).");
         sb.AppendLine($"2. \"{StarterFileName}\" starten.");
         sb.AppendLine($"3. Den angezeigten Transportstand prüfen und übernehmen (lokaler Ordner \"{WorkspaceFolderName}\" entsteht automatisch).");
-        sb.AppendLine("4. Im pädagogischen Netz das Schülerlaufwerk auswählen, Schülerdateien verteilen und später die");
-        sb.AppendLine("   Kurswahlen einsammeln (nach Abgabetermin auch abschließend einsammeln und Wahlordner räumen).");
+        sb.AppendLine("4. Im pädagogischen Netz das vorbelegte Grundverzeichnis der Klassenordner prüfen oder eines auswählen.");
+        sb.AppendLine("   Zielordner prüfen, abweichende Namensvorschläge einzeln bestätigen und Schülerdateien verteilen.");
+        sb.AppendLine("   Bei offenen Zuordnungen lässt sich ein freier Ordner derselben Klasse auswählen.");
+        sb.AppendLine("   Später Kurswahlen einsammeln (nach Abgabetermin auch abschließend einsammeln und Wahlordner räumen).");
         sb.AppendLine("5. Nach dem Einsammeln unter \"Wahl -> Kurswahlen einsammeln -> Rückwechsel ins Verwaltungsnetz\"");
         sb.AppendLine("   über \"Stand für Verwaltungsnetz speichern ...\" eine .gsm-transfer-Datei erzeugen und im Verwaltungsnetz öffnen.");
         sb.AppendLine("6. WICHTIG - AUFRÄUMEN IM PÄDAGOGISCHEN NETZ:");

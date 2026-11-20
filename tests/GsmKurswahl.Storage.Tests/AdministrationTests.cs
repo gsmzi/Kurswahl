@@ -38,6 +38,52 @@ public sealed class AdministrationTests : IDisposable
         Assert.Throws<DirectoryNotFoundException>(() => StudentDirectories.Resolve(root, "10b/Missing.Demo"));
         Assert.False(Directory.Exists(Path.Combine(root, "10b")));
     }
+    [Theory]
+    [InlineData("Testa", "probe.testa", false)]
+    [InlineData("Testa", "probe.testa2", true)]
+    [InlineData("Testa Demo", "probe.testademo", true)]
+    [InlineData("Testa Demo", "probe.testa", true)]
+    [InlineData("Testa", "probe.testademo2", true)]
+    public void DistributionSuggestsNameVariantsInTheImportedClass(string firstName, string folder, bool requiresReview)
+    {
+        var record = Record() with { MappingConfirmed = false, HomeDirectory = "10A/Probe." + firstName };
+        record = record with { Student = record.Student with { ClassName = "10A", FirstName = firstName, LastName = "Probe" } };
+        var path = Directory.CreateDirectory(Path.Combine(root, "10A", folder)).FullName;
+        Directory.CreateDirectory(Path.Combine(root, "10B", "probe.testa"));
+
+        var target = Assert.Single(StudentDirectories.PreviewDistribution(root, [record]));
+        Assert.Equal(path, target.Path);
+        Assert.Equal(requiresReview, target.RequiresReview);
+    }
+    [Fact]
+    public void DistributionKeepsAmbiguousMissingAndSharedFoldersOpen()
+    {
+        var record = Record() with { MappingConfirmed = false, HomeDirectory = "10A/Probe.Testa" };
+        record = record with { Student = record.Student with { ClassName = "10A", FirstName = "Testa", LastName = "Probe" } };
+        var exact = Directory.CreateDirectory(Path.Combine(root, "10A", "Probe.Testa")).FullName;
+        var numbered = Directory.CreateDirectory(Path.Combine(root, "10A", "probe.testa2")).FullName;
+        var ambiguous = Assert.Single(StudentDirectories.PreviewDistribution(root, [record]));
+        Assert.Null(ambiguous.Path);
+        Assert.Contains("Mehrere passende Ordner", ambiguous.Detail);
+        Assert.Contains("Probe.Testa", ambiguous.Detail);
+        Assert.Contains("probe.testa2", ambiguous.Detail);
+
+        var confirmed = record with { MappingConfirmed = true, HomeDirectory = numbered };
+        Assert.Equal(numbered, Assert.Single(StudentDirectories.PreviewDistribution(root, [confirmed])).Path);
+        var manual = record with { HomeDirectory = exact };
+        Assert.Equal(exact, Assert.Single(StudentDirectories.PreviewDistribution(root, [manual])).Path);
+        var explicitMissing = record with { HomeDirectory = "10A/probe.testademo" };
+        Assert.Null(Assert.Single(StudentDirectories.PreviewDistribution(root, [explicitMissing])).Path);
+        Assert.Contains("Grundverzeichnis nicht erreichbar", Assert.Single(StudentDirectories.PreviewDistribution(Path.Combine(root, "offline"), [record])).Detail);
+
+        Directory.Delete(exact);
+        var conflicting = Record(2) with { HomeDirectory = "10A/probe.testa2", MappingConfirmed = false };
+        Assert.All(StudentDirectories.PreviewDistribution(root, [record, conflicting]), target =>
+        {
+            Assert.Null(target.Path);
+            Assert.Contains("Ordner mehreren Personen zugeordnet", target.Detail);
+        });
+    }
     [Fact]
     public void UnchangedRowsInChangedImportFileKeepConfirmedMappingAndRevision()
     {

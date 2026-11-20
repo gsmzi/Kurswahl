@@ -30,7 +30,7 @@ Pilot ausschließlich mit synthetischen Personen und Konten, auf tatsächlichen 
 
 1. Paketprüfsumme, Version und Start ohne SDK prüfen; für frameworkabhängige Ausgabe .NET-10-Laufzeit voraussetzen. AppLocker/SmartScreen sowie 125/150-%-DPI, Tastatur und Screenreader erproben.
 2. Schülerkonto: eigenes Profil lesen, eigene Wahl schreiben; fremde Wahlordner und Lehrerbestand dürfen unzugänglich sein. Zentralen Programmordner schreibgeschützt halten. Lehrerprogrammstart allein darf keine Rechte gewähren.
-3. Berechtigtes Lehrerkonto: persönliche Profile verteilen und Wahlen einsammeln; Verwaltungsdatenbank ausschließlich lokal, ein schreibender Arbeitsplatz. Keine SQLite-Datenbank über SMB öffnen.
+3. Berechtigtes Lehrerkonto im pädagogischen Netz: Verbindung zu `M:\Allgemein` prüfen. In der Verteilungsvorschau genaue und abweichende Namen (Endziffer `2`, mit oder ohne Zweitnamen) erproben. Bei einem mehrdeutigen Fall den passenden freien Ordner aus der Klassenliste wählen. Erst nach Pfadprüfung persönliche Profile verteilen und Wahlen einsammeln. Verwaltungsdatenbank auf genau einem lokalen schreibenden Arbeitsplatz öffnen.
 4. Unterbrochene Netzwerkverbindung, fehlende Rechte, doppelte App-Instanz und konkurrierende Wahländerungen erproben. Vorhandene Dateien müssen erhalten bleiben. Fehlerbericht und Wiederholung prüfen.
 5. Netzwechsel durch Sicherung/Import, manuelle ASV-Testeingabe und allgemeinen Rückvergleich mit synthetischen Daten durchführen; produktiven Adapter erst gegen freigegebene Musterdatei testen.
 6. Sicherung in neuen Bestand wiederherstellen und Historie/Planungsstand/Vermerke vergleichen. Ergebnis und Freigabe durch Verantwortliche protokollieren.

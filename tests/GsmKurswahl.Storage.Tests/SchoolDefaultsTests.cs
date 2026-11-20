@@ -23,7 +23,7 @@ public sealed class SchoolDefaultsTests : IDisposable
     {
         var teacher = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../src/GsmKurswahl.TeacherApp"));
         var defaults = SchoolDefaults.Load(teacher);
-        Assert.True(Path.IsPathFullyQualified(defaults.DistributionRoot));
+        Assert.Equal(@"M:\Allgemein", defaults.DistributionRoot);
         Assert.Equal(Path.GetFullPath(Path.Combine(teacher, "..", "StudentApp")), defaults.StudentProgramDirectory);
     }
 

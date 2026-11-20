@@ -341,12 +341,13 @@ public class TeacherWindowTests
     public async Task SimpleDistributionDeliversProfilesWithoutCertificateOrSid()
     {
         var root = Path.Combine(Path.GetTempPath(), "gsm-distribute-ui-" + Guid.NewGuid());
-        var targetFolder = Path.Combine(root, "homes", "10a", "Eins.Demo");
+        var targetFolder = Path.Combine(root, "homes", "10a", "eins.demo2");
         Directory.CreateDirectory(targetFolder);
         var workspace = new TeacherWorkspace(root); workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Mapping });
         using (var db = workspace.OpenActive())
-            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes }), "", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new AdministrativeStudent(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes })
+            { FirstName = "Demo", LastName = "Eins" }, "", "", "10a/Eins.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         var window = new TeacherWindow(root);
         try
         {
@@ -358,6 +359,13 @@ public class TeacherWindowTests
                 window.UpdateLayout();
             }
             Click("Ziele prüfen und gemeinsame Verteilung vorbereiten");
+            var review = window.GetLogicalDescendants().OfType<CheckBox>().Single(b => b.Name == "ConfirmFolder_demo-001");
+            var distribute = window.GetLogicalDescendants().OfType<Button>().Single(b => b.Content?.ToString() == "0 Zuordnungen bestätigen und Schülerdateien verteilen");
+            Assert.False(review.IsChecked == true);
+            Assert.False(distribute.IsEnabled);
+            Assert.False(Directory.Exists(StudentFolderLayout.Data(targetFolder)));
+            review.IsChecked = true;
+            Assert.True(distribute.IsEnabled);
             Click("1 Zuordnungen bestätigen und Schülerdateien verteilen");
             // Distribution runs in the background; the window stays responsive and shows progress until it ends.
             var progress = window.GetLogicalDescendants().OfType<ProgressBar>().Single(p => p.Name == "BusyProgress");
@@ -369,6 +377,75 @@ public class TeacherWindowTests
             Assert.True(File.Exists(Path.Combine(StudentFolderLayout.Data(targetFolder), "profil.json")));
             Assert.False(File.Exists(Path.Combine(StudentFolderLayout.Data(targetFolder), "profil.sig")));
             Assert.Equal(YearSetupStep.Complete, new TeacherWorkspace(root).Active!.Step);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var store = (IAdministrationStore)typeof(TeacherWindow).GetField("store", flags)!.GetValue(window)!;
+            var recorded = Assert.Single(store.Students());
+            Assert.True(recorded.MappingConfirmed);
+            Assert.Equal(targetFolder, recorded.HomeDirectory);
+        }
+        finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [AvaloniaFact]
+    public async Task OpenDistributionRowsAllowSelectingOnlyFreeClassFolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gsm-manual-folder-" + Guid.NewGuid());
+        var homes = Path.Combine(root, "homes");
+        var classFolder = Path.Combine(homes, "10A");
+        foreach (var name in new[] { "demo.belegt", "probe.eins", "probe.zwei" })
+            Directory.CreateDirectory(Path.Combine(classFolder, name));
+        Directory.CreateDirectory(Path.Combine(homes, "10B", "probe.andereklasse"));
+        var workspace = new TeacherWorkspace(root);
+        workspace.Create(TestData.WorkflowCatalog, "demo-beratung");
+        workspace.Update(workspace.Active! with { Step = YearSetupStep.Mapping });
+        using (var db = workspace.OpenActive())
+        {
+            for (var i = 1; i <= 3; i++)
+            {
+                var home = i == 3 ? Path.Combine(classFolder, "demo.belegt") : $"10A/Testperson.{i}";
+                db.SaveStudent(new(SchemaVersions.StudentRecord,
+                    new(Guid.NewGuid(), $"demo-{i:000}", $"Demo {i}", "10A", 2029, DepartureStatus.Active, PriorEducation.Unknown),
+                    "", "", home, i == 3, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            }
+        }
+
+        var window = new TeacherWindow(root);
+        try
+        {
+            window.Show(); window.UpdateLayout();
+            void Click(string label) => window.GetLogicalDescendants().OfType<Button>().Single(b => Equals(b.Content, label))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Click("Ziele prüfen und gemeinsame Verteilung vorbereiten");
+            window.UpdateLayout();
+            var pickers = window.GetLogicalDescendants().OfType<ComboBox>().ToArray();
+            var first = pickers.Single(c => c.Name == "ChooseFolder_demo-001");
+            var second = pickers.Single(c => c.Name == "ChooseFolder_demo-002");
+            Assert.Equal(new[] { "Ordner auswählen …", "probe.eins", "probe.zwei" }, first.Items.Select(i => i?.ToString()));
+
+            first.SelectedIndex = 1;
+            Assert.Equal("probe.eins", first.SelectedItem?.ToString());
+            Assert.Equal(new[] { "Ordner auswählen …", "probe.zwei" }, second.Items.Select(i => i?.ToString()));
+            first.SelectedIndex = 0;
+            Assert.Contains(second.Items, i => i?.ToString() == "probe.eins");
+            second.SelectedIndex = 1;
+            first.SelectedIndex = 1;
+            Assert.Equal("probe.zwei", first.SelectedItem?.ToString());
+            Assert.False(Directory.Exists(StudentFolderLayout.Data(Path.Combine(classFolder, "probe.eins"))));
+
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var collecting = typeof(TeacherWindow).GetField("collecting", flags)!;
+            for (var wait = 0; wait < 500 && (bool)collecting.GetValue(window)!; wait++)
+            { Avalonia.Threading.Dispatcher.UIThread.RunJobs(); await Task.Delay(10); }
+            Assert.False((bool)collecting.GetValue(window)!);
+            Click("3 Zuordnungen bestätigen und Schülerdateien verteilen");
+            for (var wait = 0; wait < 500 && new TeacherWorkspace(root).Active!.Step != YearSetupStep.Complete; wait++)
+            { Avalonia.Threading.Dispatcher.UIThread.RunJobs(); await Task.Delay(10); }
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            var stored = (IAdministrationStore)typeof(TeacherWindow).GetField("store", flags)!.GetValue(window)!;
+            Assert.Contains(stored.Students(), r => r.Student.ExternalStudentId == "demo-001" && r.MappingConfirmed && r.HomeDirectory == Path.Combine(classFolder, "probe.zwei"));
+            Assert.Contains(stored.Students(), r => r.Student.ExternalStudentId == "demo-002" && r.MappingConfirmed && r.HomeDirectory == Path.Combine(classFolder, "probe.eins"));
+            Assert.True(File.Exists(Path.Combine(StudentFolderLayout.Data(Path.Combine(classFolder, "probe.zwei")), "profil.json")));
+            Assert.True(File.Exists(Path.Combine(StudentFolderLayout.Data(Path.Combine(classFolder, "probe.eins")), "profil.json")));
         }
         finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -655,6 +732,9 @@ public class TeacherWindowTests
             Directory.CreateDirectory(teacherDir);
             File.WriteAllText(Path.Combine(teacherDir, "GsmKurswahl.TeacherApp.exe"), "synthetic-exe");
             File.WriteAllText(Path.Combine(teacherDir, TeacherProgramLease.FileName), "held");
+            var classRoot = Path.Combine(root, "Synthetische Klassen");
+            File.WriteAllBytes(Path.Combine(teacherDir, SchoolDefaults.FileName), System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                new SchoolDefaults(1, classRoot, ""), DocumentJson.Options));
 
             var studentDir = Path.Combine(root, "StudentApp");
             Directory.CreateDirectory(studentDir);
@@ -682,6 +762,7 @@ public class TeacherWindowTests
             Assert.True(File.Exists(Path.Combine(pkgWorkspaceRoot, "verwaltung.db")));
             Assert.Contains(AllIn<TextBlock>(pkgWindow), t => t.Text?.Contains("3 · Schülerdateien verteilen (im pädagogischen Netz)") == true);
             Assert.False(NamedIn<Expander>(pkgWindow, "TransferOutExpander").IsExpanded);
+            Assert.Equal(classRoot, NamedIn<TextBox>(pkgWindow, "DistributionRoot").Text);
 
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
             pkgWindow.Close();
