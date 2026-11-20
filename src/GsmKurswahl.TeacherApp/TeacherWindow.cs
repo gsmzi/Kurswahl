@@ -46,7 +46,7 @@ public sealed partial class TeacherWindow : Window
     private Expander? importMappingExpander;
     private Border? conflictSection;
     private string? selectedStudentId;
-    private sealed record Target(StudentRecord Record) { public override string ToString() => $"{Record.Student.SyntheticDisplayName} ({Record.Student.ClassName}) → {(Record.HomeDirectory.Length == 0 ? "kein Ordner" : Record.HomeDirectory)} · Ordner {(Record.MappingConfirmed ? "bestätigt" : "noch nicht bestätigt")}"; }
+    private sealed record Target(StudentRecord Record) { public override string ToString() => $"{Record.Student.DisplayName} ({Record.Student.ClassName}) → {(Record.HomeDirectory.Length == 0 ? "kein Ordner" : Record.HomeDirectory)} · Ordner {(Record.MappingConfirmed ? "bestätigt" : "noch nicht bestätigt")}"; }
     private sealed record SubjectItem(string? Id, string Label) { public override string ToString() => Label; }
 
     private static TabItem Tab(string name, Control content) => new() { Header = name, Content = content };
@@ -99,7 +99,7 @@ public sealed partial class TeacherWindow : Window
             "1 · Neuen Abiturjahrgang anlegen – oben neben dem Jahrgang auf „Jahrgang wechseln / neu …“ klicken.",
             "2 · Leistungsfächer auswählen, die in diesem Jahrgang angeboten werden.",
             "3 · Schülerliste (Excel/CSV aus Klasse 10) im Verwaltungsnetz einlesen: Namen, Klassen und Vorbildung.",
-            "4 · Wechsel ins pädagogische Netz & Schülerdateien verteilen: Im Verwaltungsnetz ein Paket inkl. Programm (.zip) speichern, im pädagogischen Netz vollständig lokal entpacken, über „Lehrerprogramm starten.cmd“ öffnen und Profile + Fachangebot auf das Schülerlaufwerk verteilen.",
+            "4 · Wechsel ins pädagogische Netz & Schülerdateien verteilen: Im Verwaltungsnetz ein Paket inkl. Programm (.zip) speichern, im pädagogischen Netz vollständig im persönlichen Laufwerk (U:) entpacken, über „Lehrerprogramm starten.cmd“ öffnen und Profile + Fachangebot auf das Schülerlaufwerk verteilen.",
             "5 · Schüler wählen im pädagogischen Netz im Schülerprogramm. Das dortige Lehrerprogramm sammelt die Wahlen automatisch ein.",
             "6 · Im pädagogischen Netz abschließend einsammeln, Rück-Transportdatei (.gsm-transfer) für das Verwaltungsnetz sichern und dort öffnen. Sobald die Datei sicher im Verwaltungsnetz angekommen und geöffnet ist, Programm und Arbeitsstand im pädagogischen Netz vollständig löschen. Ab dann läuft alles wieder im Verwaltungsnetz (unter „Kurswahlen“ prüfen, filtern, ändern, Abgänger markieren und drucken).",
             "7 · Kursplanung: Wahlzahlen ansehen; kommt ein Kurs nicht zustande, über das ✕ neben der Wahlzahl streichen. Nachwahl unter „Kurswahlen“ direkt eintragen oder Nachwahlbögen drucken.",
@@ -117,7 +117,7 @@ public sealed partial class TeacherWindow : Window
             "Profil – kleine Datei mit den bestätigten Voraussetzungen einer Person (z. B. IMP, bilingual). Das Schülerprogramm zeigt damit die passenden Fächer an.\n" +
             "Revision – jeder gespeicherte Stand einer Wahl. Nichts wird überschrieben; Wiederherstellen legt einen neuen Stand an."));
         panel.Children.Add(Help("Verwaltungsnetz und pädagogisches Netz (Paket inkl. Programm & Transportdatei)",
-            "Schülerordner sind meist nur im pädagogischen Netz erreichbar, dort ist das Lehrerprogramm im Allgemeinen nicht mehr vorhanden. Vor dem Wechsel ins pädagogische Netz im Verwaltungsnetz unter „Schülerdateien verteilen“ ein Paket inkl. Programm (.zip) erstellen (oder falls das Programm dort schon liegt, nur eine Transportdatei). Im pädagogischen Netz das ZIP lokal entpacken, „Lehrerprogramm starten.cmd“ öffnen, den Transportstand übernehmen, verteilen und einsammeln.\n\nNach dem abschließenden Einsammeln unter „Kurswahlen einsammeln“ den „Stand für Verwaltungsnetz speichern …“ (.gsm-transfer) und im Verwaltungsnetz öffnen. Sobald die Transportdatei dort sicher angekommen und geöffnet ist, das Lehrerprogramm im pädagogischen Netz schließen und den gesamten entpackten Paketordner samt Arbeitsstand und ZIP-Datei im pädagogischen Netz vollständig löschen. Es gibt keine automatische Zusammenführung zweier Stände."));
+            "Schülerordner sind meist nur im pädagogischen Netz erreichbar, dort ist das Lehrerprogramm im Allgemeinen nicht mehr vorhanden. Vor dem Wechsel ins pädagogische Netz im Verwaltungsnetz unter „Schülerdateien verteilen“ ein Paket inkl. Programm (.zip) erstellen (oder falls das Programm dort schon liegt, nur eine Transportdatei). Im pädagogischen Netz das ZIP im persönlichen Laufwerk (U:) entpacken, „Lehrerprogramm starten.cmd“ öffnen, den Transportstand übernehmen, verteilen und einsammeln.\n\nNach dem abschließenden Einsammeln unter „Kurswahlen einsammeln“ den „Stand für Verwaltungsnetz speichern …“ (.gsm-transfer) und im Verwaltungsnetz öffnen. Sobald die Transportdatei dort sicher angekommen und geöffnet ist, das Lehrerprogramm im pädagogischen Netz schließen und den gesamten entpackten Paketordner samt Arbeitsstand und ZIP-Datei im pädagogischen Netz vollständig löschen. Es gibt keine automatische Zusammenführung zweier Stände."));
         panel.Children.Add(Help("Dateiübersicht: Inhalt, Herkunft und Verwendung", "Schülerliste (.xlsx / .csv)\nEine Tabelle aus Ihrer vorbereiteten Klassen-10-Liste bzw. aus ASV-BW über das schuleigene Exportformat „GSM Export für Kurswahl“ (ASV-ID, Familienname, Rufname, Klasse, Klassengruppe, Profil, Unterrichtsfächer; wird automatisch erkannt und umgerechnet). Unter Wahl → Schülerliste importieren.\n\nFachangebot (.json), z. B. fachangebot-demo.json\nBeschreibt Fächer, Kursarten und Halbjahre eines Jahrgangs. Wird beim Anlegen eines Jahrgangs automatisch geladen und beim Verteilen in jeden Schülerordner kopiert.\n\nVerwaltungsdatei (.db), z. B. verwaltung.db\nSpeichert den Lehrerbestand mit Änderungen und Historie lokal. Wird automatisch angelegt und geöffnet.\n\nPersönliches Profil (profil.json)\nDas Lehrerprogramm erzeugt diese Datei aus den geprüften Voraussetzungen und legt sie beim Verteilen in den Wahlordner. Keine Schülerliste und keine Kurswahl.\n\nKurswahl (aktuell.json)\nWird vom Schülerprogramm gespeichert. Das Lehrerprogramm liest sie automatisch aus dem bestätigten Wahlordner.\n\nKontrollbogen (.pdf)\nLesbare Übersicht zur Kurswahl. Zum Ansehen und Prüfen (ohne Unterschriftenzeile); kein Importformat.\n\nTransportdatei (.gsm-transfer)\nKompletter Jahrgang für den Wechsel zwischen Verwaltungs- und pädagogischem Netz bzw. als Sicherung.\n\nASV-Kurswahl-Export („zz Kursstufe Fächerwahl“)\nUnter ASV-Abgleich als .xlsx oder .csv direkt einlesbar, um Deckungsgleichheit von Kursen, Halbjahren und geplanten mündlichen Prüfungsfächern zu prüfen."));
         panel.Children.Add(Help("Mit welchen Testdateien kann ich beginnen?", "Im Projektordner samples liegen:\n• fachangebot-demo.json: wird beim Anlegen eines Jahrgangs automatisch als Vorlage geladen.\n• klasse10-demo.csv: unter Schülerliste importieren laden; enthält zwei erfundene Personen.\n• schueler-demo.json: Beispiel für eine Kurswahl. Beim Einsammeln erwartet das Programm den Namen aktuell.json im bestätigten Wahlordner.\n• profil-demo-unsigned.json: Beispiel für ein persönliches Schülerprofil."));
         panel.Children.Add(Help("Nur für die Einrichtung: Programmeinstellungen", "appsettings.json im Schülerprogramm enthält die Programmeinstellungen (Speicherort, Katalogpfad). Diese Datei wird nicht als Schülerliste importiert."));
@@ -126,7 +126,7 @@ public sealed partial class TeacherWindow : Window
     private static string Describe(StudentRecord r)
     {
         var p = r.Student.Prerequisites;
-        return $"{r.Student.SyntheticDisplayName}, Klasse {r.Student.ClassName}, Abitur {r.Student.GraduationYear}, Abgänger: {FormatDeparture(r.Student.Departure)}\n" +
+        return $"{r.Student.DisplayName}, Klasse {r.Student.ClassName}, Abitur {r.Student.GraduationYear}, Abgänger: {FormatDeparture(r.Student.Departure)}\n" +
             $"Konto: {(r.WindowsUsername.Length == 0 ? "–" : r.WindowsUsername)}; Wahlordner: {(r.HomeDirectory.Length == 0 ? "–" : r.HomeDirectory)}\n" +
             $"Italienisch-Profil: {FormatKnowledge(p.ItalianProfile)}; Informatik-Brückenkurs: {FormatKnowledge(p.InformaticsBridge)}; IMP: {FormatKnowledge(p.InformaticsImp)}; durchgängig bilingual: {FormatKnowledge(p.ContinuousBilingual)}\n" +
             $"Religion/Ethik Klasse 10: {p.ReligionEthicsGrade10 ?? "unbekannt"}; Belegung freigegeben: {FormatKnowledge(p.ReligionEthicsPermission)}; Prüfung freigegeben: {FormatKnowledge(p.ReligionEthicsExamPermission)}\n" +
@@ -147,7 +147,7 @@ public sealed partial class TeacherWindow : Window
         var shownCount = 0;
         foreach (var state in states)
         {
-            var label = $"{state.Record.Student.SyntheticDisplayName} · {state.Record.Student.ClassName} · {state.Record.Student.ExternalStudentId}";
+            var label = $"{state.Record.Student.DisplayName} · {state.Record.Student.ClassName} · {state.Record.Student.ExternalStudentId}";
             if (!label.Contains(filter.Text ?? "", StringComparison.OrdinalIgnoreCase) || followupFilter.IsChecked == true && !state.RequiresReselection) continue;
             if (statusFilter.SelectedIndex == 1 && state.Active is not null || statusFilter.SelectedIndex == 2 && state.Validation?.Status != ReviewStatus.Invalid
                 || statusFilter.SelectedIndex == 3 && state.Validation?.Status != ReviewStatus.NeedsReview || statusFilter.SelectedIndex == 4 && state.Validation?.Status != ReviewStatus.Valid) continue;
@@ -158,7 +158,7 @@ public sealed partial class TeacherWindow : Window
             var open = Compact(Button("Öffnen", () => ShowStudent(state), "Stammdaten, Vorbildung, Kurswahl und Historie dieser Person rechts anzeigen."));
             var selected = state.Record.Student.ExternalStudentId == selectedStudentId && personEditor.IsExpanded;
             roster.Children.Add(new Border { Background = selected ? HighlightAccent : Brushes.Transparent, BorderBrush = selected ? Accent : Brushes.Transparent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6),
-                Child = TableLine(state.Record.Student.SyntheticDisplayName, state.Record.Student.ClassName, FormatStatus(state.Validation?.Status), notes, open) });
+                Child = TableLine(state.Record.Student.DisplayName, state.Record.Student.ClassName, FormatStatus(state.Validation?.Status), notes, open) });
         }
         if (shownCount == 0)
             roster.Children.Add(new TextBlock { Text = "Keine Person passt zu diesen Filtern.", Foreground = Muted, Margin = new Thickness(8, 12) });
@@ -191,7 +191,7 @@ public sealed partial class TeacherWindow : Window
         Ready();
         selectedStudentId = state.Record.Student.ExternalStudentId; personEditor.IsExpanded = true; detail.Children.Clear();
         var record = state.Record; var id = record.Student.ExternalStudentId;
-        personEditor.Header = $"{record.Student.SyntheticDisplayName} · Klasse {record.Student.ClassName}";
+        personEditor.Header = $"{record.Student.DisplayName} · Klasse {record.Student.ClassName}";
         var summaryRow = new WrapPanel { Orientation = Orientation.Horizontal };
         var summary = Text($"Schüler-ID {id} · Prüfstand: {FormatStatus(state.Validation?.Status)}" + (state.RequiresReselection ? " · Nachwahl offen" : "") + (state.Record.Student.Departure == DepartureStatus.Active ? "" : " · Abgänger: " + FormatDeparture(state.Record.Student.Departure)));
         summary.Foreground = Muted; summary.Margin = new Thickness(0, 0, 12, 6); summary.VerticalAlignment = VerticalAlignment.Center;
@@ -524,7 +524,7 @@ public sealed partial class TeacherWindow : Window
         var deletion = new StackPanel { Spacing = 8 };
         deletion.Children.Add(Text("Entfernt diese Person vollständig aus dem Lehrerbestand dieses Jahrgangs: Stammdaten, Vorbildung, alle Kurswahlstände, Nachwahl- und Übertragungsvermerke, Profile, Zustellberichte, archivierte Schülerdateien und die Person in gespeicherten Planungsständen. Zurück bleibt nur ein Protokolleintrag ohne Name und Schüler-ID. Dateien im Wahlordner werden nicht verändert. Vorher ggf. „Jahrgang sichern“."));
         var deleteReason = new TextBox { Name = "DeleteStudentReason", Watermark = "Löschgrund (z. B. Schulwechsel, Löschfrist erreicht)" };
-        var deleteConfirm = new CheckBox { Name = "DeleteStudentConfirm", Content = $"Ich möchte {record.Student.SyntheticDisplayName} ({id}) endgültig löschen" };
+        var deleteConfirm = new CheckBox { Name = "DeleteStudentConfirm", Content = $"Ich möchte {record.Student.DisplayName} ({id}) endgültig löschen" };
         var deleteErrorBox = InlineErrorBox("StudentDeleteError", out var deleteErrorText);
         deleteReason.TextChanged += (_, _) => SetInlineError(deleteErrorBox, deleteErrorText, null);
         deleteConfirm.IsCheckedChanged += (_, _) => SetInlineError(deleteErrorBox, deleteErrorText, null);
@@ -643,7 +643,7 @@ public sealed partial class TeacherWindow : Window
                 try { distribution.Issue(target.Record); count++; }
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
                 {
-                    failed.Add(target.Record.Student.SyntheticDisplayName + ": " + ex.Message);
+                    failed.Add(target.Record.Student.DisplayName + ": " + ex.Message);
                     store!.LogDistribution(new(Guid.NewGuid(), target.Record.Student.ExternalStudentId, 0, DateTimeOffset.UtcNow, "Profil_abweichend", "Profilerstellung fehlgeschlagen; Ordnerzuordnung prüfen."));
                 }
             }
@@ -668,11 +668,11 @@ public sealed partial class TeacherWindow : Window
                 for (var i = 0; i < targets.Length; i++)
                 {
                     var record = targets[i];
-                    report(i, $"{i + 1} von {targets.Length}: {record.Student.SyntheticDisplayName}");
+                    report(i, $"{i + 1} von {targets.Length}: {record.Student.DisplayName}");
                     reports.Add(await Task.Run(() =>
                     {
                         var issued = store!.LatestProfile(record.Student.ExternalStudentId);
-                        if (issued is null) return record.Student.SyntheticDisplayName + ": noch kein Profil erstellt";
+                        if (issued is null) return record.Student.DisplayName + ": noch kein Profil erstellt";
                         var entry = distribution.Distribute(record, issued, catalog);
                         var programText = "";
                         if (program is not null)
@@ -680,7 +680,7 @@ public sealed partial class TeacherWindow : Window
                             var delivery = distribution.DeliverProgram(store.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId), program);
                             programText = delivery.Status == "verteilt" ? " · Programm bereitgestellt" : " · Programm: " + DistributionText(delivery.Status);
                         }
-                        return record.Student.SyntheticDisplayName + ": " + DistributionText(entry.Status) + programText;
+                        return record.Student.DisplayName + ": " + DistributionText(entry.Status) + programText;
                     }));
                 }
             });
@@ -692,7 +692,7 @@ public sealed partial class TeacherWindow : Window
         var report = new TextBox { IsReadOnly = true, AcceptsReturn = true, MinHeight = 180, TextWrapping = TextWrapping.Wrap };
         advanced.Children.Add(Button("Verteilungsbericht anzeigen", () =>
         {
-            Ready(); var names = store!.Students().ToDictionary(s => s.Student.ExternalStudentId, s => s.Student.SyntheticDisplayName);
+            Ready(); var names = store!.Students().ToDictionary(s => s.Student.ExternalStudentId, s => s.Student.DisplayName);
             report.Text = string.Join(Environment.NewLine, store.DistributionLog().Reverse().Select(e => $"{e.At.LocalDateTime:g} · {names.GetValueOrDefault(e.StudentId, e.StudentId)} · Profilversion {e.ProfileRevision} · {DistributionText(e.Status)} · {e.Detail}"));
         }, "Zeigt alle Zustellversuche, die neuesten zuerst.")); advanced.Children.Add(report);
         profilePanel.Children.Add(new Expander { Header = "Einzelfälle: Profile einzeln erstellen/zustellen und Verteilungsbericht", Content = advanced, HorizontalAlignment = HorizontalAlignment.Stretch });
@@ -733,8 +733,8 @@ public sealed partial class TeacherWindow : Window
             foreach (var (selected, preview) in chosen)
             {
                 if (!selected) { remaining.Add(preview); continue; }
-                try { session!.Confirm(preview, true, conflict.IsChecked == true, reason.Text ?? ""); results.Add(preview.Student.Student.SyntheticDisplayName + ": übernommen"); }
-                catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { remaining.Add(preview); results.Add(preview.Student.Student.SyntheticDisplayName + ": " + ex.Message); errors.Add(ex.Message); }
+                try { session!.Confirm(preview, true, conflict.IsChecked == true, reason.Text ?? ""); results.Add(preview.Student.Student.DisplayName + ": übernommen"); }
+                catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { remaining.Add(preview); results.Add(preview.Student.Student.DisplayName + ": " + ex.Message); errors.Add(ex.Message); }
             }
             collections = remaining.ToImmutable(); conflict.IsChecked = false;
             SetInlineError(conflictErrorBox, conflictErrorText, errors.FirstOrDefault());
@@ -784,14 +784,14 @@ public sealed partial class TeacherWindow : Window
                     for (var i = 0; i < records.Length; i++)
                     {
                         var record = records[i];
-                        report(i, $"Räumen {i + 1} von {records.Length}: {record.Student.SyntheticDisplayName}");
+                        report(i, $"Räumen {i + 1} von {records.Length}: {record.Student.DisplayName}");
                         var accepted = dismissedConflicts.Where(k => k.StartsWith(record.Student.ExternalStudentId + ":", StringComparison.Ordinal))
                             .Select(k => k[(record.Student.ExternalStudentId.Length + 1)..]).ToHashSet();
                         results.Add(await Task.Run(() => StudentFolderCleanup.Clean(sql, record, actorName, accepted)));
                     }
                 });
                 finalConfirm.IsChecked = false;
-                var names = CurrentStudents().ToDictionary(s => s.Student.ExternalStudentId, s => s.Student.SyntheticDisplayName);
+                var names = CurrentStudents().ToDictionary(s => s.Student.ExternalStudentId, s => s.Student.DisplayName);
                 collectionResults.Children.Clear();
                 foreach (var r in results.OrderBy(r => r.Status == "geräumt"))
                     collectionResults.Children.Add(TableLine(names.GetValueOrDefault(r.StudentId, r.StudentId), r.StudentId, r.Status, r.Detail));

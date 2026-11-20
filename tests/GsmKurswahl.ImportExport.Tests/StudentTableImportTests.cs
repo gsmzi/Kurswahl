@@ -7,9 +7,8 @@ public class StudentTableImportTests
 {
     private static ImportOrigin Origin => new("demo.csv", "synthetic-hash", "v1", DateTimeOffset.UtcNow, "demo-beratung");
     [Theory]
-    [InlineData("accountId", "S-1-5-21-100-200-300-1")]
     [InlineData("home", "10a/Muster.Demo")]
-    public void DuplicateAccountIdsAndDirectoriesAreExcludedFromBatch(string field, string value)
+    public void DuplicateDirectoriesAreExcludedFromBatch(string field, string value)
     {
         var table = StudentTableImport.Csv($"studentId;name;class;year;username;{field}\ndemo-001;Demo Eins;10a;2029;DEMO\\test1;{value}\ndemo-002;Demo Zwei;10a;2029;DEMO\\test2;{value}");
         var rows = StudentTableImport.Preview(table, table.Headers.ToDictionary(h => h, h => h), Origin, "demo-beratung");
@@ -24,7 +23,7 @@ public class StudentTableImportTests
         var table = StudentTableImport.Csv("studentId;firstName;lastName;class;year;username;folder\ndemo-001;Demo;Muster;10a;2029;DEMO\\demo;" + folder);
         var row = StudentTableImport.Preview(table, table.Headers.ToDictionary(h => h, h => h), Origin, "demo-beratung").Single();
         if (error) Assert.NotEmpty(row.Error);
-        else { Assert.Empty(row.Error); Assert.Equal(expected, row.Candidate!.HomeDirectory); Assert.Equal("Demo Muster", row.Candidate.Student.SyntheticDisplayName); Assert.Equal(("Muster", "Demo"), row.Candidate.Student.SortName()); }
+        else { Assert.Empty(row.Error); Assert.Equal(expected, row.Candidate!.HomeDirectory); Assert.Equal("Demo Muster", row.Candidate.Student.DisplayName); Assert.Equal(("Muster", "Demo"), row.Candidate.Student.SortName()); }
     }
     [Fact]
     public void ShippedDemoImportsWithoutErrorsAndLeavesMappingUnconfirmed()
@@ -42,7 +41,7 @@ public class StudentTableImportTests
         var table = StudentTableImport.Csv("Kennung;Name;Klasse;Jahr;Konto;IMP\r\ndemo-001;\"Demo; Person\";10a;2029;DEMO\\test1;\r\ndemo-001;Demo Zwei;10a;2029;DEMO\\test2;ja");
         var mapping = new Dictionary<string, string> { ["studentId"] = "Kennung", ["name"] = "Name", ["class"] = "Klasse", ["year"] = "Jahr", ["username"] = "Konto", ["imp"] = "IMP" };
         var preview = StudentTableImport.Preview(table, mapping, Origin, "demo-beratung");
-        Assert.Equal("Demo; Person", preview[0].Candidate!.Student.SyntheticDisplayName);
+        Assert.Equal("Demo; Person", preview[0].Candidate!.Student.DisplayName);
         Assert.Equal(Knowledge.Unknown, preview[0].Candidate!.Student.Prerequisites.InformaticsImp);
         Assert.Equal(Knowledge.Yes, preview[1].Candidate!.Student.Prerequisites.InformaticsImp);
         Assert.All(preview, row => Assert.NotEmpty(row.Error)); Assert.False(preview[0].Candidate!.MappingConfirmed);

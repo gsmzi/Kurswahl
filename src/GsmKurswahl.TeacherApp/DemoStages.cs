@@ -142,7 +142,7 @@ public static class DemoStages
         if (id == "schueler-7-vorbildung-unbekannt") prerequisites = PriorEducation.Unknown;
         var data = Directory.CreateDirectory(StudentFolderLayout.Data(root)).FullName;
         var profile = new StudentProfile(SchemaVersions.Profile, 1, row.Choice.StudentId, "", catalog.GraduationYear, DateTimeOffset.UtcNow, prerequisites)
-        { DisplayName = row.Record.Student.SyntheticDisplayName, ClassName = row.Record.Student.ClassName };
+        { DisplayName = row.Record.Student.DisplayName, ClassName = row.Record.Student.ClassName };
         File.WriteAllBytes(Path.Combine(data, "profil.json"), JsonSerializer.SerializeToUtf8Bytes(profile, DocumentJson.Options));
         File.WriteAllBytes(Path.Combine(data, "fachangebot.json"), JsonSerializer.SerializeToUtf8Bytes(catalog, DocumentJson.Options));
         if (id == "schueler-3-fertig") DemoWorkspace.WriteChoice(root, row.Choice);

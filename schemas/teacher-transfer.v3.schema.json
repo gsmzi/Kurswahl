@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Lehrer-Netzwechsel v2 (transfer.json in .gsm-transfer ZIP)",
+  "title": "Lehrer-Netzwechsel v3 (Format 1.0) (transfer.json in .gsm-transfer ZIP)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,7 +11,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": 2
+      "const": 3
     },
     "createdAt": {
       "type": "string",

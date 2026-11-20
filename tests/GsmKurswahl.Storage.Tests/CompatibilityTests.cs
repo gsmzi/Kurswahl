@@ -14,7 +14,8 @@ namespace GsmKurswahl.Storage.Tests;
 
 /// <summary>
 /// Frozen file and database contracts. "current" fixtures pin the exact shape the program writes today: a renamed
-/// property, enum value or type fails here. "legacy" fixtures are historical files that must stay readable forever.
+/// property, enum value or type fails here. "legacy" fixtures are historical files that must stay readable forever (pupil formats; teacher-side formats start
+/// with version 1.0 on 20.11.2026 – development formats before 1.0 are rejected, see DATEIFORMAT.md).
 /// Never edit a legacy fixture; a structural change needs a new schema version, an upgrade and new fixtures.
 /// </summary>
 public sealed class CompatibilityTests : IDisposable
@@ -38,32 +39,31 @@ public sealed class CompatibilityTests : IDisposable
         SubmissionStatus.Draft, ElectionPhase.Preliminary, [new("D-LF", "D", CourseType.Lf, CourseVariant.Normal, [1, 2, 3, 4])], ["D", "NEU"]);
     private static StudentRecord Record => new(SchemaVersions.StudentRecord,
         new(G2, "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.ExpectedDeparture, Prior) { FirstName = "Demo", LastName = "Eins" },
-        "DEMO\\eins", "", @"C:\Demo\10a\Eins.Demo", true, 2, "demo-beratung", T, new("klasse10.csv", "ABC", "map-1", T, "DEMO\\beratung"));
+        "DEMO\\eins", @"C:\Demo\10a\Eins.Demo", true, 2, "demo-beratung", T, new("klasse10.csv", "ABC", "map-1", T, "DEMO\\beratung"));
     private static StudentProfile Profile => new(SchemaVersions.Profile, 2, "demo-001", "DEMO\\eins", 2029, T, Prior) { DisplayName = "Demo Eins", ClassName = "10a" };
     private static ChoiceRevision Revision => new(G3, G1, "demo-001", T, "demo-beratung", ActorRole.Teacher, RevisionSource.TeacherEdit, "Korrektur",
         "demo-2029-compat", "m2-2", Choice, [new("D-LF", [], [1, 2, 3, 4])], new("aktuell.json", "ABC", "m3-choice-v1", T, "DEMO\\eins"));
     private static TeacherYear Year => new(Catalog, @"C:\Demo\Abitur-2029\verwaltung.db", YearSetupStep.Complete, "demo-beratung")
     { SubmissionDeadline = new DateOnly(2027, 3, 15), StudentProgramDirectory = @"C:\Demo\Programm" };
 
-    public static TheoryData<string> CurrentNames() => ["choice-v2", "catalog-v3", "profile-v2", "student-record-v2", "revision", "issued-profile",
-        "distribution-entry", "planning-document", "transfer-receipt", "collected-file", "program-delivery", "student-deletion", "workspace-v2", "transfer-v2"];
+    public static TheoryData<string> CurrentNames() => ["choice-v2", "catalog-v3", "profile-v2", "student-record-v1", "revision", "issued-profile",
+        "distribution-entry", "planning-document", "collected-file", "program-delivery", "student-deletion", "workspace-v3", "transfer-v3"];
     private static object Current(string name) => name switch
     {
         "choice-v2" => Choice,
         "catalog-v3" => Catalog,
         "profile-v2" => Profile,
-        "student-record-v2" => Record,
+        "student-record-v1" => Record,
         "revision" => Revision,
-        "issued-profile" => new IssuedProfile(Profile, [1, 2, 3], []),
+        "issued-profile" => new IssuedProfile(Profile, [1, 2, 3]),
         "distribution-entry" => new DistributionEntry(G1, "demo-001", 2, T, "verteilt", "Einzelprofil verteilt"),
         "planning-document" => new PlanningDocument(1, G1, T, "Ausgangsstand", "demo-beratung", "m2-2", Catalog, [Record], [Revision],
             [new("demo-001", true, T.AddDays(7), "Nachwahl")], true, 20, true, G2),
-        "transfer-receipt" => new TransferReceipt(1, G1, "demo-001", G3, 2, "demo-2029-compat", "m2-2", T, "demo-beratung", true, "eingegeben"),
         "collected-file" => new CollectedFile(1, G1, "demo-001", T, "demo-beratung", "aktuell.json", StudentFolderCleanup.Token([123, 125]), [123, 125]),
         "program-delivery" => new ProgramDelivery(1, G1, "demo-001", T, "Kurswahl-Programm", [new("GsmKurswahl.StudentApp.exe", "AB")]),
         "student-deletion" => new StudentDeletion(1, G1, G2, T, "demo-beratung", "Schulwechsel", 7, 1),
-        "workspace-v2" => new TeacherWorkspaceDocument(TeacherWorkspace.CurrentSchema, 2029, [Year]),
-        "transfer-v2" => new TransferManifest(TeacherWorkspace.CurrentSchema, T, Year with { DatabasePath = "verwaltung.db" }, new string('A', 64)),
+        "workspace-v3" => new TeacherWorkspaceDocument(TeacherWorkspace.CurrentSchema, 2029, [Year]),
+        "transfer-v3" => new TransferManifest(TeacherWorkspace.CurrentSchema, T, Year with { DatabasePath = "verwaltung.db" }, new string('A', 64)),
         _ => throw new ArgumentException(name)
     };
 
@@ -157,37 +157,8 @@ public sealed class CompatibilityTests : IDisposable
         Assert.Equal(ProfileStatus.ProfileInvalid, new SignedProfileReader().Verify(
             Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(Legacy("profile-v1.json")).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 3")), "demo-001", 2029).Status);
         Directory.CreateDirectory(Path.Combine(root, "ws"));
-        File.WriteAllText(Path.Combine(root, "ws", "workspace.json"), "{\"schemaVersion\":3,\"activeYear\":null,\"years\":[]}");
+        File.WriteAllText(Path.Combine(root, "ws", "workspace.json"), "{\"schemaVersion\":4,\"activeYear\":null,\"years\":[]}");
         Assert.Throws<InvalidDataException>(() => new TeacherWorkspace(Path.Combine(root, "ws")));
-    }
-
-    [Fact]
-    public void LegacyWorkspaceV1OpensAndIsRewrittenOnlyOnChange()
-    {
-        var directory = Path.Combine(root, "ws"); Directory.CreateDirectory(directory);
-        var database = Path.Combine(directory, "Abitur-2029", "verwaltung.db");
-        using (new SqliteAdministrationStore(database)) { }
-        var legacy = Encoding.UTF8.GetString(Legacy("workspace-v1.json")).Replace("C:\\\\Demo\\\\Abitur-2029\\\\verwaltung.db", database.Replace("\\", "\\\\"));
-        File.WriteAllText(Path.Combine(directory, "workspace.json"), legacy);
-        var workspace = new TeacherWorkspace(directory);
-        Assert.Equal(2029, workspace.Active!.Catalog.GraduationYear);
-        Assert.Equal(SchemaVersions.Catalog, workspace.Active.Catalog.SchemaVersion);
-        Assert.Null(workspace.Active.SubmissionDeadline);
-        Assert.Equal(legacy, File.ReadAllText(Path.Combine(directory, "workspace.json")));
-        workspace.Update(workspace.Active with { SubmissionDeadline = new DateOnly(2027, 3, 1) });
-        Assert.Equal(TeacherWorkspace.CurrentSchema, JsonDocuments.SchemaVersionOf(File.ReadAllBytes(Path.Combine(directory, "workspace.json"))));
-        Assert.Equal(new DateOnly(2027, 3, 1), new TeacherWorkspace(directory).Active!.SubmissionDeadline);
-    }
-
-    [Fact]
-    public void LegacyTransferManifestV1StaysImportable()
-    {
-        var manifest = JsonSerializer.Deserialize<TransferManifest>(
-            typeof(TeacherWorkspace).GetMethod("UpgradeYears", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
-                .Invoke(null, [Legacy("transfer-v1.json"), "Transportdatei"]) as byte[], DocumentJson.Options)!;
-        Assert.Equal(TeacherWorkspace.CurrentSchema, manifest.SchemaVersion);
-        Assert.Equal("verwaltung.db", manifest.Year.DatabasePath);
-        Assert.Equal(SchemaVersions.Catalog, manifest.Year.Catalog.SchemaVersion);
     }
 
     [Fact]
@@ -198,57 +169,24 @@ public sealed class CompatibilityTests : IDisposable
         Assert.Equal(root, new TeacherWorkspaceLocation(settings).Load());
     }
 
-    private string LegacyDatabase()
+    private string SeededDatabase()
     {
-        var path = Path.Combine(root, "verwaltung-v3.db");
-        using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()))
-        {
-            connection.Open();
-            using var command = connection.CreateCommand();
-            command.CommandText = File.ReadAllText(Path.Combine(Fixtures(), "legacy", "administration-v3.sql"));
-            command.ExecuteNonQuery();
-        }
+        var path = Path.Combine(root, "verwaltung.db");
+        using var store = new SqliteAdministrationStore(path);
+        store.SaveStudent(Record with { Version = 1 }, null);
+        store.Append(Revision with { PreviousRevisionId = null }, null);
+        store.SetReselection("demo-001", true, T.AddDays(7), "Nachwahl");
+        store.SaveProfile(new IssuedProfile(Profile with { ProfileRevision = 1 }, [1, 2, 3]));
+        store.LogDistribution(new DistributionEntry(G1, "demo-001", 1, T, "verteilt", "Einzelprofil verteilt"));
+        store.SavePlanningDocument(new PlanningDocument(1, G1, T, "Ausgangsstand", "demo-beratung", "m2-2", Catalog, [Record with { Version = 1 }],
+            [Revision with { PreviousRevisionId = null }], [new("demo-001", true, T.AddDays(7), "Nachwahl")], true, 20, true, G2));
         return path;
-    }
-
-    [Fact]
-    public void LegacyDatabaseV3IsUpgradedWithoutChangingExistingRows()
-    {
-        var path = LegacyDatabase();
-        using (var store = new SqliteAdministrationStore(path))
-        {
-            var student = Assert.Single(store.Students());
-            Assert.Equal(SchemaVersions.StudentRecord, student.SchemaVersion);
-            Assert.Equal("", student.Student.FirstName);
-            Assert.Equal(2, store.StudentHistory("demo-001").Length);
-            var revision = Assert.Single(store.History("demo-001"));
-            Assert.Equal(SchemaVersions.Choice, revision.Snapshot.SchemaVersion);
-            Assert.True(store.Reselection("demo-001").Required);
-            Assert.Equal(SchemaVersions.Profile, store.LatestProfile("demo-001")!.Profile.SchemaVersion);
-            Assert.Equal("verteilt", Assert.Single(store.DistributionLog()).Status);
-            var planning = Assert.Single(store.PlanningDocuments());
-            Assert.Equal(SchemaVersions.Catalog, planning.Catalog.SchemaVersion);
-            Assert.Equal("demo-2029-plan", store.ActivePlanningCatalog()!.Version);
-            Assert.Single(store.TransferReceipts());
-            Assert.Empty(store.CollectedFiles("demo-001"));
-            Assert.Empty(store.Deletions());
-            // Current rules judge legacy revisions without a version-mismatch finding.
-            var session = new TeacherSession(store, TestData.WorkflowCatalog with { Version = "demo-2029-neu" }, "demo-beratung");
-            Assert.DoesNotContain(session.Overview().Single().Validation!.Messages, m => m.Rule.Id == "OFFER-VERSION");
-        }
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA user_version; ";
-        Assert.Equal(SqliteAdministrationStore.CurrentSchema, Convert.ToInt32(command.ExecuteScalar()));
-        command.CommandText = "SELECT body FROM students WHERE version=1";
-        Assert.Contains("\"schemaVersion\":1", ((string)command.ExecuteScalar()!).Replace(" ", ""));
     }
 
     [Fact]
     public void DeletingAStudentRemovesEveryTraceExceptAPersonFreeLogEntry()
     {
-        var path = LegacyDatabase();
+        var path = SeededDatabase();
         using var store = new SqliteAdministrationStore(path);
         var internalId = store.Students().Single().Student.Id;
         Assert.Throws<InvalidOperationException>(() => store.DeleteStudent("demo-001", Guid.NewGuid(), "demo-beratung", "Test"));
@@ -256,7 +194,7 @@ public sealed class CompatibilityTests : IDisposable
         var log = store.DeleteStudent("demo-001", internalId, "demo-beratung", "Schulwechsel");
         Assert.Empty(store.Students()); Assert.Empty(store.StudentHistory("demo-001")); Assert.Empty(store.History("demo-001"));
         Assert.False(store.Reselection("demo-001").Required); Assert.Null(store.LatestProfile("demo-001"));
-        Assert.Empty(store.DistributionLog()); Assert.Empty(store.TransferReceipts()); Assert.Empty(store.CollectedFiles("demo-001"));
+        Assert.Empty(store.DistributionLog()); Assert.Empty(store.CollectedFiles("demo-001"));
         var planning = Assert.Single(store.PlanningDocuments());
         Assert.Empty(planning.Students); Assert.Empty(planning.Choices);
         Assert.Equal(1, log.UpdatedPlanningSnapshots);

@@ -23,7 +23,7 @@ public sealed partial class TeacherWindow
         {
             Text = returning
                 ? "Nach dem abschließenden Einsammeln und der Klärung offener Konflikte im pädagogischen Netz den aktuellen Jahrgang als Transportdatei sichern. Im Verwaltungsnetz diese Datei öffnen und dort weiterarbeiten.\n\nWichtig nach dem Rückwechsel: Sobald die Transportdatei sicher im Verwaltungsnetz angekommen und dort geöffnet ist, das Lehrerprogramm im pädagogischen Netz schließen und den gesamten entpackten Paketordner (samt Programm, Transportdatei und lokalem Arbeitsstand) sowie die ZIP-Datei vollständig löschen."
-                : "Das Verteilen der Schülerdateien und das spätere Einsammeln finden im pädagogischen Netz statt – dort ist das Lehrerprogramm im Allgemeinen nicht vorinstalliert. Erstellen Sie deshalb hier im Verwaltungsnetz ein vollständiges Paket inkl. Programm (.zip) für das pädagogische Netz (oder alternativ nur die Transportdatei). Entpacken Sie das ZIP im pädagogischen Netz vollständig in einen lokalen Ordner und starten Sie „Lehrerprogramm starten.cmd“.",
+                : "Das Verteilen der Schülerdateien und das spätere Einsammeln finden im pädagogischen Netz statt – dort ist das Lehrerprogramm im Allgemeinen nicht vorinstalliert. Erstellen Sie deshalb hier im Verwaltungsnetz ein vollständiges Paket inkl. Programm (.zip) für das pädagogische Netz (oder alternativ nur die Transportdatei). Entpacken Sie das ZIP im pädagogischen Netz vollständig in einen eigenen Ordner im persönlichen Laufwerk (U:) und starten Sie „Lehrerprogramm starten.cmd“.",
             TextWrapping = TextWrapping.Wrap, Foreground = Muted, FontSize = 13
         });
         var actions = new WrapPanel { Orientation = Orientation.Horizontal };
@@ -87,7 +87,7 @@ public sealed partial class TeacherWindow
         var path = file?.TryGetLocalPath(); if (path is null) return;
         WorkspaceTransfer.Export(workspace!.Active! with { Catalog = session!.Catalog }, (SqliteAdministrationStore)store!, path);
         SetStatus(returning
-            ? $"Transportdatei für das Verwaltungsnetz gespeichert: {path}. Im Verwaltungsnetz öffnen; sobald sie dort sicher angekommen und geöffnet ist, Programm samt lokalem Arbeitsstand/Paketordner im pädagogischen Netz vollständig löschen."
+            ? $"Transportdatei für das Verwaltungsnetz gespeichert: {path}. Im Verwaltungsnetz öffnen; sobald sie dort sicher angekommen und geöffnet ist, Programm samt Arbeitsstand/Paketordner im pädagogischen Netz vollständig löschen."
             : $"Transportdatei gespeichert: {path}. Im anderen Netz im Lehrerprogramm über „Transportdatei öffnen …“ laden.",
             FeedbackKind.Success);
     }
@@ -130,7 +130,7 @@ public sealed partial class TeacherWindow
         };
         if (!result.TeacherSelfContained)
             extras.Add("Hinweis: Lehrerprogramm benötigt im Zielnetz eine installierte .NET-10-Desktop-Laufzeit");
-        SetStatus($"Paket für das pädagogische Netz gespeichert: {result.ArchivePath} ({string.Join("; ", extras)}). Im pädagogischen Netz vollständig in einen lokalen Ordner entpacken und „{PedagogicalTransferPackage.StarterFileName}“ starten.", FeedbackKind.Success);
+        SetStatus($"Paket für das pädagogische Netz gespeichert: {result.ArchivePath} ({string.Join("; ", extras)}). Im pädagogischen Netz vollständig in einen eigenen Ordner im persönlichen Laufwerk (U:) entpacken und „{PedagogicalTransferPackage.StarterFileName}“ starten.", FeedbackKind.Success);
     }
 
     private async Task ImportTransfer()

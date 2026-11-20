@@ -26,7 +26,7 @@ public sealed class CourseAnnotationWindowTests
             using (var store = workspace.OpenActive())
             {
                 store.SaveStudent(new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Muster, Demo", "10a", 2029,
-                    DepartureStatus.Active, PriorEducation.Unknown), "", "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+                    DepartureStatus.Active, PriorEducation.Unknown), "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
                 new TeacherSession(store, workspace.Active!.Catalog, "demo-beratung").Save(TestData.Choice with
                 { Selections = [TestData.Select(TestData.WorkflowCatalog.Offers.Single(o => o.Id == "BIO-LF"))] }, null, RevisionSource.StudentSubmission, "Demo-Abgabe");
                 var preview = CoursePlanning.PreviewCancellation(CoursePlanning.Capture(store, workspace.Active.Catalog, "demo-beratung", "Test", true), ["BIO-LF"]);

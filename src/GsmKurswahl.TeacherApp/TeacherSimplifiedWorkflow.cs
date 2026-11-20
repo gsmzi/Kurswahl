@@ -60,9 +60,8 @@ public sealed partial class TeacherWindow
                 var others = existingStudents.Where(s => s.Student.ExternalStudentId != candidate.Student.ExternalStudentId);
                 var candidateHome = candidate.HomeDirectory.Replace('\\', '/').TrimEnd('/');
                 if (others.Any(s => (!string.IsNullOrWhiteSpace(candidate.WindowsUsername) && string.Equals(s.WindowsUsername, candidate.WindowsUsername, StringComparison.OrdinalIgnoreCase))
-                    || (!string.IsNullOrWhiteSpace(candidate.AccountId) && string.Equals(s.AccountId, candidate.AccountId, StringComparison.OrdinalIgnoreCase))
                     || (candidateHome.Length > 0 && string.Equals(s.HomeDirectory.Replace('\\', '/').TrimEnd('/'), candidateHome, StringComparison.OrdinalIgnoreCase))))
-                    error = "Konto, SID oder Ordner bereits einer anderen Person im Bestand zugeordnet.";
+                    error = "Konto oder Ordner bereits einer anderen Person im Bestand zugeordnet.";
             }
             var difference = current is null || candidate is null ? "" : StudentImportService.Differences(current, candidate);
             var identicalSource = current?.Origin is { } origin && candidate?.Origin is { } incoming && origin.ContentHash == incoming.ContentHash && origin.MappingVersion == incoming.MappingVersion;
@@ -75,7 +74,7 @@ public sealed partial class TeacherWindow
             else if (statusText == "Korrektur behalten") countKeep++;
             else countDiff++;
             var detailText = error.Length > 0 ? error : identicalSource ? "Bereits importiert; Korrekturen bleiben" : manualCorrection ? $"Lehreränderung vorhanden ({difference}) · nur mit Häkchen überschreiben" : difference;
-            var line = TableLine(candidate?.Student.SyntheticDisplayName ?? $"Zeile {row.Row}", candidate?.Student.ClassName ?? "", statusText, detailText, box);
+            var line = TableLine(candidate?.Student.DisplayName ?? $"Zeile {row.Row}", candidate?.Student.ClassName ?? "", statusText, detailText, box);
             ToolTip.SetTip(line, candidate is null ? error : (current is null ? "" : "Bisher:\n" + Describe(current) + "\n\n") + "Import:\n" + Describe(candidate));
             rowsToRender.Add(new Border { Background = error.Length > 0 ? Brushes.MistyRose : difference.Length > 0 && !identicalSource ? Brushes.LemonChiffon : Brushes.Transparent, Child = line });
             if (candidate is not null && error.Length == 0) selected.Add((box, candidate, current?.Version));
@@ -96,7 +95,7 @@ public sealed partial class TeacherWindow
                     row.Box.IsChecked = false; row.Box.IsEnabled = false;
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
-                { failures.Add(row.Candidate.Student.SyntheticDisplayName + ": " + ex.Message); }
+                { failures.Add(row.Candidate.Student.DisplayName + ": " + ex.Message); }
             }
             Refresh(); importResults.Children.Clear();
             var doneStack = new StackPanel { Spacing = 8 };
@@ -189,14 +188,14 @@ public sealed partial class TeacherWindow
                 if (target.AvailableFolders.Length > 0)
                 {
                     var picker = new ComboBox { Name = "ChooseFolder_" + record.Student.ExternalStudentId, HorizontalAlignment = HorizontalAlignment.Stretch };
-                    Avalonia.Automation.AutomationProperties.SetName(picker, "Freien Ordner für " + record.Student.SyntheticDisplayName + " auswählen");
+                    Avalonia.Automation.AutomationProperties.SetName(picker, "Freien Ordner für " + record.Student.DisplayName + " auswählen");
                     manual.Add((record, picker, target.AvailableFolders.Select(p => new FolderOption(p)).ToArray(), state));
                     notes = new StackPanel { Spacing = 4, Children = { Text(target.Detail), picker } };
                 }
                 rows.Add((0, new Border
                 {
                     Background = Brush.Parse("#FCEBEB"),
-                    Child = TableLine(record.Student.SyntheticDisplayName, record.Student.ClassName, "Offen", target.Detail, notesControl: notes, stateControl: state)
+                    Child = TableLine(record.Student.DisplayName, record.Student.ClassName, "Offen", target.Detail, notesControl: notes, stateControl: state)
                 }));
                 continue;
             }
@@ -204,13 +203,13 @@ public sealed partial class TeacherWindow
             if (target.RequiresReview)
             {
                 review = new CheckBox { Name = "ConfirmFolder_" + record.Student.ExternalStudentId };
-                Avalonia.Automation.AutomationProperties.SetName(review, "Ordner für " + record.Student.SyntheticDisplayName + " bestätigt");
+                Avalonia.Automation.AutomationProperties.SetName(review, "Ordner für " + record.Student.DisplayName + " bestätigt");
                 ToolTip.SetTip(review, "Nur ankreuzen, wenn der vorgeschlagene Ordner zu dieser Person gehört.");
             }
             rows.Add((target.RequiresReview ? 1 : 2, new Border
             {
                 Background = target.RequiresReview ? Brush.Parse("#FAEEDA") : Brushes.Transparent,
-                Child = TableLine(record.Student.SyntheticDisplayName, record.Student.ClassName, target.RequiresReview ? "Vorschlag" : "Bereit", target.Path, review)
+                Child = TableLine(record.Student.DisplayName, record.Student.ClassName, target.RequiresReview ? "Vorschlag" : "Bereit", target.Path, review)
             }));
             prepared.Add((record with { HomeDirectory = target.Path }, review));
         }
@@ -242,7 +241,7 @@ public sealed partial class TeacherWindow
                 for (var i = 0; i < selected.Length; i++)
                 {
                     var record = selected[i];
-                    report(i, $"{i + 1} von {selected.Length}: {record.Student.SyntheticDisplayName}");
+                    report(i, $"{i + 1} von {selected.Length}: {record.Student.DisplayName}");
                     var (line, delivered) = await Task.Run(() => DistributeOne(service, record, root, actorName, catalog, program));
                     if (delivered) { count++; okReports.Add(line); } else issueReports.Add(line);
                 }
@@ -335,7 +334,7 @@ public sealed partial class TeacherWindow
         {
             var box = new CheckBox { IsChecked = selections.GetValueOrDefault(Key(preview), true) };
             conflictSelection.Add((box, preview));
-            collectionResults.Children.Add(TableLine(preview.Student.Student.SyntheticDisplayName + " (" + preview.Choice.StudentId + ")", preview.Student.Student.ClassName, "Konflikt", preview.Conflict, box));
+            collectionResults.Children.Add(TableLine(preview.Student.Student.DisplayName + " (" + preview.Choice.StudentId + ")", preview.Student.Student.ClassName, "Konflikt", preview.Conflict, box));
         }
         foreach (var message in messages) collectionResults.Children.Add(Text(message));
         if (conflictSection is not null) conflictSection.IsVisible = !collections.IsEmpty;
@@ -376,10 +375,10 @@ public sealed partial class TeacherWindow
                 var delivery = service.DeliverProgram(store.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId), program);
                 programText = delivery.Status == "verteilt" ? " · Programm bereitgestellt" : " · Programm: " + DistributionText(delivery.Status);
             }
-            return (current.Student.SyntheticDisplayName + ": " + result.Status + programText, result.Status == "verteilt");
+            return (current.Student.DisplayName + ": " + result.Status + programText, result.Status == "verteilt");
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException)
-        { return (record.Student.SyntheticDisplayName + ": " + ex.Message, false); }
+        { return (record.Student.DisplayName + ": " + ex.Message, false); }
     }
     /// <summary>
     /// Long file work with a visible progress bar in the footer. The window stays responsive but locked: navigation,
@@ -436,7 +435,7 @@ public sealed partial class TeacherWindow
                     activeSession.Confirm(preview, true, false, "Automatische Sammlung aus bestätigtem Schülerordner"); count++;
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or System.Text.Json.JsonException)
-                { if (session != activeSession || store != activeStore) return; messages.Add(record.Student.SyntheticDisplayName + ": " + ex.Message); }
+                { if (session != activeSession || store != activeStore) return; messages.Add(record.Student.DisplayName + ": " + ex.Message); }
             }
             collections = pending.ToImmutable();
             RenderCollectionStatus(count, messages);

@@ -10,7 +10,8 @@ public static class SchemaVersions
     public const int Choice = 2;
     public const int Catalog = 3;
     public const int Profile = 2;
-    public const int StudentRecord = 2;
+    // 1 (Version 1.0, 20.11.2026): without the former SID field accountId; displayName instead of syntheticDisplayName.
+    public const int StudentRecord = 1;
 }
 
 /// <summary>
@@ -41,11 +42,8 @@ public static class VersionedDocuments
             // (Zwischenstand 02.11.2026 tolerierte diese optional). Die Signaturfelder hatten keine Wirkung.
             [1] = e => e.Deserialize<ProfileV1>(DocumentJson.Plain)?.Upgrade(),
         }),
-        new VersionedConverter<StudentRecord>("Stammdaten", SchemaVersions.StudentRecord, r => r.SchemaVersion, new()
-        {
-            // v1: Schüler ohne firstName/lastName (Zwischenstand 02.11.2026 tolerierte sie optional).
-            [1] = e => e.Deserialize<StudentRecord>(DocumentJson.Plain) is { } v1 ? v1 with { SchemaVersion = SchemaVersions.StudentRecord } : null,
-        }),
+        // Stammdaten exist only inside the administration database (format 1.0); version 1 is the clean 1.0 baseline.
+        new VersionedConverter<StudentRecord>("Stammdaten", SchemaVersions.StudentRecord, r => r.SchemaVersion, new()),
     ];
 
     private sealed record OfferBeforeV3(string Id, string SubjectId, CourseType Type, CourseVariant Variant,

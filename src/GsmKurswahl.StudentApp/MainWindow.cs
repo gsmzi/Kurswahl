@@ -71,8 +71,8 @@ public sealed class MainWindow : Window
             Padding = new Thickness(0), MinHeight = 0, IsExpanded = false
         };
         Title = session.AllowSelfServicePrerequisites
-            ? "GSM-Kurswahl | Testversion (Selbstauskunft)"
-            : "GSM-Kurswahl | Schülerprogramm · Demo";
+            ? $"GSM-Kurswahl {ProgramVersion.Short} | Testversion (Selbstauskunft)"
+            : $"GSM-Kurswahl {ProgramVersion.Short} | Schülerprogramm · Demo";
         Width = 1440; Height = 900; MinWidth = 900; MinHeight = 600;
         WindowState = WindowState.Maximized;
         RequestedThemeVariant = ThemeVariant.Light;

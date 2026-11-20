@@ -52,12 +52,12 @@ public sealed class TeacherWorkspaceTests : IDisposable
     {
         Directory.CreateDirectory(root); var path = Path.Combine(root, "previous.db");
         using (var db = new SqliteAdministrationStore(path))
-            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         var workspace = new TeacherWorkspace(Path.Combine(root, "managed"));
         Assert.Throws<InvalidDataException>(() => workspace.Attach(TestData.Catalog with { GraduationYear = 2030 }, path, "demo-beratung"));
         workspace.Attach(TestData.Catalog, path, "demo-beratung");
         using var attached = new TeacherWorkspace(Path.Combine(root, "managed")).OpenActive();
-        Assert.Equal("Demo Eins", attached.Students().Single().Student.SyntheticDisplayName);
+        Assert.Equal("Demo Eins", attached.Students().Single().Student.DisplayName);
     }
     [Fact]
     public void LocationIsRememberedButMissingTargetDoesNotFallBackToEmptyState()
@@ -68,24 +68,43 @@ public sealed class TeacherWorkspaceTests : IDisposable
         Directory.Delete(other); Assert.Throws<DirectoryNotFoundException>(() => settings.Load());
     }
     [Fact]
-    public void Version2DatabaseUpgradesSeamlesslyToVersion3AndPreservesRecords()
+    public void DevelopmentDatabaseBeforeVersion1IsRejectedUnchanged()
     {
-        Directory.CreateDirectory(root); var path = Path.Combine(root, "v2.db");
-        using (var db = new SqliteAdministrationStore(path))
-            db.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown), "DEMO\\test1", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+        Directory.CreateDirectory(root); var path = Path.Combine(root, "alt.db");
         using (var raw = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()))
         {
             raw.Open(); using var cmd = raw.CreateCommand();
-            cmd.CommandText = "DROP TRIGGER IF EXISTS transfer_receipts_no_update; DROP TRIGGER IF EXISTS transfer_receipts_no_delete; DROP TABLE IF EXISTS transfer_receipts; PRAGMA user_version = 2;";
+            cmd.CommandText = "CREATE TABLE students (id TEXT NOT NULL, version INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(id,version)); PRAGMA user_version = 4;";
             cmd.ExecuteNonQuery();
         }
-        using (var upgraded = new SqliteAdministrationStore(path))
-        {
-            Assert.True(upgraded.PlanningEnabled);
-            Assert.True(upgraded.TransferTrackingEnabled);
-            Assert.Equal("Demo Eins", upgraded.Students().Single().Student.SyntheticDisplayName);
-        }
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        var before = File.ReadAllBytes(path);
+        var error = Assert.Throws<InvalidDataException>(() => new SqliteAdministrationStore(path));
+        Assert.Contains("vor Version 1.0", error.Message);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+    [Fact]
+    public void NewDatabaseCarriesFormatMarkerAndRollbackJournal()
+    {
+        Directory.CreateDirectory(root); var path = Path.Combine(root, "neu.db");
+        using (new SqliteAdministrationStore(path)) { }
+        using var raw = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
+        raw.Open();
+        long Pragma(string sql) { using var cmd = raw.CreateCommand(); cmd.CommandText = sql; return Convert.ToInt64(cmd.ExecuteScalar()); }
+        Assert.Equal(SqliteAdministrationStore.ApplicationId, Pragma("PRAGMA application_id"));
+        Assert.Equal(SqliteAdministrationStore.CurrentSchema, Pragma("PRAGMA user_version"));
+        using var journal = raw.CreateCommand(); journal.CommandText = "PRAGMA journal_mode";
+        Assert.Equal("delete", journal.ExecuteScalar());
+        Assert.Equal(0, Pragma("SELECT count(*) FROM sqlite_master WHERE name='transfer_receipts'"));
+    }
+    [Fact]
+    public void DevelopmentWorkspaceBeforeVersion1IsRejectedUnchanged()
+    {
+        Directory.CreateDirectory(root); var path = Path.Combine(root, "workspace.json");
+        const string text = "{\"schemaVersion\":2,\"activeYear\":null,\"years\":[]}";
+        File.WriteAllText(path, text);
+        var error = Assert.Throws<InvalidDataException>(() => new TeacherWorkspace(root));
+        Assert.Contains("vor Version 1.0", error.Message);
+        Assert.Equal(text, File.ReadAllText(path));
     }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

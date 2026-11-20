@@ -19,8 +19,6 @@ public sealed record PlanningAnalysis(int All, int ExpectedDepartures, int Confi
     ImmutableArray<OverlapRow> Overlaps);
 public interface IPlanningStore
 {
-    bool PlanningEnabled { get; }
-    void EnablePlanning();
     ImmutableArray<PlanningDocument> PlanningDocuments();
     void SavePlanningDocument(PlanningDocument document);
     OfferCatalog? ActivePlanningCatalog();

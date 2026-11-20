@@ -23,7 +23,7 @@ public sealed class PlanningTests : IDisposable
             var id = $"demo-{i:000}";
             var record = new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), id, "Demo " + i, "10a", 2029,
                 i == 1 ? DepartureStatus.Active : i == 2 ? DepartureStatus.ExpectedDeparture : DepartureStatus.ConfirmedDeparture,
-                PriorEducation.Unknown with { ContinuousBilingual = Knowledge.Yes }), "", "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
+                PriorEducation.Unknown with { ContinuousBilingual = Knowledge.Yes }), "", "", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
             store.SaveStudent(record, null);
             var choice = TestData.Choice with { StudentId = id, Selections = [TestData.Select(Catalog.Offers.Single(o => o.Id == (i == 1 ? "BIO-LF-BILI" : "BIO-LF"))), TestData.Select(Catalog.Offers.Single(o => o.Id == "M-LF"))] };
             new TeacherSession(store, Catalog, "demo-beratung").Save(choice, null, RevisionSource.StudentSubmission, "Demo-Abgabe");
@@ -40,7 +40,6 @@ public sealed class PlanningTests : IDisposable
         Assert.DoesNotContain(preview.Changes.Single(c => c.StudentId == "demo-001").Choice.Selections, s => s.OfferId == "BIO-LF-BILI");
         Assert.Contains(preview.Changes.Single(c => c.StudentId == "demo-002").Choice.Selections, s => s.OfferId == "BIO-LF");
         Assert.Equal(before, JsonSerializer.Serialize(store.History("demo-001"), DocumentJson.Options));
-        Assert.True(store.PlanningEnabled);
     }
     [Fact]
     public void DepartureFilterOnlyChangesPlanningNumbersAndGroupEstimate()
@@ -61,7 +60,7 @@ public sealed class PlanningTests : IDisposable
         Guid snapshotId;
         using (var store = new SqliteAdministrationStore(Database))
         {
-            Seed(store); store.EnablePlanning(); var basis = Capture(store); snapshotId = basis.Id;
+            Seed(store); var basis = Capture(store); snapshotId = basis.Id;
             var preview = CoursePlanning.PreviewCancellation(basis, ["BIO-LF-BILI"]);
             Assert.Throws<ArgumentException>(() => CoursePlanning.Confirm(store, preview, "demo-beratung", "Demo Streichung", false));
             CoursePlanning.Confirm(store, preview, "demo-beratung", "", true);
@@ -75,7 +74,6 @@ public sealed class PlanningTests : IDisposable
             Assert.Throws<InvalidOperationException>(() => CoursePlanning.Confirm(store, preview, "demo-beratung", "Doppelt", true));
         }
         using var reopened = new SqliteAdministrationStore(Database);
-        Assert.True(reopened.PlanningEnabled);
         Assert.Equal(OfferStatus.Cancelled, reopened.ActivePlanningCatalog()!.Offers.Single(o => o.Id == "BIO-LF-BILI").Status);
         Assert.Equal(snapshotId, reopened.PlanningDocuments().Single().Id);
         Assert.Contains(reopened.PlanningDocuments().Single().Choices.Single(c => c.StudentId == "demo-001").Snapshot.Selections, s => s.OfferId == "BIO-LF-BILI");
@@ -86,7 +84,7 @@ public sealed class PlanningTests : IDisposable
     [InlineData("followup")]
     public void StalePreviewRejectsEntireBatch(string changed)
     {
-        using var store = new SqliteAdministrationStore(Database); Seed(store); store.EnablePlanning();
+        using var store = new SqliteAdministrationStore(Database); Seed(store);
         var preview = CoursePlanning.PreviewCancellation(Capture(store), ["BIO-LF-BILI"]);
         var record = store.Students().Last();
         if (changed == "student") store.SaveStudent(record with { Version = 2, ChangedAt = DateTimeOffset.UtcNow }, 1);
@@ -98,7 +96,7 @@ public sealed class PlanningTests : IDisposable
     [Fact]
     public void MidTransactionFailureRollsBackAllRevisionsAndSnapshot()
     {
-        using var store = new SqliteAdministrationStore(Database); Seed(store); store.EnablePlanning();
+        using var store = new SqliteAdministrationStore(Database); Seed(store);
         var preview = CoursePlanning.PreviewCancellation(Capture(store), ["BIO-LF-BILI"]);
         var revisions = preview.Changes.Select(c => new ChoiceRevision(Guid.NewGuid(), c.ExpectedActive, c.StudentId, DateTimeOffset.UtcNow,
             "demo", ActorRole.Teacher, RevisionSource.OfferCancellation, "Test", preview.Catalog.Version, "m2-2", c.Choice, [], null)).ToImmutableArray();
@@ -109,7 +107,7 @@ public sealed class PlanningTests : IDisposable
     [Fact]
     public void SnapshotsAreImmutableAndUnknownSchemaIsRejected()
     {
-        using var store = new SqliteAdministrationStore(Database); Seed(store); store.EnablePlanning();
+        using var store = new SqliteAdministrationStore(Database); Seed(store);
         var snapshot = Capture(store); store.SavePlanningDocument(snapshot);
         Assert.ThrowsAny<Exception>(() => store.SavePlanningDocument(snapshot with { Name = "Überschreiben" }));
         Assert.Throws<InvalidDataException>(() => store.SavePlanningDocument(snapshot with { Id = Guid.NewGuid(), SchemaVersion = 99 }));
@@ -118,7 +116,7 @@ public sealed class PlanningTests : IDisposable
     [Fact]
     public void SavedScenarioKeepsActiveChoicesAndRestorationCreatesNewRevision()
     {
-        using var store = new SqliteAdministrationStore(Database); Seed(store); store.EnablePlanning();
+        using var store = new SqliteAdministrationStore(Database); Seed(store);
         var basis = Capture(store) with { TargetGroupSize = 17 };
         var preview = CoursePlanning.PreviewCancellation(basis, ["BIO-LF-BILI"]);
         store.SavePlanningDocument(basis);
@@ -139,7 +137,7 @@ public sealed class PlanningTests : IDisposable
     [Fact]
     public void CatalogChangeRequiresRedeliveryEvenWithSamePrerequisites()
     {
-        using var store = new SqliteAdministrationStore(Database); Seed(store); store.EnablePlanning();
+        using var store = new SqliteAdministrationStore(Database); Seed(store);
         var record = store.Students().First();
         record = record with { Version = 2, ChangedAt = DateTimeOffset.UtcNow, HomeDirectory = Path.Combine(root, "demo-home"), MappingConfirmed = true };
         Directory.CreateDirectory(record.HomeDirectory); store.SaveStudent(record, 1);
@@ -157,7 +155,7 @@ public sealed class PlanningTests : IDisposable
     {
         var fullCatalog = GsmKurswahl.Storage.JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "../../../../../samples/fachangebot-demo.json")));
         fullCatalog = fullCatalog with { Offers = [.. fullCatalog.Offers.Select(o => o.Id == "I-BF" ? o with { Status = OfferStatus.Offered } : o)] };
-        using var store = new SqliteAdministrationStore(Database); store.EnablePlanning();
+        using var store = new SqliteAdministrationStore(Database);
         var cohort = DemoCohort.Create(fullCatalog);
         // Pick one student with PSY-WF (extra 2 courses above 42) and one with BIO-LF-BILI.
         var psyStudent = cohort.First(c => c.Choice.Selections.Any(s => s.OfferId == "PSY-WF") && c.Choice.Selections.Sum(s => s.Semesters.Length) >= 44);

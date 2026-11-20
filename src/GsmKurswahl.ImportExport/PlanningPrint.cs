@@ -24,7 +24,7 @@ public static class PlanningPrint
             if (i > 0) pdf.StartStudent("Kontrollbogen - " + item.Student.Student.ExternalStudentId);
             pdf.Title("Kontrollbogen zur Kurswahl");
             pdf.Paragraph("Stand der Lehrerverwaltung · Abitur " + catalog.GraduationYear);
-            pdf.Paragraph(item.Student.Student.SyntheticDisplayName + "  |  Klasse " + item.Student.Student.ClassName + "  |  " + item.Student.Student.ExternalStudentId);
+            pdf.Paragraph(item.Student.Student.DisplayName + "  |  Klasse " + item.Student.Student.ClassName + "  |  " + item.Student.Student.ExternalStudentId);
             if (item.Choice is null) { pdf.Paragraph("Für diese Person liegt noch keine Kurswahl vor."); continue; }
             var table = item.Choice.Selections.OrderBy(s => s.Type).ThenBy(s => SubjectLabel(catalog, s.SubjectId), StringComparer.CurrentCulture).Select(s =>
             {
@@ -130,7 +130,7 @@ public static class PlanningPrint
         var remaining = item.Remaining;
         var removed = item.Removed;
         pdf.Title("Nachwahl zur Kurswahl");
-        pdf.Paragraph(student.Student.SyntheticDisplayName + "  |  Klasse " + student.Student.ClassName);
+        pdf.Paragraph(student.Student.DisplayName + "  |  Klasse " + student.Student.ClassName);
         if (removed.Length > 0)
         {
             pdf.Heading("Warum eine Nachwahl nötig ist");

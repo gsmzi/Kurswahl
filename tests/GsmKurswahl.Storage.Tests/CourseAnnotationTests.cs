@@ -50,20 +50,11 @@ public sealed class CourseAnnotationTests
 
     [Theory]
     [InlineData("catalog-v2.json")]
-    [InlineData("workspace-v2-catalog-v2.json")]
-    [InlineData("transfer-v2-catalog-v2.json")]
-    [InlineData("planning-document-catalog-v2.json")]
-    public void FrozenV2CatalogsIncludingNestedDocumentsStayReadable(string name)
+    public void FrozenV2CatalogStaysReadable(string name)
     {
         var path = Path.Combine(Path.GetDirectoryName(GetSourcePath())!, "Compatibility", "legacy", name);
         var bytes = File.ReadAllBytes(path);
-        OfferCatalog catalog = name switch
-        {
-            "catalog-v2.json" => JsonDocuments.ReadCatalog(bytes),
-            "workspace-v2-catalog-v2.json" => JsonSerializer.Deserialize<TeacherWorkspaceDocument>(bytes, DocumentJson.Options)!.Years.Single().Catalog,
-            "transfer-v2-catalog-v2.json" => JsonSerializer.Deserialize<TransferManifest>(bytes, DocumentJson.Options)!.Year.Catalog,
-            _ => JsonSerializer.Deserialize<PlanningDocument>(bytes, DocumentJson.Options)!.Catalog
-        };
+        var catalog = JsonDocuments.ReadCatalog(bytes);
         Assert.Equal(SchemaVersions.Catalog, catalog.SchemaVersion);
         Assert.All(catalog.Offers, o => { Assert.Equal(CooperationSchool.None, o.CooperationSchool); Assert.False(o.IsTopUpCourse); });
         Assert.Equal(bytes, File.ReadAllBytes(path));

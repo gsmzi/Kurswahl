@@ -154,7 +154,7 @@ public sealed partial class TeacherWindow
             var rowIndex = 0;
             foreach (var (change, student) in affected)
             {
-                var row = CompactLine(columns, [Text(student.Student.SyntheticDisplayName), Text(student.Student.ClassName),
+                var row = CompactLine(columns, [Text(student.Student.DisplayName), Text(student.Student.ClassName),
                     Text(string.Join(", ", change.RemovedOffers.Select(OfferLabel))), Text(PlanningPresentation.Choices(change.Choice, true)), Text(PlanningPresentation.Choices(change.Choice, false))]);
                 ToolTip.SetTip(row, string.Join("\n", change.Validation.Messages.Select(m => m.Explanation)));
                 impact.Children.Add(new Border { Child = row, Background = rowIndex++ % 2 == 0 ? RowAlt : Brushes.White });
@@ -283,7 +283,7 @@ public sealed partial class TeacherWindow
                 var violations = ChoiceOverview.Violations(change.Validation);
                 var consequence = Text(violations.IsEmpty ? "weiterhin ohne Regelverletzung" : "Nachwahl nötig: " + string.Join(" · ", violations));
                 consequence.Foreground = violations.IsEmpty ? Green : Red;
-                card.Children.Add(CompactLine(cancelColumns, [Text(student.Student.SyntheticDisplayName), Text(student.Student.ClassName), consequence]));
+                card.Children.Add(CompactLine(cancelColumns, [Text(student.Student.DisplayName), Text(student.Student.ClassName), consequence]));
             }
             cancelHost.Children.Add(new Border { Background = Brush.Parse("#FFF6E5"), BorderBrush = Brush.Parse("#E0B45A"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(14), Child = card });
             scroll.Offset = new Vector(0, 0);

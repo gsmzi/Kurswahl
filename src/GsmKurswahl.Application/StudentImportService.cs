@@ -6,9 +6,6 @@ public static class StudentImportService
 {
     private static StudentRecord KeepResolvedDirectory(StudentRecord current, StudentRecord candidate)
     {
-        if (!string.IsNullOrWhiteSpace(current.AccountId) && string.IsNullOrWhiteSpace(candidate.AccountId)
-            && string.Equals(current.WindowsUsername, candidate.WindowsUsername, StringComparison.OrdinalIgnoreCase))
-            candidate = candidate with { AccountId = current.AccountId };
         var relative = candidate.HomeDirectory.Replace('\\', '/');
         if (Path.IsPathFullyQualified(current.HomeDirectory) && !Path.IsPathRooted(candidate.HomeDirectory)
             && (relative.Length == 0 || (!relative.Split('/').Any(p => p is ".." or "." or "")
@@ -20,13 +17,13 @@ public static class StudentImportService
     {
         candidate = KeepResolvedDirectory(current, candidate);
         var differences = new List<string>();
-        if (current.Student.SyntheticDisplayName != candidate.Student.SyntheticDisplayName
+        if (current.Student.DisplayName != candidate.Student.DisplayName
             || current.Student.FirstName != candidate.Student.FirstName
             || current.Student.LastName != candidate.Student.LastName) differences.Add("Name");
         if (current.Student.ClassName != candidate.Student.ClassName) differences.Add("Klasse");
         if (current.Student.GraduationYear != candidate.Student.GraduationYear) differences.Add("Jahrgang");
         if (current.Student.Departure != candidate.Student.Departure) differences.Add("Abgängerstatus");
-        if (current.WindowsUsername != candidate.WindowsUsername || current.AccountId != candidate.AccountId) differences.Add("Konto/SID");
+        if (current.WindowsUsername != candidate.WindowsUsername) differences.Add("Konto");
         if (current.HomeDirectory != candidate.HomeDirectory) differences.Add("Ordner");
         if (System.Text.Json.JsonSerializer.Serialize(current.Student.Prerequisites, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(candidate.Student.Prerequisites, DocumentJson.Options)) differences.Add("Voraussetzungen");
         return string.Join(", ", differences);
@@ -51,7 +48,7 @@ public static class StudentImportService
         {
             Student = candidate.Student with { Id = current?.Student.Id ?? candidate.Student.Id },
             Version = (expectedVersion ?? 0) + 1,
-            MappingConfirmed = current?.MappingConfirmed == true && current.WindowsUsername == candidate.WindowsUsername && current.AccountId == candidate.AccountId && current.HomeDirectory == candidate.HomeDirectory
+            MappingConfirmed = current?.MappingConfirmed == true && current.WindowsUsername == candidate.WindowsUsername && current.HomeDirectory == candidate.HomeDirectory
         }, expectedVersion);
         return true;
     }

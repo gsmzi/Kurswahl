@@ -9,7 +9,7 @@ public class TeacherPrintTests
 {
     private static StudentRecord Record(int number) => new(SchemaVersions.StudentRecord,
         new(Guid.NewGuid(), $"demo-{number:000}", $"Testperson {number:000}, Demo", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown),
-        "", "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
+        "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
     private static CourseChoice Choice(int number) => TestData.Choice with
     {
         StudentId = $"demo-{number:000}", PlannedOralSubjects = ["D"],

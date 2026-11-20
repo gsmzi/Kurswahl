@@ -16,10 +16,10 @@ public sealed class ProfileDistribution(IAdministrationStore store)
         var previous = store.LatestProfile(record.Student.ExternalStudentId);
         var profile = new StudentProfile(SchemaVersions.Profile, (previous?.Profile.ProfileRevision ?? 0) + 1, record.Student.ExternalStudentId,
             record.WindowsUsername, record.Student.GraduationYear, DateTimeOffset.UtcNow, record.Student.Prerequisites)
-        { DisplayName = record.Student.SyntheticDisplayName, ClassName = record.Student.ClassName };
+        { DisplayName = record.Student.DisplayName, ClassName = record.Student.ClassName };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(profile, DocumentJson.Options);
         if (bytes.Length > 65536) throw new ArgumentException("Profil überschreitet 64 KiB.");
-        var issued = new IssuedProfile(profile, bytes, []);
+        var issued = new IssuedProfile(profile, bytes);
         store.SaveProfile(issued);
         return issued;
     }

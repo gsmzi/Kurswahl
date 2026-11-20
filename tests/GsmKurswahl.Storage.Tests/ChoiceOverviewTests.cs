@@ -17,7 +17,7 @@ public class ChoiceOverviewTests
             ReligionEthicsPermission = Knowledge.Yes, ReligionEthicsExamPermission = Knowledge.Yes };
         var record = new StudentRecord(SchemaVersions.StudentRecord,
             new(Guid.NewGuid(), $"demo-{number:000}", $"Testperson {number:000}, Demo", className, 2029, DepartureStatus.Active, prerequisites),
-            "", "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
+            "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
         if (offers is null) return new(record, null, null, reselection, null, "");
         var choice = TestData.Choice with { StudentId = record.Student.ExternalStudentId, OfferVersion = Catalog.Version, PlannedOralSubjects = [.. oral ?? ["BIO", "G"]],
             Selections = [.. offers.Where(id => id != withoutOffer).Select(id => TestData.Select(Catalog.Offers.Single(o => o.Id == id)))] };

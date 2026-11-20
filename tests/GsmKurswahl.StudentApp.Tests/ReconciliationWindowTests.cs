@@ -33,10 +33,10 @@ public sealed class ReconciliationWindowTests
         workspace.Update(workspace.Active! with { Step = YearSetupStep.Complete });
         using (var store = workspace.OpenActive())
         {
-            store.EnablePlanning();
-            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
-            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-002", "Demo Zwei", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
-            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-003", "Demo Drei", "10b", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+           
+            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-002", "Demo Zwei", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-003", "Demo Drei", "10b", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
 
             var session = new TeacherSession(store, catalog, "demo-test");
             session.Save(TestData.Choice with

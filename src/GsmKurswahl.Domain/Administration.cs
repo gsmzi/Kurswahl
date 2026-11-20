@@ -3,15 +3,17 @@ using System.Collections.Immutable;
 namespace GsmKurswahl.Domain;
 
 // Independent, versioned protected administrative records; never included in pupil choices.
+// WindowsUsername is the school account (folder suggestion and profile); HomeDirectory the confirmed personal folder.
 public sealed record StudentRecord(int SchemaVersion, AdministrativeStudent Student, string WindowsUsername,
-    string AccountId, string HomeDirectory, bool MappingConfirmed, int Version, string Actor,
+    string HomeDirectory, bool MappingConfirmed, int Version, string Actor,
     DateTimeOffset ChangedAt, ImportOrigin? Origin);
 public sealed record TeacherState(StudentRecord Record, ChoiceRevision? Active, ValidationResult? Validation,
     bool RequiresReselection, DateTimeOffset? ReselectionDeadline, string Note);
 public sealed record DistributionEntry(Guid Id, string StudentId, int ProfileRevision, DateTimeOffset At,
     string Status, string Detail);
-public sealed record IssuedProfile(StudentProfile Profile, byte[] ProfileBytes, byte[] SignatureBytes);
-// Database schema 4: byte-exact archive of pupil files before they are removed from a pupil folder.
+// The exact bytes written to the pupil folder; a redistribution compares against them.
+public sealed record IssuedProfile(StudentProfile Profile, byte[] ProfileBytes);
+// Byte-exact archive of pupil files before they are removed from a pupil folder.
 public sealed record CollectedFile(int SchemaVersion, Guid Id, string StudentId, DateTimeOffset At, string Actor,
     string FileName, string Sha256, byte[] Content);
 public sealed record DeliveredFile(string Path, string Sha256);

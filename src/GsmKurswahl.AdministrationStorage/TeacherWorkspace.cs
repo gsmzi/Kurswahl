@@ -5,7 +5,7 @@ using GsmKurswahl.Domain;
 
 namespace GsmKurswahl.AdministrationStorage;
 
-/// <summary>Versioned local workspace. Missing registered databases are errors, never empty replacements.</summary>
+/// <summary>Versioned workspace (local folder or network drive). Missing registered databases are errors, never empty replacements.</summary>
 public sealed class TeacherWorkspace
 {
     public static string DefaultRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GSM-Kurswahl", "Lehrerverwaltung");
@@ -17,39 +17,27 @@ public sealed class TeacherWorkspace
     public TeacherWorkspace(string root)
     {
         Root = Path.GetFullPath(root);
-        if (Root.StartsWith(@"\\", StringComparison.Ordinal) || new DriveInfo(Path.GetPathRoot(Root)!).DriveType == DriveType.Network)
-            throw new ArgumentException("Verwaltungsverzeichnis muss lokal liegen.");
+        // Local folder or network drive (home drive U: in the pedagogical network); workspace.json is replaced atomically.
         path = Path.Combine(Root, "workspace.json");
         var bytes = Read(path);
         Document = bytes is null ? new(CurrentSchema, null, []) : Parse(bytes);
         token = Token(bytes);
     }
-    public const int CurrentSchema = 2;
-    // v1 carried the former certificate fields of each year. They never had an effect and are dropped in memory;
-    // the file itself is only rewritten (as v2) by the next deliberate change.
-    internal static byte[] UpgradeYears(byte[] bytes, string container)
+    // 3 (Version 1.0, 20.11.2026): clean baseline for workspace.json and the .gsm-transfer manifest. Development
+    // formats before 1.0 (v1, v2) are rejected unchanged; they always referred to pre-1.0 databases.
+    public const int CurrentSchema = 3;
+    internal static byte[] RequireCurrent(byte[] bytes, string container)
     {
         var root = JsonNode.Parse(bytes, documentOptions: new() { MaxDepth = 32 }) as JsonObject ?? throw new InvalidDataException($"{container}: ungültiges JSON.");
         var version = root["schemaVersion"]?.GetValueKind() == JsonValueKind.Number ? root["schemaVersion"]!.GetValue<int>() : 0;
-        if (version is not (1 or CurrentSchema)) throw new InvalidDataException($"{container}: Schemaversion {version} wird nicht unterstützt; keine Migration.");
-        if (version == CurrentSchema) return bytes;
-        static void Strip(JsonNode? year)
-        {
-            if (year is not JsonObject value) return;
-            foreach (var legacy in new[] { "certificateThumbprint", "keyId" })
-            {
-                if (!value.ContainsKey(legacy) || value[legacy]?.GetValueKind() != JsonValueKind.String) throw new InvalidDataException("Jahrgangseintrag v1 unvollständig.");
-                value.Remove(legacy);
-            }
-        }
-        if (root["years"] is JsonArray years) foreach (var year in years) Strip(year);
-        if (root["year"] is { } single) Strip(single);
-        root["schemaVersion"] = CurrentSchema;
-        return JsonSerializer.SerializeToUtf8Bytes(root);
+        if (version is > 0 and < CurrentSchema)
+            throw new InvalidDataException($"{container} stammt aus einem Entwicklungsstand vor Version 1.0 und wird nicht übernommen. Datei bleibt unverändert; bitte neu anlegen.");
+        if (version != CurrentSchema) throw new InvalidDataException($"{container}: Schemaversion {version} wird nicht unterstützt; keine Migration.");
+        return bytes;
     }
     private static TeacherWorkspaceDocument Parse(byte[] bytes)
     {
-        var value = JsonSerializer.Deserialize<TeacherWorkspaceDocument>(UpgradeYears(bytes, "Jahrgangsverwaltung"), DocumentJson.Options) ?? throw new InvalidDataException("Leere Jahrgangsverwaltung.");
+        var value = JsonSerializer.Deserialize<TeacherWorkspaceDocument>(RequireCurrent(bytes, "Jahrgangsverwaltung"), DocumentJson.Options) ?? throw new InvalidDataException("Leere Jahrgangsverwaltung.");
         if (value.SchemaVersion != CurrentSchema || value.Years.IsDefault || (value.Years.Length > 0 && value.ActiveYear is null) || value.Years.Select(y => y.Catalog.GraduationYear).Distinct().Count() != value.Years.Length
             || (value.ActiveYear is not null && !value.Years.Any(y => y.Catalog.GraduationYear == value.ActiveYear)))
             throw new InvalidDataException("Unbekannte oder ungültige Jahrgangsverwaltung; keine automatische Migration.");

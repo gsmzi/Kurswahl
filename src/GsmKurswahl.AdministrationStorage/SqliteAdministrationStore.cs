@@ -5,78 +5,70 @@ using Microsoft.Data.Sqlite;
 
 namespace GsmKurswahl.AdministrationStorage;
 
-/// <summary>One local writer. SQLite transactions and immutable rows protect administrative history.</summary>
+/// <summary>
+/// One writer at a time (exclusive lease file, also across computers on a network share). SQLite transactions and
+/// append-only rows protect the administrative history. Format 1.0: the database carries the application id
+/// <see cref="ApplicationId"/>; development databases from before version 1.0 are rejected, never migrated.
+/// </summary>
 public sealed partial class SqliteAdministrationStore : IAdministrationStore, IPlanningStore
 {
-    // 4 (02.11.2026): archive of collected pupil files, program deliveries and the person-free deletion log.
-    public const int CurrentSchema = 4;
+    /// <summary>"GSKW": marks a GSM-Kurswahl administration database (format 1.0 and later).</summary>
+    public const int ApplicationId = 0x47534B57;
+    // 1 (Version 1.0, 20.11.2026): clean baseline. Later structural changes need a new number and an explicit upgrade.
+    public const int CurrentSchema = 1;
     internal static readonly string[] Tables = ["students", "revisions", "reselections", "profiles", "distributions", "planning_snapshots",
-        "planning_decisions", "transfer_receipts", "collected_files", "program_deliveries", "deletions"];
-    private const string Schema4Tables = """
-        CREATE TABLE IF NOT EXISTS collected_files (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS program_deliveries (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS deletions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+        "planning_decisions", "collected_files", "program_deliveries", "deletions"];
+    private const string Schema1 = """
+        CREATE TABLE students (id TEXT NOT NULL, version INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(id,version));
+        CREATE TABLE revisions (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, student TEXT NOT NULL, body TEXT NOT NULL);
+        CREATE TABLE reselections (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
+        CREATE TABLE profiles (student TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(student,revision));
+        CREATE TABLE distributions (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
+        CREATE TABLE planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
+        CREATE TABLE planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+        CREATE TABLE collected_files (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
+        CREATE TABLE program_deliveries (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
+        CREATE TABLE deletions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
+        CREATE INDEX revisions_student ON revisions(student);
+        CREATE INDEX reselections_student ON reselections(student);
+        CREATE INDEX distributions_student ON distributions(student);
+        CREATE INDEX collected_files_student ON collected_files(student);
+        CREATE INDEX program_deliveries_student ON program_deliveries(student);
         """;
     private readonly FileStream lease;
     private readonly SqliteConnection db;
     public SqliteAdministrationStore(string path)
     {
         path = Path.GetFullPath(path);
-        if (path.StartsWith(@"\\", StringComparison.Ordinal) || new DriveInfo(Path.GetPathRoot(path)!).DriveType == DriveType.Network)
-            throw new ArgumentException("Verwaltungsdatenbank muss lokal liegen; kein SMB/Netzlaufwerk.");
+        // Local folders and network drives (e.g. the home drive U: in the pedagogical network) are allowed. The exclusive
+        // lease below keeps a second program instance – also on another computer – away from the same database.
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         lease = new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
         try
         {
             db.Open();
-            var version = Convert.ToInt32(Scalar("PRAGMA user_version"));
-            if (version is < 0 or > CurrentSchema) throw new InvalidDataException("Verwaltungsschemaversion " + version + " stammt von einer neueren Programmversion; keine Migration.");
-            if (version == 0)
-            {
-                if (Convert.ToInt32(Scalar("SELECT count(*) FROM sqlite_master WHERE type='table'")) != 0)
-                    throw new InvalidDataException("Unversionierte Datenbank wird nicht verändert.");
-                Execute("""
-                    BEGIN IMMEDIATE;
-                    CREATE TABLE students (id TEXT NOT NULL, version INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(id,version));
-                    CREATE TABLE revisions (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, student TEXT NOT NULL, body TEXT NOT NULL);
-                    CREATE TABLE reselections (seq INTEGER PRIMARY KEY, student TEXT NOT NULL, body TEXT NOT NULL);
-                    CREATE TABLE profiles (student TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(student,revision));
-                    CREATE TABLE distributions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    CREATE TABLE planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
-                    CREATE TABLE planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    CREATE TABLE transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    """ + Schema4Tables + """
-                    PRAGMA user_version=4;
-                    COMMIT;
-                    """);
-            }
-            else if (version == 1)
-            {
-                Execute("""
-                    BEGIN IMMEDIATE;
-                    CREATE TABLE IF NOT EXISTS planning_snapshots (seq INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
-                    CREATE TABLE IF NOT EXISTS planning_decisions (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    CREATE TABLE IF NOT EXISTS transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    """ + Schema4Tables + """
-                    PRAGMA user_version=4;
-                    COMMIT;
-                    """);
-            }
-            else if (version is 2 or 3)
-            {
-                // Existing rows stay untouched; only missing empty tables are added.
-                Execute("""
-                    BEGIN IMMEDIATE;
-                    CREATE TABLE IF NOT EXISTS transfer_receipts (seq INTEGER PRIMARY KEY, body TEXT NOT NULL);
-                    """ + Schema4Tables + """
-                    PRAGMA user_version=4;
-                    COMMIT;
-                    """);
-            }
+            Check(db);
+            if (Convert.ToInt32(Scalar("SELECT count(*) FROM sqlite_master")) == 0)
+                Execute("BEGIN IMMEDIATE;" + Schema1 + $"PRAGMA application_id={ApplicationId}; PRAGMA user_version={CurrentSchema}; COMMIT;");
+            // Rollback journal instead of WAL: WAL needs shared memory and is unsafe on network drives.
+            Execute("PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL;");
             CreateAppendOnlyTriggers();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
+    }
+    /// <summary>Accepts an empty database or one in format 1.0; everything else is rejected unchanged.</summary>
+    internal static void Check(SqliteConnection connection)
+    {
+        static long Pragma(SqliteConnection c, string sql) { using var command = c.CreateCommand(); command.CommandText = sql; return Convert.ToInt64(command.ExecuteScalar()); }
+        var tables = Pragma(connection, "SELECT count(*) FROM sqlite_master");
+        var application = Pragma(connection, "PRAGMA application_id");
+        var version = Pragma(connection, "PRAGMA user_version");
+        if (tables == 0 && application == 0 && version == 0) return;
+        if (application != ApplicationId)
+            throw new InvalidDataException("Diese Verwaltungsdatei stammt aus einem Entwicklungsstand vor Version 1.0 oder ist keine GSM-Kurswahl-Datenbank. Sie wird nicht verändert; bitte einen neuen Jahrgang anlegen.");
+        if (version > CurrentSchema) throw new InvalidDataException("Verwaltungsschemaversion " + version + " stammt von einer neueren Programmversion. Bitte das Programm aktualisieren.");
+        if (version != CurrentSchema) throw new InvalidDataException("Unbekannte Verwaltungsschemaversion " + version + "; keine Migration.");
     }
     private void CreateAppendOnlyTriggers()
     {
@@ -109,7 +101,7 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
     {
         if (record.SchemaVersion != SchemaVersions.StudentRecord || record.Version != (expectedVersion ?? 0) + 1 || string.IsNullOrWhiteSpace(record.Actor)
             || !record.Student.ExternalStudentId.StartsWith("demo-", StringComparison.Ordinal) || record.Student.Id == Guid.Empty
-            || record.Student.GraduationYear is < 2000 or > 2200 || string.IsNullOrWhiteSpace(record.Student.SyntheticDisplayName)
+            || record.Student.GraduationYear is < 2000 or > 2200 || string.IsNullOrWhiteSpace(record.Student.DisplayName)
             || !Enum.IsDefined(record.Student.Departure))
             throw new ArgumentException("Ungültige Stammdaten; dieser Entwicklungsstand erlaubt nur synthetische demo-IDs.");
         ModelGuard.PriorEducation(record.Student.Prerequisites);
@@ -119,9 +111,8 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
         if (existing is not null && existing.Student.Id != record.Student.Id) throw new InvalidOperationException("Interne Schüler-ID darf nicht geändert werden.");
         var others = all.Where(s => s.Student.ExternalStudentId != record.Student.ExternalStudentId);
         if (others.Any(s => s.Student.Id == record.Student.Id || (!string.IsNullOrWhiteSpace(record.WindowsUsername) && string.Equals(s.WindowsUsername, record.WindowsUsername, StringComparison.OrdinalIgnoreCase))
-            || (!string.IsNullOrWhiteSpace(record.AccountId) && s.AccountId == record.AccountId)
             || (!string.IsNullOrWhiteSpace(record.HomeDirectory) && string.Equals(s.HomeDirectory.Replace('\\', '/').TrimEnd('/'), record.HomeDirectory.Replace('\\', '/').TrimEnd('/'), StringComparison.OrdinalIgnoreCase))))
-            throw new InvalidOperationException("Schüler-ID, Konto, SID oder Home bereits einer anderen Person zugeordnet.");
+            throw new InvalidOperationException("Schüler-ID, Konto oder Home bereits einer anderen Person zugeordnet.");
         using var tx = db.BeginTransaction();
         var current = Scalar("SELECT MAX(version) FROM students WHERE id=$p0", record.Student.ExternalStudentId);
         if ((current is null or DBNull ? (int?)null : Convert.ToInt32(current)) != expectedVersion) throw new InvalidOperationException("Stammdaten wurden inzwischen geändert.");
@@ -152,7 +143,7 @@ public sealed partial class SqliteAdministrationStore : IAdministrationStore, IP
         if (profile.Profile.ProfileRevision != (LatestProfile(profile.Profile.StudentId)?.Profile.ProfileRevision ?? 0) + 1) throw new InvalidOperationException("Profilrevision ist nicht fortlaufend.");
         Execute("INSERT INTO profiles VALUES($p0,$p1,$p2)", profile.Profile.StudentId, profile.Profile.ProfileRevision, Json(profile));
     }
-    public void LogDistribution(DistributionEntry entry) => Execute("INSERT INTO distributions(body) VALUES($p0)", Json(entry));
+    public void LogDistribution(DistributionEntry entry) => Execute("INSERT INTO distributions(student,body) VALUES($p0,$p1)", entry.StudentId, Json(entry));
     public ImmutableArray<DistributionEntry> DistributionLog() => Read<DistributionEntry>("SELECT body FROM distributions ORDER BY seq");
     public void Dispose() { db.Dispose(); lease.Dispose(); }
 }

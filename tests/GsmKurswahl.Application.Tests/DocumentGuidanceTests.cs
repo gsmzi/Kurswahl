@@ -17,7 +17,7 @@ public sealed class DocumentGuidanceTests
     private static StudentRecord Student(PriorEducation prerequisites) => new(
         SchemaVersions.StudentRecord,
         new(Guid.NewGuid(), "demo-012", "Testperson012, Demo", "10a", 2029, DepartureStatus.Active, prerequisites),
-        "", "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
+        "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
 
     private static void AssertJargonFree(string text)
     {

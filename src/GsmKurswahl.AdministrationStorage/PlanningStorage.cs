@@ -5,11 +5,6 @@ namespace GsmKurswahl.AdministrationStorage;
 
 public sealed partial class SqliteAdministrationStore
 {
-    // Since 28.10.2026 every administrative database is created directly with schema 3 (planning and
-    // transfer receipts included). Older databases only receive the missing empty tables on open.
-    public bool PlanningEnabled => Convert.ToInt32(Scalar("PRAGMA user_version")) >= 3;
-    public void EnablePlanning() { }
-    private void RequirePlanning() { if (!PlanningEnabled) throw new InvalidOperationException("Unbekannte Verwaltungsschemaversion."); }
     private static void ValidatePlanning(PlanningDocument document)
     {
         if (document.SchemaVersion != 1 || document.Id == Guid.Empty || document.CreatedAt == default || string.IsNullOrWhiteSpace(document.Name)
@@ -31,29 +26,28 @@ public sealed partial class SqliteAdministrationStore
     }
     public ImmutableArray<PlanningDocument> PlanningDocuments()
     {
-        RequirePlanning(); var documents = Read<PlanningDocument>("SELECT body FROM planning_snapshots ORDER BY seq");
+        var documents = Read<PlanningDocument>("SELECT body FROM planning_snapshots ORDER BY seq");
         foreach (var d in documents) ValidatePlanning(d);
         return documents;
     }
     public void SavePlanningDocument(PlanningDocument document)
     {
-        RequirePlanning(); ValidatePlanning(document);
+        ValidatePlanning(document);
         Execute("INSERT INTO planning_snapshots(id,body) VALUES($p0,$p1)", document.Id.ToString(), Json(document));
     }
     private sealed record PlanningDecision(int SchemaVersion, Guid Id, DateTimeOffset At, string Actor, string Reason, Guid BasisId, OfferCatalog Catalog);
     public OfferCatalog? ActivePlanningCatalog()
     {
-        if (!PlanningEnabled) return null;
         var decision = Read<PlanningDecision>("SELECT body FROM planning_decisions ORDER BY seq DESC LIMIT 1").FirstOrDefault();
         if (decision is null) return null;
         if (decision.SchemaVersion != 1) throw new InvalidDataException("Unbekanntes Planungsschema.");
         ModelGuard.Catalog(decision.Catalog); return decision.Catalog;
     }
-    public DateTimeOffset? PlanningCatalogChangedAt() => PlanningEnabled
-        ? Read<PlanningDecision>("SELECT body FROM planning_decisions ORDER BY seq DESC LIMIT 1").FirstOrDefault()?.At : null;
+    public DateTimeOffset? PlanningCatalogChangedAt() =>
+        Read<PlanningDecision>("SELECT body FROM planning_decisions ORDER BY seq DESC LIMIT 1").FirstOrDefault()?.At;
     public void SaveCourseAnnotations(OfferCatalog expected, OfferCatalog next, string actor)
     {
-        RequirePlanning(); ModelGuard.Catalog(next);
+        ModelGuard.Catalog(next);
         var withoutChanges = next with { Offers = [.. next.Offers.Select(o => expected.Offers.FirstOrDefault(e => e.Id == o.Id) is { } old
             ? o with { CooperationSchool = old.CooperationSchool, IsTopUpCourse = old.IsTopUpCourse } : o)] };
         if (string.IsNullOrWhiteSpace(actor) || Json(withoutChanges) != Json(expected))
@@ -69,7 +63,7 @@ public sealed partial class SqliteAdministrationStore
     public void CommitCancellation(CancellationPreview preview, string actor, string reason,
         ImmutableArray<ChoiceRevision> revisions, ImmutableArray<PlanningFollowUp> followUps)
     {
-        RequirePlanning(); ValidatePlanning(preview.Basis); ModelGuard.Catalog(preview.Catalog);
+        ValidatePlanning(preview.Basis); ModelGuard.Catalog(preview.Catalog);
         if (preview.Basis.IsScenario || string.IsNullOrWhiteSpace(actor) || string.IsNullOrWhiteSpace(reason) || revisions.Length != preview.Basis.Choices.Length
             || preview.Catalog.GraduationYear != preview.Basis.Catalog.GraduationYear || preview.Catalog.Version == preview.Basis.Catalog.Version)
             throw new ArgumentException("Ungültige Planungsbestätigung.");

@@ -35,7 +35,7 @@ public static class ChoiceOverview
     {
         var student = state.Record.Student;
         if (!string.IsNullOrWhiteSpace(filter.Text)
-            && !(student.SyntheticDisplayName + " " + student.ClassName + " " + student.ExternalStudentId).Contains(filter.Text.Trim(), StringComparison.OrdinalIgnoreCase)) return false;
+            && !(student.DisplayName + " " + student.ClassName + " " + student.ExternalStudentId).Contains(filter.Text.Trim(), StringComparison.OrdinalIgnoreCase)) return false;
         if (filter.ClassName is not null && student.ClassName != filter.ClassName) return false;
         if (filter.OfferId is not null && !(state.Active?.Snapshot.Selections.Any(s => s.OfferId == filter.OfferId
             && (filter.Semester is not { } h || s.Semesters.Contains(h))) ?? false)) return false;

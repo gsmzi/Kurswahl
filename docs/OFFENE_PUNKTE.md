@@ -161,3 +161,13 @@ Schülertexte am 28.10.2026 berichtigt: Die automatische Regelprüfung ist vorha
 
 - Das GSM-Grundverzeichnis liegt unter „Alle Klassen (M:) → Allgemein“. Vorbelegung und Namensvorschläge sind im [Verteilungsablauf](LEHRERVERWALTUNG.md#gemeinsame-verteilung-und-automatisches-einsammeln) beschrieben.
 - Offen bleibt der Schulnetz-Pilot mit einem berechtigten Lehrerkonto. Zu prüfen sind Laufwerkszuordnung, Lese-/Schreibrechte, Bestätigung der abweichenden Ordnernamen und Einsammeln über die gespeicherten Pfade.
+
+## Format 1.0, Betrieb auf U: und Aktualisierung (20.11.2026)
+
+- Umgesetzt (Nutzerentscheidung 20.11.2026): Lehrerseitige Datenformate neu als Format 1.0 ohne Rückwärtskompatibilität zu Entwicklungsständen (Datenbank mit Formatkennung, ohne Übertragungsvermerke, ohne SID-Feld und Signaturrest). Vorhandene Entwicklungs-/Testbestände lassen sich nicht mehr öffnen und müssen neu angelegt werden; Testpakete erzeugen ihre Stände ohnehin frisch.
+- Umgesetzt: Lokale Ordner der Stationen im pädagogischen Netz sind wegen Selbstheilung unbrauchbar. Verwaltungsbestand darf jetzt auf Netzlaufwerken liegen (Rollback-Journal, kein WAL); das Paket für das pädagogische Netz wird auf U: entpackt.
+- Offen (Pilot): SQLite auf U: bei Verbindungsabbruch, Abmeldung und Neustart der Station; Dauer von Verteilung/Einsammeln mit Datenbank auf U:; Kontingent auf U: (Paket inkl. Schülerprogramm ca. 200 MB).
+- Umgesetzt: Versionsnummer 1.0.x (automatisch aus `version.txt` und Commitzahl), Programmpaket `GSM-Kurswahl-<Version>.zip` mit `Aktualisieren.cmd` (siehe [BETRIEB.md](BETRIEB.md)).
+- Offen (Pilot): Ausführung von `Aktualisieren.cmd`/PowerShell-Skripten unter AppLocker; Schreibrechte der Lehrkraft auf den Programm-Stammordner.
+- Offen: Die Browser-Testversion zeigt keine Programmversion (eigenständige Webseite, unverändert).
+

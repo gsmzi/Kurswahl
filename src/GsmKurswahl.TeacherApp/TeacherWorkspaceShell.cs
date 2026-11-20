@@ -36,7 +36,7 @@ public sealed partial class TeacherWindow
     {
         explicitWorkspaceRoot = workspaceRoot;
         transferPackageDirectory = string.IsNullOrWhiteSpace(packageDirectory) ? null : Path.GetFullPath(packageDirectory);
-        Title = "GSM-Kurswahl | Lehrerverwaltung · M5"; Width = 1400; Height = 900; MinWidth = 900; MinHeight = 600;
+        Title = $"GSM-Kurswahl {ProgramVersion.Short} | Lehrerverwaltung"; Width = 1400; Height = 900; MinWidth = 900; MinHeight = 600;
         BuildVisualShell();
         // Split view: list on the left, the selected person on the right (no small bottom drawer).
         var people = new Grid { ColumnDefinitions = new ColumnDefinitions("*,16,1.3*") };
@@ -102,7 +102,7 @@ public sealed partial class TeacherWindow
         Intro(panel, "Gespeicherte Daten bleiben erhalten", ex.Message);
         panel.Children.Add(Text("Prüfen Sie Speicherort und Zugriffsrechte. Ein fehlender oder beschädigter Bestand wird nicht automatisch neu angelegt."));
         if (transferPackageDirectory is not null)
-            panel.Children.Add(Text("Hinweis für das pädagogische Netz: Entpacken Sie das ZIP-Paket vollständig in einen lokalen Ordner (nicht direkt im ZIP und nicht auf einem Netzlaufwerk als Arbeitsstand öffnen)."));
+            panel.Children.Add(Text("Hinweis für das pädagogische Netz: Entpacken Sie das ZIP-Paket vollständig in einen eigenen Ordner im persönlichen Laufwerk (U:) (nicht direkt im ZIP öffnen). Lokale Ordner der Stationen werden durch die Selbstheilung zurückgesetzt."));
         var actions = new WrapPanel { Orientation = Orientation.Horizontal };
         var retry = Primary(Button("Erneut versuchen", LoadWorkspace)); retry.Margin = new Thickness(0, 0, 8, 6);
         actions.Children.Add(retry);
@@ -502,6 +502,9 @@ public sealed partial class TeacherWindow
             actorRow.Children.Add(Button("Bearbeiter speichern", () => { workspace.Update(active with { Actor = editor.Text?.Trim() ?? "" }); OpenActiveYear(); }));
             mainStack.Children.Add(Labeled("Bearbeiterkennung", actorRow, "Name oder Kürzel für alle neu gespeicherten Änderungen im Änderungsprotokoll."));
         }
+        var versionText = Text($"Programmversion {ProgramVersion.Full} · Programmordner {AppContext.BaseDirectory}");
+        versionText.Name = "ProgramVersionText";
+        mainStack.Children.Add(versionText);
         settingsPanel.Children.Add(Surface(mainStack, 14));
 
         var transferStack = new StackPanel { Spacing = 8 };

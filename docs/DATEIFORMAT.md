@@ -56,6 +56,8 @@ Verwaltungsdatenbank: optionale, ausdrücklich ausgelöste Erweiterung 2 → 3 m
 
 Ersetzt die früheren Aussagen „ältere Schemaversion wird abgewiesen, keine Migration“. Ziel: Spätere Programmversionen öffnen alle bestehenden Projekte und Schülerdateien.
 
+**Neubeginn der Lehrerseite mit Format 1.0 (Nutzerentscheidung 20.11.2026, vor Produktivbetrieb):** Für Verwaltungsdatenbank, Stammdatensätze, `workspace.json` und `.gsm-transfer` gilt der Vertrag ab dem Format 1.0 (siehe Abschnitt unten). Entwicklungsstände davor werden mit Hinweis abgewiesen und nicht verändert. Die Schülerformate (Wahl, Fachangebot, Profil, Einstellungen) sind davon unberührt und bleiben einschließlich ihrer Altversionen lesbar.
+
 **Regeln**
 - Jede veröffentlichte Schemaversion bleibt lesbar. Ältere Versionen werden beim Einlesen **im Speicher** in die aktuelle Version umgewandelt (`VersionedDocuments` in `GsmKurswahl.Domain`). Die Datei bzw. der Datenbankeintrag bleibt dabei unverändert.
 - Geschrieben wird ausschließlich die aktuelle Version. Eine Schülerdatei wird erst beim nächsten Speichern im aktuellen Format geschrieben; die vorherige Datei bleibt als `.bak`. Das Schülerprogramm meldet die Umwandlung sichtbar. Append-only-Zeilen der Lehrerdatenbank werden nie umgeschrieben.
@@ -71,22 +73,22 @@ Ersetzt die früheren Aussagen „ältere Schemaversion wird abgewiesen, keine M
 | Schülerwahl `aktuell.json` | 2 | 1, 2 | v1 ohne `plannedOralSubjects` → leere Liste |
 | Fachangebot `fachangebot.json` / eingebettete Kataloge | 3 | 1, 2, 3 | v3: beschreibende Angebotsmerkmale `cooperationSchool`, `isTopUpCourse`; v2-Fachmerkmale und `submissionDeadline` bleiben erhalten |
 | Profil `profil.json` | 2 | 1, 2 | v2: `displayName`, `className`; entfallen: `keyId`, `accountId` (wirkungslose Reste der Signatur) |
-| Stammdatensatz (Lehrer-DB) | 2 | 1, 2 | v2: optionale `firstName`, `lastName` |
-| `workspace.json`, Transportmanifest `.gsm-transfer` | 2 | 1, 2 | v2: je Jahrgang optional `submissionDeadline`, `studentProgramDirectory`; entfallen: `certificateThumbprint`, `keyId` |
-| Lehrerdatenbank `verwaltung.db` | 4 | 1–4 | 4: Tabellen `collected_files`, `program_deliveries`, `deletions`; ältere Datenbanken erhalten nur die fehlenden leeren Tabellen |
-| `location.json`, Planungsstand, Übertragungsvermerk | 1 | 1 | unverändert |
+| Stammdatensatz (Lehrer-DB) | 1 | 1 | Format 1.0: `displayName` (statt `syntheticDisplayName`), ohne `accountId` (SID) |
+| `workspace.json`, Transportmanifest `.gsm-transfer` | 3 | 3 | Format 1.0; v1/v2 (Entwicklungsstand) werden abgewiesen |
+| Lehrerdatenbank `verwaltung.db` | 1 (mit `application_id` „GSKW“) | 1 | Format 1.0; Datenbanken ohne Kennung (Entwicklungsschema 1–4) werden abgewiesen |
+| `location.json`, Planungsstand | 1 | 1 | unverändert; Übertragungsvermerke entfallen mit Format 1.0 |
 
 Die Zwischenstände vom 02.11.2026 (optionale neue Felder bereits in v1-Dateien) werden toleriert und als v1 gelesen.
 
 **Lehrerprüfung nach Versionswechsel:** Das Lehrerprogramm bewertet gespeicherte Wahlen stets mit dem aktuellen Angebot und Regelstand. Die bei einer Revision gespeicherte Angebots-/Regelversion dokumentiert die Herkunft; eine ältere Versionskennung allein ergibt keinen `OFFER-VERSION`-Befund und keine Nachwahl mehr.
 
-**Datenbank Schema 4**
+**Datenbanktabellen (seit Format 1.0 Teil des Grundschemas)**
 - `collected_files`: byte-genaue Kopie (mit SHA-256) jeder Datei, die beim abschließenden Einsammeln aus einem Wahlordner entfernt wird.
 - `program_deliveries`: Liste der vom Lehrerprogramm in einen Wahlordner kopierten Programmdateien mit Prüfsumme; nur diese unveränderten Dateien werden später entfernt.
 - `deletions`: Löschprotokoll ohne Name und Schüler-ID (nur interne Kennung, Bearbeiter, Grund, Anzahl).
 - Die Append-only-Sperren gelten für alle Tabellen. Einzige Ausnahme ist die ausdrücklich bestätigte Löschfunktion; sie hebt die Sperre nur innerhalb ihrer Transaktion auf.
 
-Entfernt: `profile-trust.json`, `schemas/profile-signature.v1.schema.json` und die zugehörigen Modelltypen (Signaturkonzept seit 27.10.2026 aufgegeben). In der Lehrerdatenbank bleibt das stets leere Feld `signatureBytes` der Profilzeilen erhalten, weil die Zeilen unveränderlich sind.
+Entfernt: `profile-trust.json`, `schemas/profile-signature.v1.schema.json` und die zugehörigen Modelltypen (Signaturkonzept seit 27.10.2026 aufgegeben). Mit Format 1.0 entfällt auch das stets leere Feld `signatureBytes` der Profilzeilen.
 
 ## Schulvorgaben v1 (02.11.2026)
 
@@ -97,3 +99,15 @@ Neue, eigenständige Konfigurationsdatei `schulvorgaben.json` neben dem Lehrerpr
 Schema `schemas/offer-catalog.v3.schema.json`: je Angebot neue Pflichtfelder `cooperationSchool` (`none`, `ewg`, `gsm`) und `isTopUpCourse` (Boolean). Bestehende Kataloge v1/v2 erhalten beim Lesen ausschließlich im Speicher `none`/`false`. Geschrieben wird nur v3. Die Angebotsversion bleibt bei reinen Markierungsänderungen gleich; Markierungen verändern keine Wahl, Regel oder Kurszählung. Katalogversionen ab v4, fehlende v3-Pflichtfelder und unbekannte Standorte werden abgewiesen.
 
 Eingebettete Kataloge verwenden dieselbe Umwandlung; Workspace/Transport bleiben v2 und Planungsdokumente v1, da ihre eigene Struktur unverändert ist. Die entsprechenden Schemavarianten und eingefrorenen Altdateien sind ergänzt. Neue Markierungen nach einer Kursstreichung werden als vollständiger Katalog-Snapshot append-only gespeichert, ohne neue Schülerrevision. Bedienung, Ressourcen und Layout: [Schulvorlage](SCHULVORLAGE.md).
+
+## Format 1.0 der Lehrerseite (20.11.2026)
+
+Nutzerentscheidung vor dem Produktivbetrieb: Rückwärtskompatibilität zu Entwicklungsständen der Lehrerseite ist nicht nötig; Altlasten werden entfernt. Ab hier gilt der Kompatibilitätsvertrag oben wieder vollständig.
+
+- **Verwaltungsdatenbank:** genau ein Grundschema mit `PRAGMA application_id = 0x47534B57` („GSKW“) und `user_version = 1`. Tabellen: `students`, `revisions`, `reselections`, `profiles`, `distributions` (jetzt mit Spalte `student`), `planning_snapshots`, `planning_decisions`, `collected_files`, `program_deliveries`, `deletions` sowie Indizes auf die Schülerspalten. Entfallen: `transfer_receipts`, alle Erweiterungspfade von Schema 1–4, `PlanningEnabled`/`EnablePlanning`. Leere Datei → Grundschema; fremde oder ältere Datenbank → Hinweis „Entwicklungsstand vor Version 1.0“, Datei bleibt unverändert.
+- **Journal:** `journal_mode=DELETE`, `synchronous=FULL` (kein WAL, da WAL auf Netzlaufwerken nicht sicher ist). Damit darf der Bestand auf dem persönlichen Laufwerk U: im pädagogischen Netz liegen. Gleichzeitiger Zugriff bleibt ausgeschlossen: exklusive Begleitsperre `verwaltung.db.lock` und Startsperre des Lehrerprogramms, auch über Rechnergrenzen.
+- **Stammdatensatz v1:** `displayName` statt `syntheticDisplayName`; ohne `accountId` (SID). Kontozuordnung nur noch über `windowsUsername` und den bestätigten Ordner.
+- **Ausgestelltes Profil:** nur Profil und exakte Bytes, ohne `signatureBytes`.
+- **`workspace.json` und Transportmanifest v3:** Struktur wie v2; v1/v2 werden abgewiesen. Schemata `teacher-workspace.v3`, `teacher-transfer.v3`; v1/v2-Schemata und Altfixtures der Lehrerseite entfernt.
+- Unverändert: Schülerwahl v2 (liest v1), Fachangebot v3 (liest v1/v2), Profil v2 (liest v1), Einstellungen v2, Schulvorgaben v1, `location.json` v1.
+

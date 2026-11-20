@@ -72,7 +72,7 @@ public static class DemoCohort
             if (errors.Length > 0) throw new InvalidOperationException(id + ": " + string.Join("; ", errors.Select(m => m.Rule.Id + " " + m.Explanation)));
             var departure = index % 20 == 19 ? DepartureStatus.ConfirmedDeparture : index % 20 >= 17 ? DepartureStatus.ExpectedDeparture : DepartureStatus.Active;
             var record = new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), id, $"Testperson {number:000}, Demo", "10" + (char)('a' + index / 20),
-                catalog.GraduationYear, departure, prerequisites), "", "", "", false, 1, "demo-generator", time, null);
+                catalog.GraduationYear, departure, prerequisites), "", "", false, 1, "demo-generator", time, null);
             result.Add(new(record, choice));
         }
         return result.ToImmutable();

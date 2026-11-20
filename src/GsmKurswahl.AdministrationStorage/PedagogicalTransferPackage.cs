@@ -257,10 +257,12 @@ public static class PedagogicalTransferPackage
         sb.AppendLine($"({transferEntryName})" + (studentIncluded ? " und das selbstenthaltende Schülerprogramm." : "."));
         sb.AppendLine();
         sb.AppendLine("Ablauf im pädagogischen Netz:");
-        sb.AppendLine("1. Dieses ZIP-Paket vollständig in einen LOKALEN Ordner im pädagogischen Netz entpacken");
-        sb.AppendLine("   (nicht direkt aus dem ZIP starten und keinen reinen Netzlaufwerk-Ordner als Arbeitsstand verwenden).");
+        sb.AppendLine("1. Dieses ZIP-Paket vollständig in einen eigenen Ordner im persönlichen Laufwerk U: entpacken,");
+        sb.AppendLine("   z. B. U:\\Kurswahl-Verteilung (nicht direkt aus dem ZIP starten). Lokale Ordner der Stationen");
+        sb.AppendLine("   eignen sich nicht, weil die Selbstheilung sie beim Neustart zurücksetzt. Nur ein Lehrerprogramm");
+        sb.AppendLine("   gleichzeitig öffnen; die Startsperre verhindert einen zweiten Start.");
         sb.AppendLine($"2. \"{StarterFileName}\" starten.");
-        sb.AppendLine($"3. Den angezeigten Transportstand prüfen und übernehmen (lokaler Ordner \"{WorkspaceFolderName}\" entsteht automatisch).");
+        sb.AppendLine($"3. Den angezeigten Transportstand prüfen und übernehmen (Ordner \"{WorkspaceFolderName}\" entsteht automatisch im Paketordner).");
         sb.AppendLine("4. Im pädagogischen Netz das vorbelegte Grundverzeichnis der Klassenordner prüfen oder eines auswählen.");
         sb.AppendLine("   Zielordner prüfen, abweichende Namensvorschläge einzeln bestätigen und Schülerdateien verteilen.");
         sb.AppendLine("   Bei offenen Zuordnungen lässt sich ein freier Ordner derselben Klasse auswählen.");
@@ -270,7 +272,7 @@ public static class PedagogicalTransferPackage
         sb.AppendLine("6. WICHTIG - AUFRÄUMEN IM PÄDAGOGISCHEN NETZ:");
         sb.AppendLine("   Sobald die Rück-Transportdatei sicher im Verwaltungsnetz angekommen und dort erfolgreich geöffnet ist:");
         sb.AppendLine($"   - Lehrerprogramm im pädagogischen Netz schließen,");
-        sb.AppendLine($"   - den gesamten entpackten Paketordner (samt {TeacherFolderName}, {TransferFolderName}" + (studentIncluded ? $", {StudentFolderName}" : "") + $" und lokalem {WorkspaceFolderName})");
+        sb.AppendLine($"   - den gesamten entpackten Paketordner (samt {TeacherFolderName}, {TransferFolderName}" + (studentIncluded ? $", {StudentFolderName}" : "") + $" und {WorkspaceFolderName})");
         sb.AppendLine("     sowie die übertragene ZIP-Datei im pädagogischen Netz vollständig löschen.");
         if (!studentIncluded || !teacherSelfContained)
         {

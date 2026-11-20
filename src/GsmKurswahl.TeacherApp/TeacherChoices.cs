@@ -98,7 +98,7 @@ public sealed partial class TeacherWindow
                 var record = state.Record; var id = record.Student.ExternalStudentId;
                 var choice = state.Active?.Snapshot;
                 var religion = ReligionCases.For(state);
-                var name = new Button { Name = "ResultOpen_" + id, Content = record.Student.SyntheticDisplayName, Padding = new Thickness(4, 1), MinHeight = 24, Background = Brushes.Transparent,
+                var name = new Button { Name = "ResultOpen_" + id, Content = record.Student.DisplayName, Padding = new Thickness(4, 1), MinHeight = 24, Background = Brushes.Transparent,
                     HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, FontWeight = id == choiceSelectedId ? FontWeight.SemiBold : FontWeight.Normal };
                 ToolTip.SetTip(name, id + " · Kurswahl dieser Person anzeigen und bearbeiten");
                 name.Click += (_, _) => { choiceSelectedId = id; Render(); };
@@ -123,7 +123,7 @@ public sealed partial class TeacherWindow
                         Refresh(preserveEditor: true);
                         if (detail.GetLogicalDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "ChoiceSave")?.IsEnabled != true)
                             Render();
-                        SetStatus(record.Student.SyntheticDisplayName + ": Abgängerstatus gespeichert. Kursplanung berücksichtigt die Änderung.", FeedbackKind.Success);
+                        SetStatus(record.Student.DisplayName + ": Abgängerstatus gespeichert. Kursplanung berücksichtigt die Änderung.", FeedbackKind.Success);
                     }
                     catch (Exception ex)
                     {
@@ -182,7 +182,7 @@ public sealed partial class TeacherWindow
         var panel = new StackPanel { Spacing = 8, Margin = new Thickness(4, 0, 8, 0) };
         var titleRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
         var titleWrap = new WrapPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        titleWrap.Children.Add(new TextBlock { Name = "ChoiceEditorTitle", Text = $"{record.Student.SyntheticDisplayName} · Klasse {record.Student.ClassName}", FontSize = 18, FontWeight = FontWeight.SemiBold, Foreground = Ink, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center });
+        titleWrap.Children.Add(new TextBlock { Name = "ChoiceEditorTitle", Text = $"{record.Student.DisplayName} · Klasse {record.Student.ClassName}", FontSize = 18, FontWeight = FontWeight.SemiBold, Foreground = Ink, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center });
         var dirtyBadge = new Border
         {
             Name = "ChoiceDirtyBadge", Background = YellowSoft, BorderBrush = Brush.Parse("#C48723"), BorderThickness = new Thickness(1),
@@ -351,7 +351,7 @@ public sealed partial class TeacherWindow
                 var closed = false;
                 if (state.RequiresReselection && closeFollowUp.IsChecked == true && validation.Status != ReviewStatus.Invalid) { session.FollowUp(id, false, null, text); closed = true; }
                 Refresh(preserveEditor: true);
-                SetStatus(record.Student.SyntheticDisplayName + ": Kurswahl als neuer Stand gespeichert" + (closed ? "; Nachwahl abgeschlossen." : ".")
+                SetStatus(record.Student.DisplayName + ": Kurswahl als neuer Stand gespeichert" + (closed ? "; Nachwahl abgeschlossen." : ".")
                     + (validation.Status == ReviewStatus.Invalid ? " Es bestehen weiterhin Regelverletzungen." : ""),
                     validation.Status == ReviewStatus.Invalid ? FeedbackKind.Warning : FeedbackKind.Success);
                 reload();
@@ -406,7 +406,7 @@ public sealed partial class TeacherWindow
     }
 
     internal byte[] OverviewPdf(IReadOnlyCollection<TeacherState> states) => PlanningPrint.Overview(session!.Catalog.GraduationYear, FilterDescription(),
-        [.. states.Select(s => new[] { s.Record.Student.SyntheticDisplayName, s.Record.Student.ClassName,
+        [.. states.Select(s => new[] { s.Record.Student.DisplayName, s.Record.Student.ClassName,
             s.Active is null ? "–" : PlanningPresentation.Choices(s.Active.Snapshot, true, session!.Catalog), s.Active is null ? "" : PlanningPresentation.Choices(s.Active.Snapshot, false, session!.Catalog).Replace(" · ", ", "),
             s.Active is null ? "" : string.Join(", ", s.Active.Snapshot.PlannedOralSubjects),
             FormatStatus(s.Validation?.Status) + (s.RequiresReselection ? ", Nachwahl" : "") })]);
@@ -425,7 +425,7 @@ public sealed partial class TeacherWindow
             : ChoiceOverview.AllCourseLists(states, session!.Catalog);
         return PlanningPrint.CourseLists(session.Catalog.GraduationYear, lists.Where(l => !l.Members.IsEmpty).Select(l => new CourseListPrint(
             l.Title + (choiceFilter.ClassName is { } c ? " · Klasse " + c : ""),
-            [.. l.Members.Select((m, i) => new[] { (i + 1).ToString(), m.Student.Student.SyntheticDisplayName, m.Student.Student.ClassName,
+            [.. l.Members.Select((m, i) => new[] { (i + 1).ToString(), m.Student.Student.DisplayName, m.Student.Student.ClassName,
                 m.Semesters.SequenceEqual(new[] { 1, 2, 3, 4 }) ? "HJ 1–4" : "HJ " + string.Join(", ", m.Semesters) })])));
     }
 

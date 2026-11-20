@@ -23,7 +23,7 @@ public sealed partial class TeacherWindow
         Ready();
         var cases = ReligionCases.All(session!.Overview().Where(s => s.Record.Student.GraduationYear == session.Catalog.GraduationYear));
         return new(["Name", "Klasse", "Schüler-ID", "Klasse 10", "Belegung Kursstufe", "Mündlich geplant", "Feststellungsprüfung", "Hinweis"],
-            [.. cases.Select(c => new[] { c.State.Record.Student.SyntheticDisplayName, c.State.Record.Student.ClassName, c.State.Record.Student.ExternalStudentId,
+            [.. cases.Select(c => new[] { c.State.Record.Student.DisplayName, c.State.Record.Student.ClassName, c.State.Record.Student.ExternalStudentId,
                 c.Grade10, string.Join(c.ChangeDuringCourse ? " → " : "/", c.Chosen),
                 string.Join(", ", c.State.Active!.Snapshot.PlannedOralSubjects.Where(o => o is "ETH" or "ER" or "KR")),
                 c.AssessmentSubject is null ? "nein" : "ja, " + c.AssessmentSubject,
@@ -193,7 +193,7 @@ public sealed partial class TeacherWindow
         });
 
         static string DisplayName(ReconciliationItem item) =>
-            item.Student?.Student.SyntheticDisplayName is { Length: > 0 } internalName
+            item.Student?.Student.DisplayName is { Length: > 0 } internalName
                 ? internalName
                 : item.External?.DisplayName ?? "";
 

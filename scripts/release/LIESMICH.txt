@@ -1,0 +1,36 @@
+GSM-Kurswahl - Programmpaket
+============================
+
+Version: siehe version.json (auch in der Titelleiste und unter Einstellungen des Lehrerprogramms).
+
+Aufbau des Stammordners
+  TeacherApp\            Lehrerprogramm (GsmKurswahl.TeacherApp.exe) mit Startsperre und Schulvorgaben
+  StudentApp\            Schuelerprogramm (selbstenthaltend), wird bei der Verteilung in die Schuelerordner kopiert
+  docs\, README.md       Dokumentation
+  Aktualisieren.cmd      spielt ein neues Programmpaket ein
+  _Update\               Aktualisierungsskript
+  version.json           installierte Version
+  SHA256.json            Pruefsummen aller Programmdateien
+  Updates\               (entsteht beim ersten Update) neue Pakete hier ablegen
+  Sicherung\             (entsteht beim ersten Update) die letzten drei vorherigen Programmstaende
+
+Erstinstallation
+  1. ZIP entpacken, den entstandenen Ordner "GSM-Kurswahl-<Version>" z. B. in "GSM-Kurswahl" umbenennen
+     und an den gewuenschten Ort verschieben (Stammordner).
+  2. Lehrerprogramm ueber TeacherApp\GsmKurswahl.TeacherApp.exe starten.
+
+Aktualisierung
+  1. Alle Lehrerprogramme schliessen (auch an anderen Rechnern).
+  2. Neues Paket GSM-Kurswahl-<Version>.zip (ungeoeffnet) in den Ordner "Updates" legen.
+  3. Aktualisieren.cmd doppelklicken. Das Skript prueft das Paket, sichert den bisherigen Stand nach
+     "Sicherung", setzt TeacherApp und StudentApp neu ein und uebernimmt TeacherApp\schulvorgaben.json.
+  4. Bei einem Fehler bleibt bzw. wird der bisherige Stand wiederhergestellt; Protokoll in
+     Updates\update-protokoll.txt.
+  Zurueck zu einer aelteren Version: deren ZIP in "Updates" legen und
+     Aktualisieren.cmd -ErlaubeAeltereVersion
+  ausfuehren. Eine aeltere Version oeffnet keine Datenbank, die eine neuere Version in einem neueren
+  Format gespeichert hat.
+
+Verwaltungsdaten (Datenbank/Arbeitsstand) und Schuelerordner liegen nicht im Stammordner und werden durch
+die Aktualisierung nicht veraendert. Schuelerprogramme in den Schuelerordnern werden mit der naechsten
+Verteilung erneuert.

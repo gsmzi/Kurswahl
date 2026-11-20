@@ -86,11 +86,11 @@
   },
   "students": [
     {
-      "schemaVersion": 2,
+      "schemaVersion": 1,
       "student": {
         "id": "22222222-2222-2222-2222-222222222222",
         "externalStudentId": "demo-001",
-        "syntheticDisplayName": "Demo Eins",
+        "displayName": "Demo Eins",
         "className": "10a",
         "graduationYear": 2029,
         "departure": "expected_departure",
@@ -115,7 +115,6 @@
         "lastName": "Eins"
       },
       "windowsUsername": "DEMO\\eins",
-      "accountId": "",
       "homeDirectory": "C:\\Demo\\10a\\Eins.Demo",
       "mappingConfirmed": true,
       "version": 2,

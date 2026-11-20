@@ -19,7 +19,7 @@ public sealed class SchoolStationeryTests
             _ => o
         })] };
         var choice = TestData.Choice with { Selections = [.. catalog.Offers.Where(o => o.Id is "D-LF" or "M-LF" or "E-LF" || o.Type == CourseType.Bf && o.SubjectId is not ("D" or "M" or "E" or "MU")).Select(TestData.Select)], PlannedOralSubjects = ["BIO", "G"] };
-        var student = new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Muster, Demo", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
+        var student = new StudentRecord(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Muster, Demo", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
         var item = new ReselectionPrintItem(student, choice, ["E-LF"])
         {
             Steps =
@@ -36,7 +36,7 @@ public sealed class SchoolStationeryTests
                 new(ProfileStatus.Verified, PriorEducation.Unknown) { DisplayName = "Demo Muster", ClassName = "10a" },
                 new(ReviewStatus.NeedsReview, []), [new(1, 12, 34), new(2, 12, 34), new(3, 11, 32), new(4, 11, 32)], [new("BIO", "G", 36, ReviewStatus.NeedsReview, "Test")]),
             ["Kontrollbogen-Lehrer.pdf"] = PlanningPrint.ControlSheets([new(student, choice, [], ["Die persönliche Berechtigung für einzelne Fächer ist noch zu klären."])], catalog),
-            ["Nachwahl.pdf"] = PlanningPrint.Reselections([item, notesOnly with { Student = student with { Student = student.Student with { SyntheticDisplayName = "Zweiter, Demo" } }, Remaining = choice with { StudentId = "demo-002" } }], catalog),
+            ["Nachwahl.pdf"] = PlanningPrint.Reselections([item, notesOnly with { Student = student with { Student = student.Student with { DisplayName = "Zweiter, Demo" } }, Remaining = choice with { StudentId = "demo-002" } }], catalog),
             ["Kursliste.pdf"] = PlanningPrint.CourseLists(2029, [new("Englisch LF · Koopkurs am EWG", Enumerable.Range(1, 42).Select(i => new[] { i.ToString(), $"Testperson {i:000}, Demo", "10a", "HJ 1-4" }).ToArray())]),
             ["Wahlzahlen.pdf"] = PlanningPrint.Demand(2029, "Aktueller Jahrgang", "Ohne bestätigte Abgänger", [["Englisch", "24", "-", "50", "-", "-"], ["Chemie", "14", "-", "19", "-", "-"]], catalog),
             ["Uebersicht.pdf"] = PlanningPrint.Overview(2029, "Alle Personen", Enumerable.Range(1, 25).Select(i => new[] { $"Testperson {i:000}, Demo", "10a", "D, M, E [Koopkurs am EWG]", "BIO, CH [Koopkurs am GSM · Aufsetzerkurs], G, GK, GEO, SP, BK, ETH", "BIO, G", "Fachlich zu klären" }).ToArray()),

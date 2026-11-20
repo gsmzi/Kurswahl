@@ -25,7 +25,7 @@ public sealed class PedagogicalTransferPackageTests : IDisposable
         {
             store.SaveStudent(new(SchemaVersions.StudentRecord,
                 new(Guid.NewGuid(), "demo-001", "Demo Paket", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown),
-                "", "", "10a/Paket.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
+                "", "10a/Paket.Demo", false, 1, "demo-beratung", DateTimeOffset.UtcNow, null), null);
         }
 
         var teacherDir = Path.Combine(root, "TeacherApp");

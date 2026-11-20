@@ -14,19 +14,18 @@ public sealed class AdministrationTests : IDisposable
     private string DbPath => Path.Combine(root, "admin.db");
     private StudentRecord Record(int number = 1) => new(SchemaVersions.StudentRecord,
         new(Guid.NewGuid(), $"demo-{number:000}", $"Demo Person {number}", "10-demo", 2029, DepartureStatus.Active, PriorEducation.Unknown),
-        $"DEMO\\test{number}", $"S-1-5-21-100-200-300-{number}", Path.Combine(root, "home" + number), true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
+        $"DEMO\\test{number}", Path.Combine(root, "home" + number), true, 1, "demo-beratung", DateTimeOffset.UtcNow, null);
     [Fact]
     public void RelativeReimportKeepsResolvedMappingAndOnlyReportsChangedPrerequisites()
     {
         using var store = new SqliteAdministrationStore(DbPath);
         var current = Record() with { HomeDirectory = Path.Combine(root, "10a", "Muster.Demo"), Origin = new("demo.csv", "old", "map", DateTimeOffset.UtcNow, "demo-beratung") };
         store.SaveStudent(current, null);
-        var incoming = current with { HomeDirectory = "10a/Muster.Demo", AccountId = "", MappingConfirmed = false, Origin = current.Origin! with { ContentHash = "new" }, Student = current.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } };
+        var incoming = current with { HomeDirectory = "10a/Muster.Demo", MappingConfirmed = false, Origin = current.Origin! with { ContentHash = "new" }, Student = current.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } };
         Assert.Equal("Voraussetzungen", StudentImportService.Differences(current, incoming));
         Assert.True(StudentImportService.Confirm(store, incoming, 1, true));
         Assert.True(store.Students().Single().MappingConfirmed);
         Assert.Equal(current.HomeDirectory, store.Students().Single().HomeDirectory);
-        Assert.Equal(current.AccountId, store.Students().Single().AccountId);
     }
     [Fact]
     public void DistributionRootResolvesExistingClassFoldersAndRejectsEscapeOrMissingTargets()
@@ -185,12 +184,12 @@ public sealed class AdministrationTests : IDisposable
         session.Confirm(updated, true, false, "Mit Prüffehler übernommen");
         Assert.True(session.Overview().Single().RequiresReselection);
         Assert.Throws<InvalidOperationException>(() => store.SaveStudent(corrected, 1));
-        Assert.Throws<InvalidOperationException>(() => store.SaveStudent(Record(2) with { AccountId = record.AccountId }, null));
+        Assert.Throws<InvalidOperationException>(() => store.SaveStudent(Record(2) with { WindowsUsername = record.WindowsUsername }, null));
     }
     [Fact]
     public void ProfilesRoundTripAndOldProfileCannotWinAgainstCorrection()
     {
-        using var store = new SqliteAdministrationStore(DbPath); var record = Record() with { WindowsUsername = "", AccountId = "" }; store.SaveStudent(record, null); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory));
+        using var store = new SqliteAdministrationStore(DbPath); var record = Record() with { WindowsUsername = "" }; store.SaveStudent(record, null); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory));
         var distribution = new ProfileDistribution(store);
         var issued = distribution.Issue(record);
         var reader = new SignedProfileReader();

@@ -12,16 +12,12 @@ foreach ($pair in @(
     @("$fixtures/current/choice-v2.json", 'schemas/course-choice.v2.schema.json'),
     @("$fixtures/current/catalog-v3.json", 'schemas/offer-catalog.v3.schema.json'),
     @("$fixtures/current/profile-v2.json", 'schemas/student-profile.v2.schema.json'),
-    @("$fixtures/current/workspace-v2.json", 'schemas/teacher-workspace.v2.schema.json'),
-    @("$fixtures/current/transfer-v2.json", 'schemas/teacher-transfer.v2.schema.json'),
+    @("$fixtures/current/workspace-v3.json", 'schemas/teacher-workspace.v3.schema.json'),
+    @("$fixtures/current/transfer-v3.json", 'schemas/teacher-transfer.v3.schema.json'),
     @("$fixtures/legacy/choice-v1.json", 'schemas/course-choice.v1.schema.json'),
     @("$fixtures/legacy/catalog-v2.json", 'schemas/offer-catalog.v2.schema.json'),
-    @("$fixtures/legacy/workspace-v2-catalog-v2.json", 'schemas/teacher-workspace.v2.schema.json'),
-    @("$fixtures/legacy/transfer-v2-catalog-v2.json", 'schemas/teacher-transfer.v2.schema.json'),
     @("$fixtures/legacy/catalog-v1.json", 'schemas/offer-catalog.v1.schema.json'),
     @("$fixtures/legacy/profile-v1.json", 'schemas/student-profile.v1.schema.json'),
-    @("$fixtures/legacy/workspace-v1.json", 'schemas/teacher-workspace.v1.schema.json'),
-    @("$fixtures/legacy/transfer-v1.json", 'schemas/teacher-transfer.v1.schema.json'),
     @("$fixtures/legacy/location-v1.json", 'schemas/teacher-location.v1.schema.json')
 )) {
     $valid = Get-Content (Join-Path $root $pair[0]) -Raw | Test-Json -SchemaFile (Join-Path $root $pair[1])

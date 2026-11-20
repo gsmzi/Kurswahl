@@ -1,0 +1,40 @@
+<Project>
+  <!--
+    Programmversion: Haupt- und Nebenversion stehen in version.txt (z. B. 1.0) und werden nur bewusst geändert.
+    Die dritte Stelle zählt automatisch die Commits seit der letzten Änderung von version.txt (1.0.0, 1.0.1, ...).
+    InformationalVersion ergänzt den Commit-Hash und ".geaendert", wenn nicht committete Änderungen enthalten sind.
+    Ohne Git (z. B. Bau aus einem ZIP) entsteht <Version>.0+unbekannt.
+  -->
+  <PropertyGroup>
+    <GsmVersionFile>$(MSBuildThisFileDirectory)../version.txt</GsmVersionFile>
+    <GsmBaseVersion>$([System.IO.File]::ReadAllText('$(GsmVersionFile)').Trim())</GsmBaseVersion>
+    <Version>$(GsmBaseVersion).0</Version>
+    <Product>GSM-Kurswahl</Product>
+    <Company>Gymnasium bei St. Michael</Company>
+  </PropertyGroup>
+  <Target Name="GsmVersionFromGit" BeforeTargets="GetAssemblyVersion;GenerateAssemblyInfo;GenerateNuspec" Condition="'$(GsmVersionFromGitDone)' != 'true'">
+    <Exec Command="git rev-list -1 HEAD -- version.txt" WorkingDirectory="$(MSBuildThisFileDirectory).." ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GsmVersionCommit" />
+    </Exec>
+    <Exec Command="git rev-list --count $(GsmVersionCommit)..HEAD" Condition="'$(GsmVersionCommit)' != ''" WorkingDirectory="$(MSBuildThisFileDirectory).." ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GsmVersionHeight" />
+    </Exec>
+    <Exec Command="git rev-parse --short=8 HEAD" WorkingDirectory="$(MSBuildThisFileDirectory).." ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GsmVersionHash" />
+    </Exec>
+    <Exec Command="git status --porcelain --untracked-files=no" WorkingDirectory="$(MSBuildThisFileDirectory).." ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true" ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GsmVersionDirty" />
+    </Exec>
+    <PropertyGroup>
+      <GsmVersionHeight Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(GsmVersionHeight)', '^[0-9]+$'))">0</GsmVersionHeight>
+      <GsmVersionHash Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(GsmVersionHash)', '^[0-9a-f]+$'))">unbekannt</GsmVersionHash>
+      <Version>$(GsmBaseVersion).$(GsmVersionHeight)</Version>
+      <AssemblyVersion>$(GsmBaseVersion).0.0</AssemblyVersion>
+      <FileVersion>$(GsmBaseVersion).$(GsmVersionHeight).0</FileVersion>
+      <InformationalVersion>$(Version)+$(GsmVersionHash)</InformationalVersion>
+      <InformationalVersion Condition="'$(GsmVersionDirty)' != '' and '$(GsmVersionHash)' != 'unbekannt'">$(InformationalVersion).geaendert</InformationalVersion>
+      <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+      <GsmVersionFromGitDone>true</GsmVersionFromGitDone>
+    </PropertyGroup>
+  </Target>
+</Project>

@@ -90,7 +90,7 @@ public static class ReselectionWord
                 new XElement(Rel + "Relationship", new XAttribute("Id", "rId11"), new XAttribute("Type", R.NamespaceName + "/image"), new XAttribute("Target", "media/image1.jpeg")))));
             relationships.Root!.Add(new XElement(Rel + "Relationship", new XAttribute("Id", headerId), new XAttribute("Type", R.NamespaceName + "/header"), new XAttribute("Target", headerName)));
             ContentType(headerName, "header");
-            body.Add(P(item.Student.Student.SyntheticDisplayName + " · Klasse " + item.Student.Student.ClassName));
+            body.Add(P(item.Student.Student.DisplayName + " · Klasse " + item.Student.Student.ClassName));
             if (item.Removed.Length > 0)
             {
                 body.Add(P("Warum eine Nachwahl nötig ist", "GsmHeading", keep: true));

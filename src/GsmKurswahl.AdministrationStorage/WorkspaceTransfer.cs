@@ -45,7 +45,7 @@ public static class WorkspaceTransfer
             if (entry.Length > limit) throw new InvalidDataException("Transportdatei zu groß.");
             using var stream = entry.Open(); var bytes = new byte[checked((int)entry.Length)]; stream.ReadExactly(bytes); return bytes;
         }
-        var manifest = JsonSerializer.Deserialize<TransferManifest>(TeacherWorkspace.UpgradeYears(Entry("transfer.json", 4 * 1024 * 1024), "Transportdatei"), DocumentJson.Options)
+        var manifest = JsonSerializer.Deserialize<TransferManifest>(TeacherWorkspace.RequireCurrent(Entry("transfer.json", 4 * 1024 * 1024), "Transportdatei"), DocumentJson.Options)
             ?? throw new InvalidDataException("Leere Transportdatei.");
         if (manifest.SchemaVersion != TeacherWorkspace.CurrentSchema || manifest.Year is null || manifest.Year.DatabasePath != "verwaltung.db" || !Enum.IsDefined(manifest.Year.Step)
             || !manifest.Year.Catalog.IsDemo || string.IsNullOrWhiteSpace(manifest.Year.Actor))
@@ -57,7 +57,7 @@ public static class WorkspaceTransfer
     }
     public static TransferManifest Inspect(string path) => Read(path).Manifest;
 
-    // Always import to a fresh local folder. Old workspaces are preserved, never merged or overwritten.
+    // Always import to a fresh folder. Old workspaces are preserved, never merged or overwritten.
     public static TeacherWorkspace Import(string path, string newRoot, TransferManifest? expected = null)
     {
         var (manifest, bytes) = Read(path);
@@ -70,8 +70,7 @@ public static class WorkspaceTransfer
         using (var output = new FileStream(database, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { output.Write(bytes); output.Flush(true); }
         using (var check = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = database, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString()))
         {
-            check.Open(); using var command = check.CreateCommand(); command.CommandText = "PRAGMA user_version";
-            if (Convert.ToInt32(command.ExecuteScalar()) is not (>= 1 and <= SqliteAdministrationStore.CurrentSchema)) throw new InvalidDataException("Unbekannte oder unversionierte Transportdatenbank; keine Migration.");
+            check.Open(); SqliteAdministrationStore.Check(check);
         }
         // Attach validates DB schema and graduation year before registering it.
         workspace.Attach(manifest.Year.Catalog, database, manifest.Year.Actor);

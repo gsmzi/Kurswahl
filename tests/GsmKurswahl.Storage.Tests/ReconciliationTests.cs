@@ -15,7 +15,7 @@ public sealed class ReconciliationTests : IDisposable
         var workspace = new TeacherWorkspace(root); workspace.Create(catalog, "demo-test");
         var store = workspace.OpenActive();
         foreach (var id in new[] { "demo-001", "demo-002" })
-            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), id, "Demo Test", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+            store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), id, "Demo Test", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
         new TeacherSession(store, catalog, "demo-test").Save(TestData.Choice, null, RevisionSource.TeacherEdit, "Ursprung");
         return store;
     }
@@ -60,21 +60,15 @@ public sealed class ReconciliationTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => service.Confirm(preview, "demo-001", true, "Test"));
     }
     [Fact]
-    public void ReceiptsRequireExplicitMigrationAndSurviveBackupWithHistory()
+    public void BackupKeepsChoiceHistory()
     {
         using var store = Seed();
         var active = store.History("demo-001").Single();
-        var receipt = new TransferReceipt(1, Guid.NewGuid(), "demo-001", active.Id, 1, catalog.Version, active.RuleVersion, DateTimeOffset.UtcNow, "demo-test", true, "Synthetische manuelle Eingabe");
-        Assert.True(store.PlanningEnabled); Assert.True(store.TransferTrackingEnabled);
-        store.RecordTransfer(receipt); store.RecordTransfer(receipt with { Id = Guid.NewGuid(), Entered = false, Note = "Erneut prüfen" });
-        Assert.Equal(2, store.TransferReceipts().Length);
-        new TeacherSession(store, catalog, "demo-test").Save(active.Snapshot, active.Id, RevisionSource.TeacherEdit, "Nach Vermerk geändert");
-        Assert.Throws<InvalidOperationException>(() => store.RecordTransfer(receipt));
+        new TeacherSession(store, catalog, "demo-test").Save(active.Snapshot, active.Id, RevisionSource.TeacherEdit, "Nach Beratung geändert");
         var archive = Path.Combine(root, "backup.gsm-transfer");
         WorkspaceTransfer.Export(new TeacherWorkspace(root).Active!, store, archive);
         var restored = WorkspaceTransfer.Import(archive, Path.Combine(root, "restore"));
-        using var check = restored.OpenActive(); Assert.Equal(2, check.TransferReceipts().Length); Assert.Equal(2, check.History("demo-001").Length);
-        Assert.True(check.TransferTrackingEnabled); Assert.True(check.PlanningEnabled);
+        using var check = restored.OpenActive(); Assert.Equal(2, check.History("demo-001").Length);
     }
 
     [Fact]
@@ -87,8 +81,8 @@ public sealed class ReconciliationTests : IDisposable
         };
         var workspace = new TeacherWorkspace(root); workspace.Create(biliCatalog, "demo-test");
         using var store = workspace.OpenActive();
-        store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
-        store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-002", "Demo Zwei", "10a", 2029, DepartureStatus.ConfirmedDeparture, PriorEducation.Unknown), "", "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+        store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-001", "Demo Eins", "10a", 2029, DepartureStatus.Active, PriorEducation.Unknown), "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
+        store.SaveStudent(new(SchemaVersions.StudentRecord, new(Guid.NewGuid(), "demo-002", "Demo Zwei", "10a", 2029, DepartureStatus.ConfirmedDeparture, PriorEducation.Unknown), "", "", false, 1, "demo-test", DateTimeOffset.UtcNow, null), null);
 
         var session = new TeacherSession(store, biliCatalog, "demo-test");
         session.Save(TestData.Choice with

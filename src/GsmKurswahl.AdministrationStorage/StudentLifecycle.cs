@@ -5,7 +5,7 @@ using GsmKurswahl.Domain;
 
 namespace GsmKurswahl.AdministrationStorage;
 
-// Database schema 4: archive before removal from pupil folders, program deliveries and deliberate deletion.
+// Archive before removal from pupil folders, program deliveries and deliberate deletion.
 public sealed partial class SqliteAdministrationStore
 {
     public void ArchiveCollectedFiles(IReadOnlyCollection<CollectedFile> files)
@@ -40,7 +40,7 @@ public sealed partial class SqliteAdministrationStore
 
     /// <summary>
     /// Deliberately removes one person from this year's protected stock: master data, choice history, follow-ups,
-    /// profiles, delivery reports, transfer receipts, archived files and program deliveries; stored planning
+    /// profiles, delivery reports, archived files and program deliveries; stored planning
     /// snapshots are rewritten without the person. Only a person-free log entry remains. Pupil folders are not touched.
     /// </summary>
     public StudentDeletion DeleteStudent(string studentId, Guid expectedInternalId, string actor, string reason)
@@ -53,16 +53,9 @@ public sealed partial class SqliteAdministrationStore
         foreach (var table in Tables) Execute($"DROP TRIGGER IF EXISTS {table}_no_update; DROP TRIGGER IF EXISTS {table}_no_delete;");
         var removed = 0;
         foreach (var (table, column) in new[] { ("students", "id"), ("revisions", "student"), ("reselections", "student"), ("profiles", "student"),
-            ("collected_files", "student"), ("program_deliveries", "student") })
+            ("distributions", "student"), ("collected_files", "student"), ("program_deliveries", "student") })
         {
             using var command = Command($"DELETE FROM {table} WHERE {column}=$p0", studentId);
-            removed += command.ExecuteNonQuery();
-        }
-        // Tables without a student column: match the parsed body, never a text search.
-        foreach (var seq in ReadRows<DistributionEntry>("distributions").Where(r => r.Value.StudentId == studentId).Select(r => r.Seq)
-            .Select(s => ("distributions", s)).Concat(ReadRows<TransferReceipt>("transfer_receipts").Where(r => r.Value.StudentId == studentId).Select(r => ("transfer_receipts", r.Seq))))
-        {
-            using var command = Command($"DELETE FROM {seq.Item1} WHERE seq=$p0", seq.Item2);
             removed += command.ExecuteNonQuery();
         }
         var snapshots = 0;

@@ -94,7 +94,7 @@ public sealed record ExamOption(string First, string Second, int MinimumCredits,
 // Protected teacher storage in M3: these are separate from CourseChoice and never written to pupil homes.
 public sealed record ImportOrigin(string SourceId, string ContentHash, string MappingVersion,
     DateTimeOffset ImportedAt, string AuthenticatedAccount);
-public sealed record AdministrativeStudent(Guid Id, string ExternalStudentId, string SyntheticDisplayName,
+public sealed record AdministrativeStudent(Guid Id, string ExternalStudentId, string DisplayName,
     string ClassName, int GraduationYear, DepartureStatus Departure, PriorEducation Prerequisites)
 {
     public string FirstName { get; init; } = "";
@@ -103,13 +103,13 @@ public sealed record AdministrativeStudent(Guid Id, string ExternalStudentId, st
     {
         if (!string.IsNullOrWhiteSpace(LastName) || !string.IsNullOrWhiteSpace(FirstName))
             return (LastName, FirstName);
-        var comma = SyntheticDisplayName.IndexOf(',');
+        var comma = DisplayName.IndexOf(',');
         if (comma >= 0)
-            return (SyntheticDisplayName[..comma].Trim(), SyntheticDisplayName[(comma + 1)..].Trim());
-        var space = SyntheticDisplayName.LastIndexOf(' ');
+            return (DisplayName[..comma].Trim(), DisplayName[(comma + 1)..].Trim());
+        var space = DisplayName.LastIndexOf(' ');
         return space > 0
-            ? (SyntheticDisplayName[(space + 1)..].Trim(), SyntheticDisplayName[..space].Trim())
-            : (SyntheticDisplayName, "");
+            ? (DisplayName[(space + 1)..].Trim(), DisplayName[..space].Trim())
+            : (DisplayName, "");
     }
 }
 public sealed record SelectionChange(string OfferId, ImmutableArray<int> Before, ImmutableArray<int> After);

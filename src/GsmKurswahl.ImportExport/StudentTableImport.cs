@@ -11,7 +11,7 @@ public sealed record ImportTable(ImmutableArray<string> Headers, ImmutableArray<
 public sealed record StudentImportRow(int Row, StudentRecord? Candidate, string Error);
 public static class StudentTableImport
 {
-    public static readonly string[] Fields = ["studentId", "name", "firstName", "lastName", "folder", "class", "year", "username", "accountId", "home", "italian", "bridge", "imp", "bilingual", "religion", "sport", "languages", "religionPermission", "religionExamPermission", "permanentSport", "departure"];
+    public static readonly string[] Fields = ["studentId", "name", "firstName", "lastName", "folder", "class", "year", "username", "home", "italian", "bridge", "imp", "bilingual", "religion", "sport", "languages", "religionPermission", "religionExamPermission", "permanentSport", "departure"];
     public static ImportTable Csv(string text, char separator = ';') => Table(ReadCsvRows(text, separator));
     internal static List<ImmutableArray<string>> ReadCsvRows(string text, char separator = ';')
     {
@@ -140,14 +140,13 @@ public static class StudentTableImport
                 var departure = Value("departure").ToLowerInvariant() switch { "" or "aktiv" => DepartureStatus.Active, "voraussichtlich" => DepartureStatus.ExpectedDeparture, "bestaetigt" or "bestätigt" => DepartureStatus.ConfirmedDeparture, _ => throw new ArgumentException("Abgängerstatus ungültig.") };
                 var student = new AdministrativeStudent(Guid.NewGuid(), id, name, Value("class"), year, departure, prior)
                 { FirstName = firstName, LastName = lastName };
-                result.Add(new(i + 2, new(SchemaVersions.StudentRecord, student, Value("username"), Value("accountId"), home, false, 1, actor, DateTimeOffset.UtcNow, origin), ""));
+                result.Add(new(i + 2, new(SchemaVersions.StudentRecord, student, Value("username"), home, false, 1, actor, DateTimeOffset.UtcNow, origin), ""));
             }
             catch (Exception ex) when (ex is ArgumentException or FormatException or OverflowException) { result.Add(new(i + 2, null, ex.Message)); }
         }
         var duplicates = result.Where(r => r.Candidate is not null).GroupBy(r => r.Candidate!.Student.ExternalStudentId, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var accounts = result.Where(r => !string.IsNullOrWhiteSpace(r.Candidate?.WindowsUsername)).GroupBy(r => r.Candidate!.WindowsUsername, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var sids = result.Where(r => !string.IsNullOrWhiteSpace(r.Candidate?.AccountId)).GroupBy(r => r.Candidate!.AccountId, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var homes = result.Where(r => !string.IsNullOrWhiteSpace(r.Candidate?.HomeDirectory)).GroupBy(r => r.Candidate!.HomeDirectory.Replace('\\', '/').TrimEnd('/'), StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return [.. result.Select(r => r.Candidate is { } c && (duplicates.Contains(c.Student.ExternalStudentId) || accounts.Contains(c.WindowsUsername) || sids.Contains(c.AccountId) || homes.Contains(c.HomeDirectory.Replace('\\', '/').TrimEnd('/'))) ? r with { Error = "Doppelte Schüler-ID, Benutzerkennung oder Ordner; keine Übernahme." } : r)];
+        return [.. result.Select(r => r.Candidate is { } c && (duplicates.Contains(c.Student.ExternalStudentId) || accounts.Contains(c.WindowsUsername) || homes.Contains(c.HomeDirectory.Replace('\\', '/').TrimEnd('/'))) ? r with { Error = "Doppelte Schüler-ID, Benutzerkennung oder Ordner; keine Übernahme." } : r)];
     }
 }
