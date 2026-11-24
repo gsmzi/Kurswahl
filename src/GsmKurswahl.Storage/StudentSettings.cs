@@ -61,18 +61,18 @@ public sealed record StudentSettings(int SchemaVersion, string HomeDirectory, st
     public (string StudentId, ProfileContext Profile) ReadPersonalProfile(int graduationYear)
     {
         var directory = Path.GetDirectoryName(ResolveChoicePath())!;
-        if (SchemaVersion == 1) return (DemoStudentId, new SignedProfileReader().Read(directory, DemoStudentId, graduationYear));
-        return new SignedProfileReader().ReadPersonal(directory, graduationYear);
+        if (SchemaVersion == 1) return (DemoStudentId, new ProfileReader().Read(directory, DemoStudentId, graduationYear));
+        return new ProfileReader().ReadPersonal(directory, graduationYear);
     }
 }
 
-// OS identity alone grants nothing; SignedProfileReader verifies it against signed administrative binding.
+// The OS account name is only shown and compared with the profile; it grants nothing by itself.
 public sealed class OperatingSystemIdentityProvider : ICurrentIdentityProvider
 {
     public CurrentIdentity GetCurrent()
     {
-        if (!OperatingSystem.IsWindows()) return new(Environment.UserName, null);
+        if (!OperatingSystem.IsWindows()) return new(Environment.UserName);
         using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
-        return new(identity.Name, identity.User?.Value);
+        return new(identity.Name);
     }
 }

@@ -192,7 +192,7 @@ public sealed class AdministrationTests : IDisposable
         using var store = new SqliteAdministrationStore(DbPath); var record = Record() with { WindowsUsername = "" }; store.SaveStudent(record, null); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory));
         var distribution = new ProfileDistribution(store);
         var issued = distribution.Issue(record);
-        var reader = new SignedProfileReader();
+        var reader = new ProfileReader();
         Assert.Equal("verteilt", distribution.Distribute(record, issued).Status);
         Assert.Equal(ProfileStatus.Verified, reader.Read(StudentFolderLayout.Data(record.HomeDirectory), "demo-001", 2029).Status);
         Assert.Equal("verteilt", distribution.Distribute(record, issued).Status); Assert.Empty(store.History("demo-001"));

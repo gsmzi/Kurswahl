@@ -133,7 +133,7 @@ public sealed class DemoStagesTests
     {
         var data = StudentFolderLayout.Data(root);
         var catalog = JsonDocuments.ReadCatalog(File.ReadAllBytes(Path.Combine(data, "fachangebot.json")));
-        var (studentId, profile) = new SignedProfileReader().ReadPersonal(data, catalog.GraduationYear);
+        var (studentId, profile) = new ProfileReader().ReadPersonal(data, catalog.GraduationYear);
         Assert.Equal("demo-002", studentId); Assert.Equal(ProfileStatus.Verified, profile.Status);
         var loaded = new JsonChoiceStore(Path.Combine(data, "aktuell.json"), data).LoadAsync().GetAwaiter().GetResult();
         Assert.Equal(hasChoice, loaded is not null);

@@ -4,7 +4,7 @@ using GsmKurswahl.Domain;
 namespace GsmKurswahl.Storage;
 
 /// <summary>Read-only boundary for student profiles (profil.json). Authoritative validation always happens in the teacher app against the local database.</summary>
-public sealed class SignedProfileReader
+public sealed class ProfileReader
 {
     // Bootstrap an advisory identity from one explicitly selected personal directory, never from a shared roster.
     public (string StudentId, ProfileContext Profile) ReadPersonal(string directory, int graduationYear)

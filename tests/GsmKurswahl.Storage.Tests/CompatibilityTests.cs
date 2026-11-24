@@ -143,7 +143,7 @@ public sealed class CompatibilityTests : IDisposable
         var catalog = JsonDocuments.ReadCatalog(Legacy("catalog-v1.json"));
         Assert.Equal(SchemaVersions.Catalog, catalog.SchemaVersion);
         Assert.Null(catalog.SubmissionDeadline);
-        var profile = new SignedProfileReader().Verify(Legacy("profile-v1.json"), "demo-001", 2029);
+        var profile = new ProfileReader().Verify(Legacy("profile-v1.json"), "demo-001", 2029);
         Assert.Equal(ProfileStatus.Verified, profile.Status);
         Assert.Equal(Knowledge.Yes, profile.Prerequisites.InformaticsImp);
         Assert.Equal("", profile.DisplayName);
@@ -154,7 +154,7 @@ public sealed class CompatibilityTests : IDisposable
     {
         var future = Encoding.UTF8.GetString(Legacy("catalog-v1.json")).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 99");
         Assert.Throws<JsonException>(() => JsonDocuments.ReadCatalog(Encoding.UTF8.GetBytes(future)));
-        Assert.Equal(ProfileStatus.ProfileInvalid, new SignedProfileReader().Verify(
+        Assert.Equal(ProfileStatus.ProfileInvalid, new ProfileReader().Verify(
             Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(Legacy("profile-v1.json")).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 3")), "demo-001", 2029).Status);
         Directory.CreateDirectory(Path.Combine(root, "ws"));
         File.WriteAllText(Path.Combine(root, "ws", "workspace.json"), "{\"schemaVersion\":4,\"activeYear\":null,\"years\":[]}");

@@ -80,7 +80,7 @@ public sealed record ProfileContext(ProfileStatus Status, PriorEducation Prerequ
     public string ClassName { get; init; } = "";
     public static ProfileContext Missing { get; } = new(ProfileStatus.Missing, PriorEducation.Unknown);
 }
-public sealed record CurrentIdentity(string Username, string? AccountId);
+public sealed record CurrentIdentity(string Username);
 public interface ICurrentIdentityProvider { CurrentIdentity GetCurrent(); }
 
 public sealed record RuleDefinition(string Id, string Description, string Source, string Scope,
@@ -117,14 +117,6 @@ public sealed record ChoiceRevision(Guid Id, Guid? PreviousRevisionId, string St
     DateTimeOffset ChangedAt, string ActorId, ActorRole ActorRole, RevisionSource Source, string Reason,
     string OfferVersion, string RuleVersion, CourseChoice Snapshot, ImmutableArray<SelectionChange> Changes,
     ImportOrigin? ImportOrigin);
-public sealed record AdministrativeChoice(Guid Id, string StudentId, Guid ActiveRevisionId,
-    Guid OriginalStudentRevisionId, bool RequiresReselection);
-public sealed record CourseGroup(Guid Id, string OfferId, int Semester, string ExternalGroupCode);
-public sealed record CourseAssignment(Guid GroupId, string StudentId);
-public sealed record PlanningSnapshot(Guid Id, DateTimeOffset CreatedAt, OfferCatalog Catalog,
-    ImmutableArray<ChoiceRevision> Choices, ImmutableArray<AdministrativeStudent> Students,
-    bool IncludeExpectedDepartures);
-public sealed record PlanningScenario(Guid Id, Guid BaseSnapshotId, ImmutableArray<string> CancelledOfferIds);
 
 public sealed record StoredChoice(CourseChoice Choice, string ContentToken)
 {

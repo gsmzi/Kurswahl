@@ -5,7 +5,7 @@ using GsmKurswahl.Domain;
 namespace GsmKurswahl.Storage.Tests;
 
 // Profile validation without certificate or SID requirement.
-public sealed class SignedProfileReaderTests
+public sealed class ProfileReaderTests
 {
     private static StudentProfile Profile => new(SchemaVersions.Profile, 3, "demo-001", "", 2029,
         DateTimeOffset.Parse("2026-01-01T12:00:00Z"), PriorEducation.Unknown with
@@ -16,7 +16,7 @@ public sealed class SignedProfileReaderTests
         // The writer only emits the current version; other versions are produced textually for reader tests.
         var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(profile with { SchemaVersion = SchemaVersions.Profile }, JsonDocuments.Options)
             .Replace($"\"schemaVersion\": {SchemaVersions.Profile}", $"\"schemaVersion\": {profile.SchemaVersion}"));
-        return new SignedProfileReader().Verify(bytes, "demo-001", 2029);
+        return new ProfileReader().Verify(bytes, "demo-001", 2029);
     }
 
     [Fact] public void ProfileBytesGrantOnlyVerifiedPrerequisites()
@@ -30,7 +30,7 @@ public sealed class SignedProfileReaderTests
     [Fact] public void DuplicateJsonFieldsAreRejected()
     {
         var json = Encoding.UTF8.GetBytes("{\"schemaVersion\":1,\"schemaVersion\":1}");
-        AssertInvalid(new SignedProfileReader().Verify(json, "demo-001", 2029));
+        AssertInvalid(new ProfileReader().Verify(json, "demo-001", 2029));
     }
     [Theory] [InlineData("student")] [InlineData("year")]
     [InlineData("schema")] [InlineData("revision")] [InlineData("future")] [InlineData("semesters")]
@@ -48,11 +48,11 @@ public sealed class SignedProfileReaderTests
         AssertInvalid(Check(profile));
     }
     [Fact] public void MalformedFilesReturnInvalidWithoutThrowing() => AssertInvalid(
-        new SignedProfileReader().Verify([1, 2], "demo-001", 2029));
+        new ProfileReader().Verify([1, 2], "demo-001", 2029));
     [Fact] public void MissingFilesDoNotCreateAnything()
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Assert.Equal(ProfileStatus.Missing, new SignedProfileReader().Read(path, "demo-001", 2029).Status);
+        Assert.Equal(ProfileStatus.Missing, new ProfileReader().Read(path, "demo-001", 2029).Status);
         Assert.False(Directory.Exists(path));
     }
     private static void AssertInvalid(ProfileContext result)

@@ -114,6 +114,6 @@ public sealed class M3RegressionTests : IDisposable
         using var store = new SqliteAdministrationStore(Path.Combine(root,"db.db"));
         var record = Record("demo-002",true); Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory)); store.SaveStudent(record,null);
         var service = new ProfileDistribution(store); Assert.Equal("verteilt",service.Distribute(record,service.Issue(record),TestData.WorkflowCatalog).Status);
-        var settings = new StudentSettings(2, StudentFolderLayout.Data(record.HomeDirectory), "", "aktuell.json", "{WAHLORDNER}/fachangebot.json", ""); var personal = settings.ReadPersonalProfile(2029); Assert.Equal("demo-002", personal.StudentId); Assert.Equal(ProfileStatus.Verified, personal.Profile.Status); Assert.Equal(ProfileStatus.ProfileInvalid, new SignedProfileReader().Read(StudentFolderLayout.Data(record.HomeDirectory), "demo-001", 2029).Status);
+        var settings = new StudentSettings(2, StudentFolderLayout.Data(record.HomeDirectory), "", "aktuell.json", "{WAHLORDNER}/fachangebot.json", ""); var personal = settings.ReadPersonalProfile(2029); Assert.Equal("demo-002", personal.StudentId); Assert.Equal(ProfileStatus.Verified, personal.Profile.Status); Assert.Equal(ProfileStatus.ProfileInvalid, new ProfileReader().Read(StudentFolderLayout.Data(record.HomeDirectory), "demo-001", 2029).Status);
     }
 }
