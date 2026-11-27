@@ -171,3 +171,11 @@ Schülertexte am 28.10.2026 berichtigt: Die automatische Regelprüfung ist vorha
 - Offen (Pilot): Ausführung von `Aktualisieren.cmd`/PowerShell-Skripten unter AppLocker; Schreibrechte der Lehrkraft auf den Programm-Stammordner.
 - Offen: Die Browser-Testversion zeigt keine Programmversion (eigenständige Webseite, unverändert).
 
+
+## Ausbaustufe M6: Online-Kurswahl mit LDAP-Anmeldung (27.11.2026)
+
+- Konzept erstellt: [M6_ONLINE_ANMELDUNG.md](M6_ONLINE_ANMELDUNG.md). Nicht beauftragt und nicht umgesetzt; Version 1 bleibt ohne Server, Webserver und LDAP-Anmeldung.
+- Offen (Schule/Netzwerkbetreuung): Verzeichnissystem, LDAPS/StartTLS und Zertifikat, Base-DN, Gruppen je Jahrgang, stabiles Kontoattribut für die Zuordnung zur Schüler-ID, nur lesendes Dienstkonto.
+- Offen (Betrieb): Hosting (Schulserver oder Dienstleister), Erreichbarkeit nur im Schulnetz oder auch von außen, Zuständigkeit für Updates und Sicherung.
+- Offen (Freigaben): Schulleitung, Datenschutzbeauftragte(r), Verarbeitungsverzeichnis, ggf. Datenschutz-Folgenabschätzung, Information von Schülern und Eltern.
+- Offen: Desktop-Schülerprogramm als Rückfallebene parallel erhalten (Empfehlung ja) und Umgang mit Wahlen aus beiden Wegen.

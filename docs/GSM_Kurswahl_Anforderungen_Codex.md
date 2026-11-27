@@ -17,7 +17,7 @@ Es sind zwei Anwendungen vorgesehen: **Schülerprogramm** für persönliche Kurs
 
 - Sprache: C# mit einer unterstützten .NET-LTS-Version; GUI: Avalonia UI.
 - Zuerst Windows 11 x64. Spätere Portierung nach macOS (z.B. MacBook Neo) einplanen; iPadOS ist nicht Bestandteil des ersten Releases.
-- Kein Anwendungsserver, keine Cloud, keine eigene LDAP-Anmeldung, kein Webserver und keine Online-Synchronisation in Version 1. Keine komplette Abiturorganisation, Notenverwaltung oder Untis-Stundenplanoptimierung in Version 1.
+- Kein Anwendungsserver, keine Cloud, keine eigene LDAP-Anmeldung, kein Webserver und keine Online-Synchronisation in Version 1 (eine spätere Online-Kurswahl mit LDAP-Anmeldung ist als Ausbaustufe M6 nur konzipiert, nicht beauftragt: [M6-Konzept](M6_ONLINE_ANMELDUNG.md)). Keine komplette Abiturorganisation, Notenverwaltung oder Untis-Stundenplanoptimierung in Version 1.
 - Verteilung der Schüler-EXE über eine schulintern lesbare Netzwerkfreigabe oder lokale Bereitstellung. Selbstenthaltende Releases prüfen; keine lokalen Administratorrechte für den normalen Betrieb voraussetzen.
 - Windows-Anmeldung ist die Ausgangsidentität. Username und gegebenenfalls SID über eine austauschbare Schnittstelle ermitteln. Nicht einer beliebig in JSON gespeicherten Benutzerkennung vertrauen. Individuelle, signierte Schülerprofile nach Abschnitt 5a bereitstellen.
 - Schülerprogramm speichert die aktive Wahl als versioniertes JSON im persönlichen Home-Verzeichnis. Home-Pfad und Dateiname sind konfigurierbar, nicht im Code hart verdrahten.

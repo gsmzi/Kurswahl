@@ -1041,3 +1041,8 @@ M3-Korrekturen zuvor separat als 07c83c9 committet. Die M4-Änderungen liegen an
 - **Bereitstellung:** Der erste Robocopy-Aufruf mit `\?\`-Präfix scheiterte mit Fehler 123 (ungültige Syntax), es wurde nichts kopiert. Danach per Robocopy ohne Präfix (Robocopy unterstützt lange Pfade selbst) nach `Kurswahl-Testversion\2026-11-24_10-35` kopiert (Exitcode 1 = Dateien kopiert). 15 `.cmd`-Starter, `LIESMICH.txt` und `_system` liegen auf oberster Ebene. Alle 5 Verzeichnisse und **488 Dateien** (214.810.487 Bytes) stimmen per SHA-256 mit dem Bauordner überein.
 - **Versionsbereinigung:** `2026-11-20_10-42` bleibt als Vorversion. `2026-11-20_09-06` stimmte in allen 488 Dateien und im Verzeichnisbestand mit seinem Bauordner überein, keine Laufzeitdaten zu sichern; nach Pfadprüfung entfernt.
 - **Prüfumfang:** Headless-UI und Paketvorbereitung mit den selbstenthaltenden Programmen. Nativer Fenster- und Schulnetztest stehen aus.
+
+### Konzeptpapier Ausbaustufe M6 (27.11.2026)
+
+- **Umfang:** Nur Dokumentation: neues Konzept `docs/M6_ONLINE_ANMELDUNG.md` (Online-Kurswahl mit LDAP-Anmeldung), Verweise in Anforderungen, README, AGENTS und Offenen Punkten. Keine Änderung an Code, Regeln, Datenformaten oder Darstellung; Browser-Testversion unberührt.
+- **Tests:** Nicht ausgeführt. In der verwendeten Cloud-Umgebung ist kein .NET-SDK und kein PowerShell installiert; da kein Code geändert wurde, gilt der zuletzt protokollierte Stand (428/428 Tests, 15/15 Schemaprüfungen) unverändert, ohne neuen Nachweis.
