@@ -26,12 +26,12 @@ public sealed class ImportColumnPicker : StackPanel
         ("imp", "IMP besucht", "IMP besucht: ja/nein; leer bedeutet unbekannt. Getrennt vom Brückenkurs erfassen."),
         ("bilingual", "Durchgängig bilingual", "Durchgängiger bilingualer Bildungsgang: ja/nein; leer bedeutet unbekannt."),
         ("religion", "Religion/Ethik in Klasse 10", "Fachkennung ETH, ER oder KR; leer bedeutet unbekannt."),
-        ("sport", "Sportbefreiung: Halbjahre", "Halbjahre mit Komma trennen, z. B. 1,2. keine bestätigt keine Befreiung; leer bedeutet unbekannt. Keine Diagnosen."),
+        ("sport", "Sportbefreiung: Halbjahre", "Halbjahre mit Komma trennen, z. B. „1,2“. „keine“ bestätigt, dass keine Befreiung besteht; leer bedeutet unbekannt. Keine Diagnosen."),
         ("languages", "Bestätigte Sprachlaufbahnen", "Fachkennungen fortgeführter Sprachen mit Komma trennen, z. B. E,F. Nur bestätigte Angaben übernehmen."),
         ("religionPermission", "Religion/Ethik: Belegung freigegeben", "Administrative Bestätigung: ja/nein; leer bedeutet unbekannt."),
         ("religionExamPermission", "Religion/Ethik: Prüfung freigegeben", "Administrative Bestätigung für die mündliche Prüfung: ja/nein; leer bedeutet unbekannt."),
         ("permanentSport", "Dauerhafte Sportbefreiung", "ja/nein; leer bedeutet unbekannt. Keine medizinischen Details."),
-        ("departure", "Abgängerstatus", "aktiv, voraussichtlich oder bestaetigt. Leer wird als aktiv übernommen.")
+        ("departure", "Abgängerstatus", "aktiv, voraussichtlich oder bestätigt. Leer wird als aktiv übernommen.")
     ];
 
     public ImportColumnPicker() { Spacing = 8; Clear(); }

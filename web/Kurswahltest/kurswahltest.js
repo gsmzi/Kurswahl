@@ -210,8 +210,8 @@
       requireRule(offer.subjectId !== "INF" || (offer.type === "bf" && arraysEqual(semesters, [1, 2, 3, 4])
         && offer.schedule.every((s) => s.weeklyHours === 3) && offer.requirements.includes("informatics")),
       "CATALOG-INF", "Informatik benötigt BF HJ 1–4, drei Stunden und Vorbildungsprüfung.");
-      requireRule(offer.subjectId !== "I" || ((offer.type === "bf" || offer.type === "lf") && arraysEqual(semesters, [1, 2, 3, 4]) && offer.requirements.includes("italian_profile")),
-        "CATALOG-I-PROFILE", "Italienisch benötigt HJ 1–4 und die Profilprüfung.");
+      requireRule(offer.subjectId !== "I" || (offer.type === "bf" && arraysEqual(semesters, [1, 2, 3, 4]) && offer.requirements.includes("italian_profile")),
+        "CATALOG-I-PROFILE", "Italienisch wird nur als Basisfach in HJ 1–4 mit Profilprüfung angeboten.");
       requireRule(offer.variant !== "bilingual" || offer.requirements.includes("continuous_bilingual"),
         "CATALOG-BILINGUAL", "Bilinguale Angebote benötigen die Bili-Vorbildungsprüfung.");
       return messages;
@@ -380,7 +380,7 @@
         const unknownAlternative = scienceCount > 0 && (
           full.some((s) => {
             const subj = catalog.subjects.find((x) => x.id === s);
-            const isLang = ["I", "F", "L", "GR", "SPA", "RU", "POR"].includes(s) || Boolean(subj && subj.isForeignLanguage);
+            const isLang = (s !== "E" && AcademicRules.isLanguageSubject(s)) || Boolean(subj && subj.isForeignLanguage);
             return isLang && !languages.includes(s) && !AcademicRules.languageExcluded(s, profile, catalog);
           }) || (full.includes("INF") && (profile.status !== "verified"
             || profile.prerequisites.informaticsImp === "unknown"
@@ -427,13 +427,13 @@
         relSubjects);
       } else if ((grade10 === "KR" || grade10 === "ER") && chosenRelEthics.includes("ETH")) {
         add("AGVO-RELIGION",
-          "Austritt aus dem Religionsunterricht muss beantragt werden. Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig."
+          "Die Abmeldung vom Religionsunterricht muss beantragt werden. Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig."
           + (AcademicRules.assessmentSubject(choice, profile) === "ETH" ? " Du planst Ethik mündlich: Die Feststellungsprüfung findet zu Beginn des 1. Halbjahres statt (AGVO § 21 Abs. 2 Nr. 5)." : "")
           + " Bitte mit der Oberstufenberatung klären.",
           ["ETH"]);
       } else if (switchedRelEthics) {
         add("AGVO-RELIGION",
-          `Wechsel der Belegung gegenüber Klasse 10 (${grade10} -> ${chosenRelEthics.join("/")}): Für eine mündliche Prüfung im gewechselten Fach ist eine Feststellungsprüfung zu Beginn des 1. Schulhalbjahres erforderlich (AGVO § 21 Abs. 2 Nr. 4/5). Bitte mit der Oberstufenberatung klären.`,
+          `Wechsel der Belegung gegenüber Klasse 10 (${grade10} -> ${chosenRelEthics.join("/")}): Für eine mündliche Prüfung im gewechselten Fach ist eine Feststellungsprüfung zu Beginn des 1. Halbjahres erforderlich (AGVO § 21 Abs. 2 Nr. 4/5). Bitte mit der Oberstufenberatung klären.`,
           chosenRelEthics);
       } else if (chosenRelEthics.length > 0 && (p.religionEthicsPermission === "no"
         || (p.religionEthicsPermission === "unknown"
@@ -813,7 +813,7 @@
       const lf = ChoiceWorkflow._lf(choice);
       const sciences = AcademicRules.scienceSubjects(catalog);
       if (lf.length !== 3 || distinct(lf).length !== 3) return "PLAN-LF: Bitte genau drei verschiedene Leistungsfächer wählen.";
-      if (lf.some((s) => AcademicRules.field(s, context, catalog) === 0 && s !== "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Fachangebots klären.";
+      if (lf.some((s) => AcademicRules.field(s, context, catalog) === 0 && s !== "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Fachangebots.";
       if (lf.filter((s) => CORE_SUBJECTS.includes(s) || sciences.includes(s) || AcademicRules.languages(context, catalog).includes(s)).length < 2) {
         return "PLAN-LF: Mindestens zwei LF aus Deutsch, Mathematik, fortgeführten Fremdsprachen oder BIO/CH/PH wählen.";
       }
@@ -1956,13 +1956,14 @@
       }
     }
 
-    function addRestricted(parent, offers, header) {
+    // Task cards pass their own explanations: they can be stricter than the general availability of the offer.
+    function addRestricted(parent, offers, header, explanations = null) {
       if (offers.length === 0) return;
       const body = el("div", { className: "expander-body" });
       for (const offer of offers) {
         body.appendChild(el("p", {
           className: "small-muted",
-          textContent: displayText(`${offerLabel(offer)}: ${session.availability(offer).explanation}`)
+          textContent: displayText(`${offerLabel(offer)}: ${explanations ? explanations[offers.indexOf(offer)] : session.availability(offer).explanation}`)
         }));
       }
       parent.appendChild(el("details", { className: "expander" }, [
@@ -2020,8 +2021,9 @@
         () => updatePrior((x) => ({ ...x, continuedLanguages: buildLanguages(true, false, x.italianProfile === "yes") })));
       addRadio(langGroup, "Prereq_Lang_L", "Prereq_Lang", "Englisch + Latein", hasL && !hasF,
         () => updatePrior((x) => ({ ...x, continuedLanguages: buildLanguages(false, true, x.italianProfile === "yes") })));
-      addRadio(langGroup, "Prereq_Lang_FL", "Prereq_Lang", "Englisch + Französisch und Latein", hasF && hasL,
-        () => updatePrior((x) => ({ ...x, continuedLanguages: buildLanguages(true, true, x.italianProfile === "yes") })));
+      if (hasF && hasL) {
+        langGroup.appendChild(el("p", { role: "alert", textContent: "In deinem Entwurf stehen Französisch und Latein. Bitte wähle deine zweite Fremdsprache aus." }));
+      }
       container.appendChild(langGroup);
 
       const profileGroup = el("div", { className: "prereq-group" }, [
@@ -2202,7 +2204,7 @@
             ]);
             card.appendChild(optionBox(lbl, chosen));
           }
-          addRestricted(card, task.restricted.map((r) => session.catalog.offers.find((o) => o.id === r.offerId)), "weitere Angebote brauchen ein geprüftes Profil oder sind nicht freigegeben");
+          addRestricted(card, task.restricted.map((r) => session.catalog.offers.find((o) => o.id === r.offerId)), "Weitere derzeit nicht wählbare Angebote", task.restricted.map((r) => r.explanation));
           if (task.isSatisfied && expandedTask === task.id) {
             card.appendChild(el("div", {}, el("button", {
               type: "button",
@@ -2238,7 +2240,7 @@
 
     function renderExtraStep(container) {
       container.appendChild(el("h2", { className: "step-title", textContent: "Weitere Kurse" }));
-      container.appendChild(el("p", { className: "step-hint", textContent: "Ergänze Kurse, bis du das Planungsziel erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten." }));
+      container.appendChild(el("p", { className: "step-hint", textContent: "Ergänze Kurse, bis du die Mindestzahl erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten." }));
       container.appendChild(el("p", {
         className: "section-heading",
         style: progressCourses() >= MINIMUM_COURSES ? "color: var(--done);" : undefined,
@@ -2302,7 +2304,7 @@
           });
           container.appendChild(optionBox(el("label", { className: "option-label" }, [
             box,
-            el("span", { textContent: offerLabel(offer) + ` · +${offer.schedule.length} Kurse` })
+            el("span", { textContent: offerLabel(offer) + (offer.schedule.length === 1 ? " · +1 Kurs" : ` · +${offer.schedule.length} Kurse`) })
           ]), false));
         }
       }

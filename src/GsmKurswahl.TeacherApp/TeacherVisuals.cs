@@ -38,7 +38,7 @@ public sealed partial class TeacherWindow
     {
         ReviewStatus.Valid => "Formal gültig",
         ReviewStatus.NeedsReview => "Fachlich zu klären",
-        ReviewStatus.Invalid => "Regelverstoß",
+        ReviewStatus.Invalid => "Regelverletzung",
         _ => "Ohne Wahl"
     };
     internal static string FormatKnowledge(Knowledge value) => value switch
@@ -387,7 +387,7 @@ public sealed partial class TeacherWindow
             values = [
                 (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen.", () => ShowPage("people")),
                 (summary.Choices.ToString(), "Wahlen eingelesen", "Alle Schüler dieses Jahrgangs haben eine erfasste Kurswahl.", () => { choiceFilter = new(); ShowResults(); }),
-                (summary.Reselections.ToString(), "Offene Nachwahlen", "Schüler, die nach einer Kursstreichung oder wegen eines Regelverstoßes erneut wählen müssen.", () => { choiceFilter = new(State: ChoiceStateFilter.ReselectionOpen); ShowResults(); }),
+                (summary.Reselections.ToString(), "Offene Nachwahlen", "Schüler, die nach einer Kursstreichung oder wegen einer Regelverletzung erneut wählen müssen.", () => { choiceFilter = new(State: ChoiceStateFilter.ReselectionOpen); ShowResults(); }),
                 (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen oder Sonderfällen.", () => { choiceFilter = new(State: ChoiceStateFilter.NeedsReview); ShowResults(); })];
         for (var i = 0; i < values.Length; i++)
         {

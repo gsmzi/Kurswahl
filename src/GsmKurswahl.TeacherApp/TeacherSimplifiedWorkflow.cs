@@ -125,7 +125,7 @@ public sealed partial class TeacherWindow
         var summaryBar = new StackPanel { Spacing = 8 };
         summaryBar.Children.Add(new TextBlock
         {
-            Text = $"{importRows.Length} Zeilen geprüft: {countNew} neu · {countDiff} Abweichungen · {countSame} unverändert · {countKeep} Korrektur behalten · {countError} Fehler",
+            Text = $"{importRows.Length} Zeilen geprüft: {countNew} neu · {countDiff} abweichend · {countSame} unverändert · {countKeep} Korrektur behalten · {countError} Fehler",
             FontWeight = FontWeight.SemiBold, Foreground = countError > 0 ? Brush.Parse("#785311") : Ink, TextWrapping = TextWrapping.Wrap
         });
         var barActions = new WrapPanel { Orientation = Orientation.Horizontal };
@@ -375,7 +375,7 @@ public sealed partial class TeacherWindow
                 var delivery = service.DeliverProgram(store.Students().Single(s => s.Student.ExternalStudentId == record.Student.ExternalStudentId), program);
                 programText = delivery.Status == "verteilt" ? " · Programm bereitgestellt" : " · Programm: " + DistributionText(delivery.Status);
             }
-            return (current.Student.DisplayName + ": " + result.Status + programText, result.Status == "verteilt");
+            return (current.Student.DisplayName + ": " + DistributionText(result.Status) + programText, result.Status == "verteilt");
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException)
         { return (record.Student.DisplayName + ": " + ex.Message, false); }

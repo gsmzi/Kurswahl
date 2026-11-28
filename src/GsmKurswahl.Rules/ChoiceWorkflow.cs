@@ -36,14 +36,6 @@ public static class ChoiceWorkflow
     ];
 
     private static string[] Lf(CourseChoice choice) => choice.Selections.Where(s => s.Type == CourseType.Lf).Select(s => s.SubjectId).ToArray();
-    private static int Field(string subject) => subject switch
-    {
-        "D" or "E" or "BK" or "MU" => 1,
-        "G" or "GK" or "GEO" or "W" or "ETH" or "ER" or "KR" => 2,
-        "M" or "BIO" or "CH" or "PH" or "INF" => 3,
-        _ => 0
-    };
-
     public static ImmutableArray<string> ForcedOral(CourseChoice choice) =>
         [.. new[] { "D", "M" }.Except(Lf(choice))];
 
@@ -72,7 +64,7 @@ public static class ChoiceWorkflow
         var lf = Lf(choice);
         var sciences = AcademicRules.ScienceSubjects(catalog);
         if (lf.Length != 3 || lf.Distinct().Count() != 3) return "PLAN-LF: Bitte genau drei verschiedene Leistungsfächer wählen.";
-        if (lf.Any(s => AcademicRules.Field(s, context, catalog) == 0 && s != "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Fachangebots klären.";
+        if (lf.Any(s => AcademicRules.Field(s, context, catalog) == 0 && s != "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Fachangebots.";
         if (lf.Count(s => Core.Contains(s) || sciences.Contains(s) || AcademicRules.Languages(context, catalog).Contains(s)) < 2) return "PLAN-LF: Mindestens zwei LF aus Deutsch, Mathematik, fortgeführten Fremdsprachen oder BIO/CH/PH wählen.";
         if (choice.Selections.Where(s => s.Type == CourseType.Lf).Any(s => s.Semesters.Length != 4
             || !catalog.Offers.Any(o => o.Id == s.OfferId && o.SubjectId == s.SubjectId && o.Type == s.Type

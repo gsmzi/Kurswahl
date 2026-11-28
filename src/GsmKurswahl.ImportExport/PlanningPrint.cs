@@ -56,8 +56,8 @@ public static class PlanningPrint
     /// <summary>One line per pupil of the displayed group.</summary>
     public static byte[] Overview(int year, string filter, string[][] rows)
     {
-        using var pdf = new SchoolPaper("Kurswahlen - Übersicht", year);
-        pdf.Title("Kurswahlen - Übersicht");
+        using var pdf = new SchoolPaper("Kurswahlen – Übersicht", year);
+        pdf.Title("Kurswahlen – Übersicht");
         pdf.Paragraph(filter + $"  |  {rows.Length} Personen");
         pdf.Paragraph("LF = Leistungsfach · BF = Basisfach · bili = bilingual · mündliche Fächer sind unverbindlich geplant.", true);
         pdf.Table(["Name", "Kl.", "LF", "Basis- und Wahlfächer", "Mündl.", "Prüfstand"], rows, [100, 32, 80, 175, 50, 78]);

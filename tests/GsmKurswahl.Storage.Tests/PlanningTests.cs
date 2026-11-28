@@ -184,7 +184,7 @@ public sealed class PlanningTests : IDisposable
 
         CoursePlanning.Confirm(store, preview, "demo-beratung", "PSY-WF und BIO-LF-BILI gestrichen", true);
         Assert.False(store.Reselection(psyStudent.Record.Student.ExternalStudentId).Required);
-        Assert.Contains("weiterhin strukturell gültig", store.Reselection(psyStudent.Record.Student.ExternalStudentId).Note);
+        Assert.Contains("nach Streichung weiterhin", store.Reselection(psyStudent.Record.Student.ExternalStudentId).Note);
         Assert.True(store.Reselection(biliStudent.Record.Student.ExternalStudentId).Required);
         Assert.Contains("Nachwahl erforderlich", store.Reselection(biliStudent.Record.Student.ExternalStudentId).Note);
     }

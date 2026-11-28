@@ -166,7 +166,7 @@ public static class DocumentGuidance
         {
             summaryNote = removedOffers.Length > 0
                 ? "Deine verbleibende Kurswahl erfüllt weiterhin alle Pflichtbedingungen. Eine Nachwahl ist nur nötig, wenn du stattdessen freiwillig ein anderes Fach wählen möchtest."
-                : "Aktuell liegen keine Regelverstöße vor. Falls du dennoch eine Änderung wünschst, trage sie unten ein.";
+                : "Aktuell liegen keine Regelverletzungen vor. Falls du dennoch eine Änderung wünschst, trage sie unten ein.";
         }
 
         return new([.. steps], summaryNote);
@@ -193,7 +193,7 @@ public static class DocumentGuidance
 
     private static (string Heading, string Text) DescribeTask(ChoiceTask task) => task.Id switch
     {
-        "PLAN-AREA-ART" => ("Kunst oder Musik (HJ 1–4)", "Du brauchst durchgehend vier Halbjahreskurse in Bildende Kunst oder Musik."),
+        "PLAN-AREA-ART" => ("Kunst oder Musik (HJ 1–4)", "Du brauchst durchgehend vier Halbjahreskurse in Bildender Kunst oder Musik."),
         "PLAN-AREA-RELIGION" => ("Religion oder Ethik (HJ 1–4)", "Du brauchst durchgehend vier Halbjahreskurse in Religion oder Ethik."),
         "PLAN-AREA-LANGUAGE" => ("Fortgeführte Fremdsprache (HJ 1–4)", "Du brauchst mindestens eine fortgeführte Fremdsprache über alle vier Halbjahre (als Leistungsfach oder Basisfach)."),
         "PLAN-AREA-SCIENCE" => ("Naturwissenschaft (HJ 1–4)", "Du brauchst mindestens eine Naturwissenschaft über alle vier Halbjahre (als Leistungsfach oder Basisfach)."),

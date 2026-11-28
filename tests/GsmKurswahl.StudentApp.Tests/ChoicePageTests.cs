@@ -70,10 +70,10 @@ public sealed class ChoicePageTests
                 // Without the explicit confirmation a violating choice is not stored.
                 ClickNamed("ChoiceSave");
                 Assert.True(Failed());
-                Assert.DoesNotContain("Regelverstoß", Named<TextBlock>("ResultReview_demo-001").Text);
+                Assert.DoesNotContain("Regelverletzung", Named<TextBlock>("ResultReview_demo-001").Text);
                 Named<CheckBox>("ChoiceForce").IsChecked = true;
                 ClickNamed("ChoiceSave");
-                Assert.Contains("Regelverstoß", Named<TextBlock>("ResultReview_demo-001").Text);
+                Assert.Contains("Regelverletzung", Named<TextBlock>("ResultReview_demo-001").Text);
                 Assert.Contains("Nachwahl", Named<TextBlock>("ResultReview_demo-001").Text);
                 // The pupil now shows up under "Nachwahl offen" and "Unvollständige Kurswahl"; the re-election sheet can be printed.
                 Named<ComboBox>("ResultsStatusFilter").SelectedIndex = (int)ChoiceStateFilter.ReselectionOpen; window.UpdateLayout();
@@ -90,7 +90,7 @@ public sealed class ChoicePageTests
                 ClickNamed("ChoiceSave");
                 Named<ComboBox>("ResultsStatusFilter").SelectedIndex = 0; window.UpdateLayout();
                 Assert.DoesNotContain("Nachwahl", Named<TextBlock>("ResultReview_demo-001").Text);
-                Assert.DoesNotContain("Regelverstoß", Named<TextBlock>("ResultReview_demo-001").Text);
+                Assert.DoesNotContain("Regelverletzung", Named<TextBlock>("ResultReview_demo-001").Text);
                 Capture("kurswahlen-bearbeiten");
                 ClickNamed("ChoiceClose");
                 Assert.False(Named<ContentControl>("ChoiceDetail").IsVisible);

@@ -148,7 +148,7 @@ public sealed partial class TeacherWindow
                 .ThenBy(x => x.Student.Student.SortName().Last, StringComparer.CurrentCulture)
                 .ThenBy(x => x.Student.Student.SortName().First, StringComparer.CurrentCulture)
                 .ThenBy(x => x.Change.StudentId, StringComparer.Ordinal).ToArray();
-            impact.Children.Add(new TextBlock { Text = $"{affected.Length} betroffene Schüler · Vorschau, noch keine Änderung gespeichert", FontWeight = FontWeight.SemiBold });
+            impact.Children.Add(new TextBlock { Text = $"{(affected.Length == 1 ? "1 betroffene Person" : affected.Length + " betroffene Personen")} · Vorschau, noch keine Änderung gespeichert", FontWeight = FontWeight.SemiBold });
             const string columns = "180,55,170,180,*";
             impact.Children.Add(new Border { Background = SoftAccent, Child = CompactLine(columns, [Text("Schüler"), Text("Klasse"), Text("Entfällt"), Text("Verbleibende LF"), Text("Verbleibende BF / Wahlfächer")]) });
             var rowIndex = 0;
@@ -218,7 +218,7 @@ public sealed partial class TeacherWindow
                     }
                     catch (Exception ex)
                     {
-                        SetStatus("Streichung ist gespeichert. Nachwahlbögen konnten nicht vollständig erstellt werden: " + ex.Message + ". Über Nachwahlbögen erneut erstellen wiederholen.", FeedbackKind.Warning);
+                        SetStatus("Streichung ist gespeichert. Nachwahlbögen konnten nicht vollständig erstellt werden: " + ex.Message.TrimEnd('.') + ". Mit „Nachwahlbögen jetzt erstellen“ wiederholen.", FeedbackKind.Warning);
                     }
                 }
                 else
@@ -276,7 +276,7 @@ public sealed partial class TeacherWindow
                     try { CreateReselectionSheets(); }
                     catch (Exception ex) { SetStatus("Kurs gestrichen. Nachwahlbögen konnten nicht erstellt werden: " + ex.Message, FeedbackKind.Warning); return; }
                 }
-                SetStatus($"{title} gestrichen und bei {(affected.Length == 1 ? "einer Person" : affected.Length + " Personen")} entfernt. {open} brauchen eine Nachwahl: unter „Kurswahlen“ den Filter „Nachwahl offen“ wählen, dort direkt eintragen oder Nachwahlbögen drucken.", FeedbackKind.Success);
+                SetStatus($"{title} gestrichen und bei {(affected.Length == 1 ? "einer Person" : affected.Length + " Personen")} entfernt. " + (open == 0 ? "Niemand braucht eine Nachwahl." : $"{(open == 1 ? "Eine Person braucht" : open + " Personen brauchen")} eine Nachwahl: unter „Kurswahlen“ den Filter „Nachwahl offen“ wählen, dort direkt eintragen oder Nachwahlbögen drucken."), FeedbackKind.Success);
             }));
             confirm.Name = "CancelConfirm"; confirm.Margin = new Thickness(0, 0, 8, 0); cancelButtons.Children.Add(confirm);
             var abort = Button("Abbrechen", () => cancelHost.Children.Clear()); abort.Name = "CancelAbort"; cancelButtons.Children.Add(abort);

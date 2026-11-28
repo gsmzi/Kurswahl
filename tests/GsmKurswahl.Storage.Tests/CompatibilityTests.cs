@@ -306,4 +306,19 @@ public sealed class CompatibilityTests : IDisposable
         Assert.Equal("Programm_abweichend", distribution.DeliverProgram(record, program).Status);
         Assert.Equal("fremd", File.ReadAllText(Path.Combine(StudentFolderLayout.Program(home), "GsmKurswahl.StudentApp.exe")));
     }
+
+    [Fact]
+    public void PupilFolderInsideProgramSourceIsReportedInsteadOfAbortingTheBatch()
+    {
+        using var store = new SqliteAdministrationStore(Path.Combine(root, "admin.db"));
+        var program = Path.Combine(root, "publish"); Directory.CreateDirectory(program); SchoolDefaultsTests.SelfContainedStub(program);
+        File.WriteAllText(Path.Combine(program, "GsmKurswahl.StudentApp.exe"), "exe");
+        var home = Path.Combine(program, "home"); Directory.CreateDirectory(home);
+        var record = Record with { HomeDirectory = home, Version = 1, Origin = null };
+        store.SaveStudent(record, null);
+        var entry = new ProfileDistribution(store).DeliverProgram(record, program);
+        Assert.Equal("Programmquelle_ungeeignet", entry.Status);
+        Assert.Contains("Quellordner", entry.Detail);
+        Assert.False(Directory.Exists(StudentFolderLayout.Program(home)));
+    }
 }

@@ -41,7 +41,7 @@ public sealed class ChoiceReconciliation(IAdministrationStore store, OfferCatalo
                 {
                     DepartureStatus.ConfirmedDeparture => "In ASV-Datei nicht enthalten (in GSM-Kurswahl als bestätigter Abgänger markiert).",
                     DepartureStatus.ExpectedDeparture => "In ASV-Datei nicht enthalten (in GSM-Kurswahl als voraussichtlicher Abgänger markiert).",
-                    _ => "In externer Datei nicht enthalten. Keine Löschung oder Änderung."
+                    _ => "In ASV-Datei nicht enthalten. Keine Löschung oder Änderung."
                 };
                 items.Add(new(id, ReconciliationKind.OnlyInternal, record, current, null, null, detail));
                 continue;

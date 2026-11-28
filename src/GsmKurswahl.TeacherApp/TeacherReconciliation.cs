@@ -29,7 +29,7 @@ public sealed partial class TeacherWindow
                 c.AssessmentSubject is null ? "nein" : "ja, " + c.AssessmentSubject,
                 c.ChangeDuringCourse && !c.Chosen.Contains("ETH") ? "Wechsel der Religionsgemeinschaft: Zustimmung beider Religionsgemeinschaften klären"
                     : c.ChangeDuringCourse ? "Abmeldung beantragen; weder Religion noch Ethik mündlich (KOE 3.3)"
-                    : c.Grade10 is "KR" or "ER" && c.Chosen.Contains("ETH") ? "Austritt aus dem Religionsunterricht beantragen" : "" })]);
+                    : c.Grade10 is "KR" or "ER" && c.Chosen.Contains("ETH") ? "Abmeldung vom Religionsunterricht beantragen" : "" })]);
     }
 
     private async Task ExportReligionCases()

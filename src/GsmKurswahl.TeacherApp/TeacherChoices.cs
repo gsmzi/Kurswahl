@@ -37,7 +37,7 @@ public sealed partial class TeacherWindow
         var classItems = new[] { new FilterItem(null, "Alle Klassen") }.Concat(ChoiceOverview.Classes(all).Select(c => new FilterItem(c, "Klasse " + c))).ToArray();
         var classBox = new ComboBox { Name = "ResultsClassFilter", ItemsSource = classItems, SelectedItem = classItems.FirstOrDefault(i => i.Value == choiceFilter.ClassName) ?? classItems[0], MinWidth = 130, Margin = new Thickness(0, 0, 8, 6) };
         var stateBox = new ComboBox { Name = "ResultsStatusFilter", SelectedIndex = (int)choiceFilter.State, MinWidth = 200, Margin = new Thickness(0, 0, 8, 6),
-            ItemsSource = new[] { "Alle Prüfstände", "Ohne Wahl", "Unvollständige Kurswahl", "Regelverletzung (rot)", "Zu prüfen (gelb)", "Formal gültig", "Nachwahl offen", "Feststellungsprüfung nötig" } };
+            ItemsSource = new[] { "Alle Prüfstände", "Ohne Wahl", "Unvollständige Kurswahl", "Regelverletzung (rot)", "Fachlich zu klären (gelb)", "Formal gültig", "Nachwahl offen", "Feststellungsprüfung nötig" } };
         var offerItems = new[] { new FilterItem(null, "Alle Kurse") }.Concat(session!.Catalog.Offers
             .Where(o => o.Status is OfferStatus.Offered or OfferStatus.Established || all.Any(s => s.Active?.Snapshot.Selections.Any(c => c.OfferId == o.Id) == true))
             .OrderBy(o => SubjectName(o.SubjectId), StringComparer.CurrentCulture).ThenBy(o => o.Type).ThenBy(o => o.Variant)
@@ -85,7 +85,7 @@ public sealed partial class TeacherWindow
             detail.Content = open ? BuildChoiceEditor(selected!, Render) : null;
             var withChoice = all.Where(s => s.Active is not null).ToArray();
             summary.Text = $"{shown.Length} von {all.Length} Personen angezeigt · {withChoice.Length} Kurswahlen · {all.Length - withChoice.Length} ohne Wahl · "
-                + $"{withChoice.Count(s => s.Validation?.Status == ReviewStatus.Invalid)} mit Regelverletzung · {withChoice.Count(s => s.Validation?.Status == ReviewStatus.NeedsReview)} zu prüfen · "
+                + $"{withChoice.Count(s => s.Validation?.Status == ReviewStatus.Invalid)} mit Regelverletzung · {withChoice.Count(s => s.Validation?.Status == ReviewStatus.NeedsReview)} fachlich zu klären · "
                 + $"{all.Count(s => s.RequiresReselection)} Nachwahl offen. Name anklicken, um die Wahl zu bearbeiten.";
             var columns = open ? "175,45,120,48,*,115" : "175,45,125,*,48,80,165,125";
             header.Content = new Border { Background = SoftAccent, Child = CompactLine(columns, open
@@ -105,7 +105,7 @@ public sealed partial class TeacherWindow
                 var review = Text(FormatStatus(state.Validation?.Status) + (state.RequiresReselection ? " · Nachwahl" : "") + (religion?.AssessmentSubject is { } fp ? " · FP " + fp : ""));
                 review.Name = "ResultReview_" + id;
                 review.Foreground = state.Validation?.Status switch { ReviewStatus.Invalid => Red, ReviewStatus.NeedsReview => Yellow, ReviewStatus.Valid => Green, _ => Muted };
-                var hints = ChoiceOverview.Violations(state.Validation).Select(v => "Regelverletzung: " + v).Concat(ChoiceOverview.Hints(state.Validation).Select(h => "Zu prüfen: " + h)).ToArray();
+                var hints = ChoiceOverview.Violations(state.Validation).Select(v => "Regelverletzung: " + v).Concat(ChoiceOverview.Hints(state.Validation).Select(h => "Fachlich zu klären: " + h)).ToArray();
                 ToolTip.SetTip(review, new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = 520,
                     Text = state.Active is null ? "Noch keine Kurswahl." : hints.Length == 0 ? "Keine offenen Punkte." : string.Join("\n\n", hints) });
                 var departure = new ComboBox { Name = "ResultDeparture_" + id, ItemsSource = new[] { "Aktiv", "Voraussichtlich", "Bestätigt" }, SelectedIndex = (int)record.Student.Departure,

@@ -25,7 +25,7 @@ public sealed class ProfileReader
             return Verify(ReadBounded(Path.Combine(directory, "profil.json")), studentId, graduationYear);
         }
         catch (FileNotFoundException) { return ProfileContext.Missing with { Detail = "Profildatei fehlt. Oberstufenberatung kontaktieren." }; }
-        catch (DirectoryNotFoundException) { return ProfileContext.Missing; }
+        catch (DirectoryNotFoundException) { return ProfileContext.Missing with { Detail = "Profilordner fehlt. Oberstufenberatung kontaktieren." }; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         { return Invalid("Profil nicht lesbar. Wahlentwurf bleibt erhalten."); }
     }

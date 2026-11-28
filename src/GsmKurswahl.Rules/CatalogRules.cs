@@ -42,8 +42,8 @@ public static class CatalogRules
         Require(offer.SubjectId != "INF" || (offer.Type == CourseType.Bf && semesters.SequenceEqual([1, 2, 3, 4])
             && offer.Schedule.All(s => s.WeeklyHours == 3) && offer.Requirements.Contains(Requirement.Informatics)),
             "CATALOG-INF", "Informatik benötigt BF HJ 1–4, drei Stunden und Vorbildungsprüfung.");
-        Require(offer.SubjectId != "I" || ((offer.Type is CourseType.Bf or CourseType.Lf) && semesters.SequenceEqual([1, 2, 3, 4]) && offer.Requirements.Contains(Requirement.ItalianProfile)),
-            "CATALOG-I-PROFILE", "Italienisch benötigt HJ 1–4 und die Profilprüfung.");
+        Require(offer.SubjectId != "I" || (offer.Type == CourseType.Bf && semesters.SequenceEqual([1, 2, 3, 4]) && offer.Requirements.Contains(Requirement.ItalianProfile)),
+            "CATALOG-I-PROFILE", "Italienisch wird nur als Basisfach in HJ 1–4 mit Profilprüfung angeboten.");
         Require(offer.Variant != CourseVariant.Bilingual || offer.Requirements.Contains(Requirement.ContinuousBilingual),
             "CATALOG-BILINGUAL", "Bilinguale Angebote benötigen die Bili-Vorbildungsprüfung.");
         return messages.ToImmutable();

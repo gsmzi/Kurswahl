@@ -396,8 +396,8 @@ public sealed class MainWindow : Window
             () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(true, false, x.ItalianProfile == Knowledge.Yes) }));
         AddRadio(langGroup, "Prereq_Lang_L", "Prereq_Lang", "Englisch + Latein", hasL && !hasF,
             () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(false, true, x.ItalianProfile == Knowledge.Yes) }));
-        AddRadio(langGroup, "Prereq_Lang_FL", "Prereq_Lang", "Englisch + Französisch und Latein", hasF && hasL,
-            () => UpdatePrior(x => x with { ContinuedLanguages = BuildLanguages(true, true, x.ItalianProfile == Knowledge.Yes) }));
+        if (hasF && hasL)
+            langGroup.Children.Add(Text("In deinem Entwurf stehen Französisch und Latein. Bitte wähle deine zweite Fremdsprache aus.", 12));
         panel.Children.Add(GroupCard(langGroup));
 
         var profileGroup = new StackPanel { Spacing = 6 };
@@ -556,7 +556,7 @@ public sealed class MainWindow : Window
             };
             card.Children.Add(Option(toggle, chosen));
         }
-        AddRestricted(card, [.. task.Restricted.Select(r => session.Catalog.Offers.Single(o => o.Id == r.OfferId))], "weitere Angebote brauchen ein geprüftes Profil oder sind nicht freigegeben");
+        AddRestricted(card, [.. task.Restricted.Select(r => (session.Catalog.Offers.Single(o => o.Id == r.OfferId), r.Explanation))], "Weitere derzeit nicht wählbare Angebote");
         if (task.IsSatisfied && expandedTask == task.Id)
         {
             var close = new Button { Name = "TaskDone", Content = "Fertig" };
@@ -568,7 +568,7 @@ public sealed class MainWindow : Window
 
     private Control ExtraStep()
     {
-        var panel = Step("Weitere Kurse", "Ergänze Kurse, bis du das Planungsziel erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten.");
+        var panel = Step("Weitere Kurse", "Ergänze Kurse, bis du die Mindestzahl erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten.");
         panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold, ProgressCourses >= ChoiceWorkflow.MinimumCourses ? Done : null));
         var adjustable = session.Choice.Selections.Where(s => s.Type != CourseType.Lf).Select(s => (Selection: s, Offer: session.Catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId)))
             .Where(x => x.Offer is not null && (!session.LockedSemesters(x.Selection.OfferId).Any() || x.Offer.Schedule.Length > session.LockedSemesters(x.Selection.OfferId).Length)).ToArray();
@@ -583,7 +583,7 @@ public sealed class MainWindow : Window
             panel.Children.Add(Text("Kurs hinzufügen", 15, FontWeight.SemiBold));
             foreach (var offer in extras)
             {
-                var box = new CheckBox { Name = ControlName("Offer", offer.Id), Content = OfferLabel(offer) + $" · +{offer.Schedule.Length} Kurse", IsEnabled = !session.IsBusy };
+                var box = new CheckBox { Name = ControlName("Offer", offer.Id), Content = OfferLabel(offer) + (offer.Schedule.Length == 1 ? " · +1 Kurs" : $" · +{offer.Schedule.Length} Kurse"), IsEnabled = !session.IsBusy };
                 box.IsCheckedChanged += (_, _) => Edit(() => session.SetSelection(offer.Id, offer.Schedule.Select(h => h.Semester)));
                 panel.Children.Add(Option(box, false));
             }
@@ -852,11 +852,15 @@ public sealed class MainWindow : Window
         return $"{count} von {ChoiceWorkflow.MinimumCourses} Halbjahreskursen" + (CountWithoutSeminar ? " ohne SIA" : "") + (missing > 0 ? $" – noch {missing}" : " – Mindestzahl erreicht");
     }
 
-    private void AddRestricted(StackPanel panel, ImmutableArray<CourseOffer> offers, string header)
+    private void AddRestricted(StackPanel panel, ImmutableArray<CourseOffer> offers, string header) =>
+        AddRestricted(panel, [.. offers.Select(o => (o, session.Availability(o).Explanation))], header);
+
+    // Task cards pass their own explanation: it can be stricter than the general availability of the offer.
+    private void AddRestricted(StackPanel panel, (CourseOffer Offer, string Explanation)[] offers, string header)
     {
-        if (offers.IsEmpty) return;
+        if (offers.Length == 0) return;
         var list = new StackPanel { Spacing = 4 };
-        foreach (var offer in offers) list.Children.Add(Text($"{OfferLabel(offer)}: {session.Availability(offer).Explanation}", 12, color: Muted));
+        foreach (var (offer, explanation) in offers) list.Children.Add(Text($"{OfferLabel(offer)}: {explanation}", 12, color: Muted));
         panel.Children.Add(new Expander { Header = $"{header} ({offers.Length})", Content = list, HorizontalAlignment = HorizontalAlignment.Stretch, FontSize = 12 });
     }
 

@@ -70,7 +70,6 @@ public sealed class TeacherSession(IAdministrationStore store, OfferCatalog cata
         var role = source == RevisionSource.StudentSubmission ? ActorRole.Student : ActorRole.Teacher;
         var revision = new ChoiceRevision(Guid.NewGuid(), expectedActive, choice.StudentId, DateTimeOffset.UtcNow, actor,
             role, source, reason, Catalog.Version, ChoiceValidator.Version, choice, changes, origin);
-        _ = Validate(choice, record); // Always evaluate against current protected prerequisites, never a supplied profile.
         store.Append(revision, expectedActive);
         return revision;
     }

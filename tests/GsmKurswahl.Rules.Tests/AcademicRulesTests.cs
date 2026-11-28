@@ -260,7 +260,7 @@ public class AcademicRulesTests
         var result = Check(Complete, p, catalog);
         var relMsg = Assert.Single(result.Messages.Where(m => m.Rule.Id == "AGVO-RELIGION"));
         Assert.Equal(ReviewStatus.NeedsReview, relMsg.Rule.Severity);
-        Assert.Contains("Austritt aus dem Religionsunterricht muss beantragt werden.", relMsg.Explanation);
+        Assert.Contains("Die Abmeldung vom Religionsunterricht muss beantragt werden.", relMsg.Explanation);
         Assert.Contains("Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig.", relMsg.Explanation);
         Assert.Null(AcademicRules.AssessmentSubject(Complete, p));
         Assert.Equal(new[] { "ETH" }, AcademicRules.ReligionChange(Complete, p));

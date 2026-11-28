@@ -43,7 +43,7 @@ public sealed class ProfileDistribution(IAdministrationStore store)
             var data = Directory.CreateDirectory(StudentFolderLayout.Data(record.HomeDirectory)).FullName;
             using var lease = new FileStream(Path.Combine(data, ".profil.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             var path = Path.Combine(data, "profil.json");
-            var before = ReadExisting(path);
+            var before = ReadExisting(path, ProfileLimit);
             if (before is not null)
             {
                 var old = JsonSerializer.Deserialize<StudentProfile>(before, DocumentJson.Options);
@@ -57,7 +57,7 @@ public sealed class ProfileDistribution(IAdministrationStore store)
                 ModelGuard.Catalog(catalog);
                 if (catalog.GraduationYear != record.Student.GraduationYear) throw new InvalidDataException("Profil_abweichend");
                 var catalogPath = Path.Combine(data, "fachangebot.json");
-                var oldCatalog = ReadExisting(catalogPath);
+                var oldCatalog = ReadExisting(catalogPath, CatalogLimit);
                 if (oldCatalog is not null)
                 {
                     var parsed = JsonSerializer.Deserialize<OfferCatalog>(oldCatalog, DocumentJson.Options) ?? throw new JsonException();
@@ -91,7 +91,7 @@ public sealed class ProfileDistribution(IAdministrationStore store)
             if (!record.MappingConfirmed || !Path.IsPathFullyQualified(record.HomeDirectory) || !Directory.Exists(record.HomeDirectory)) throw new DirectoryNotFoundException();
             var target = StudentFolderLayout.Program(record.HomeDirectory);
             if (target.StartsWith(program.Directory.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("Programmordner darf nicht im Schülerordner liegen.");
+                throw new ArgumentException("Der Schülerordner darf nicht im Quellordner des Schülerprogramms liegen.");
             var previous = sql.LatestProgramDelivery(record.Student.ExternalStudentId)?.Files.ToDictionary(f => f.Path, f => f.Sha256, StringComparer.OrdinalIgnoreCase) ?? [];
             var files = program.Files;
             // Check every target first; nothing is written if any existing file is foreign or changed.
@@ -126,14 +126,19 @@ public sealed class ProfileDistribution(IAdministrationStore store)
         catch (DirectoryNotFoundException) { status = "nicht_gefunden"; detail = "Bestätigtes Zielverzeichnis nicht erreichbar."; }
         catch (UnauthorizedAccessException) { status = "Zugriff_verweigert"; detail = "Keine Schreibberechtigung am Ziel."; }
         catch (InvalidDataException ex) { status = ex.Message; detail = "Vorhandene Programmdateien weichen ab und bleiben unverändert."; }
+        // A wrong source or store must not abort the delivery to all remaining pupils of a batch.
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { status = "Programmquelle_ungeeignet"; detail = ex.Message; }
         catch (IOException) { status = "Zugriff_verweigert"; detail = "Programmdatei gesperrt (Programm geöffnet?) oder Schreibvorgang fehlgeschlagen."; }
         return new(Guid.NewGuid(), record.Student.ExternalStudentId, 0, DateTimeOffset.UtcNow, status, detail);
     }
-    private static byte[]? ReadExisting(string path)
+    private const int ProfileLimit = 64 * 1024;
+    // The offer catalog is much larger than a profile and grows with the number of offers.
+    private const int CatalogLimit = 4 * 1024 * 1024;
+    private static byte[]? ReadExisting(string path, int limit)
     {
         if (!File.Exists(path)) return null;
         using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (input.Length > 65536) throw new InvalidDataException("Profil_abweichend");
+        if (input.Length > limit) throw new InvalidDataException("Profil_abweichend");
         var bytes = new byte[(int)input.Length]; input.ReadExactly(bytes); return bytes;
     }
     private static void Replace(string path, byte[] bytes, byte[]? expected)

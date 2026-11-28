@@ -141,7 +141,7 @@ public static class AcademicRules
             && choice.Selections.Any(s => s.OfferId == o.Id) && new ChoiceValidator().GetAvailability(o, profile, catalog).CanSelect);
         if (scienceCount < 1 || languageCount < 1 || !(languageCount >= 2 || scienceCount + (inf ? 1 : 0) >= 2))
         {
-            var unknownAlternative = scienceCount > 0 && (full.Any(s => (s is "I" or "F" or "L" or "GR" or "SPA" or "RU" or "POR" || catalog.Subjects.FirstOrDefault(x => x.Id == s)?.IsForeignLanguage == true) && !languages.Contains(s) && !LanguageExcluded(s, profile, catalog))
+            var unknownAlternative = scienceCount > 0 && (full.Any(s => (s != "E" && IsLanguageSubject(s) || catalog.Subjects.FirstOrDefault(x => x.Id == s)?.IsForeignLanguage == true) && !languages.Contains(s) && !LanguageExcluded(s, profile, catalog))
                 || (full.Contains("INF") && (profile.Status != ProfileStatus.Verified
                     || profile.Prerequisites.InformaticsImp == Knowledge.Unknown || profile.Prerequisites.InformaticsBridge == Knowledge.Unknown)));
             Add(unknownAlternative ? "AGVO-LANGUAGE-REVIEW" : "AGVO-LANGUAGE-SCIENCE", "Eine geeignete Sprache und BIO/CH/PH sind nötig; zusätzlich zweite geeignete Sprache oder zweite Naturwissenschaft (Informatik bei erfüllter Voraussetzung als Alternative). Italienisch-Profil allein ist keine Sprachlaufbahnbestätigung.");
@@ -168,11 +168,11 @@ public static class AcademicRules
                 ? $"Wechsel während der Kursstufe ({string.Join(" -> ", relSubjects)}): Die Abmeldung vom Religionsunterricht muss beantragt werden. Danach kann weder Religion noch Ethik mündliches Prüfungsfach sein (KOE 2026 Kap. 3.3); eine Feststellungsprüfung ist dafür nicht vorgesehen."
                 : $"Wechsel des Religionsfachs während der Kursstufe ({string.Join(" -> ", relSubjects)}): höchstens zwei Kurse einer anderen Religionsgemeinschaft und nur mit Zustimmung beider Religionsgemeinschaften (AGVO § 11 Abs. 3). Religion kann dann nicht mündliches Prüfungsfach sein.", relSubjects);
         else if (p.ReligionEthicsGrade10 is "KR" or "ER" && chosenRelEthics.Contains("ETH"))
-            Add("AGVO-RELIGION", "Austritt aus dem Religionsunterricht muss beantragt werden. Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig."
+            Add("AGVO-RELIGION", "Die Abmeldung vom Religionsunterricht muss beantragt werden. Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig."
                 + (AssessmentSubject(choice, profile) == "ETH" ? " Du planst Ethik mündlich: Die Feststellungsprüfung findet zu Beginn des 1. Halbjahres statt (AGVO § 21 Abs. 2 Nr. 5)." : "")
                 + " Bitte mit der Oberstufenberatung klären.", ["ETH"]);
         else if (switchedRelEthics)
-            Add("AGVO-RELIGION", $"Wechsel der Belegung gegenüber Klasse 10 ({p.ReligionEthicsGrade10} -> {string.Join("/", chosenRelEthics)}): Für eine mündliche Prüfung im gewechselten Fach ist eine Feststellungsprüfung zu Beginn des 1. Schulhalbjahres erforderlich (AGVO § 21 Abs. 2 Nr. 4/5). Bitte mit der Oberstufenberatung klären.", chosenRelEthics);
+            Add("AGVO-RELIGION", $"Wechsel der Belegung gegenüber Klasse 10 ({p.ReligionEthicsGrade10} -> {string.Join("/", chosenRelEthics)}): Für eine mündliche Prüfung im gewechselten Fach ist eine Feststellungsprüfung zu Beginn des 1. Halbjahres erforderlich (AGVO § 21 Abs. 2 Nr. 4/5). Bitte mit der Oberstufenberatung klären.", chosenRelEthics);
         else if (chosenRelEthics.Length > 0 && (p.ReligionEthicsPermission == Knowledge.No
             || (p.ReligionEthicsPermission == Knowledge.Unknown
                 && !(p.ReligionEthicsGrade10 is "KR" or "ER" or "ETH" && chosenRelEthics.All(s => s == p.ReligionEthicsGrade10)))))

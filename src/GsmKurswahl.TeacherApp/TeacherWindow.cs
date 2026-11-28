@@ -29,7 +29,7 @@ public sealed partial class TeacherWindow : Window
     private readonly StackPanel catalogPanel = new() { Spacing = 8 };
     private readonly TextBox filter = new() { Watermark = "Name, Klasse oder Schüler-ID" };
     private readonly CheckBox followupFilter = new() { Content = "Nur offene Nachwahlen" };
-    private readonly ComboBox statusFilter = new() { ItemsSource = new[] { "Alle Prüfstände", "Ohne Wahl", "Regelverstoß", "Fachlich zu klären", "Formal gültig", "Religion/Ethik: Wechsel", "Feststellungsprüfung nötig" }, SelectedIndex = 0 };
+    private readonly ComboBox statusFilter = new() { ItemsSource = new[] { "Alle Prüfstände", "Ohne Wahl", "Regelverletzung", "Fachlich zu klären", "Formal gültig", "Religion/Ethik: Wechsel", "Feststellungsprüfung nötig" }, SelectedIndex = 0 };
     private readonly TextBox actor = new() { Text = "demo-beratung", Watermark = "Bearbeiterkennung" };
     private string Actor => actor.Text?.Trim() is { Length: > 0 } value ? value : throw new ArgumentException("Bearbeiterkennung fehlt. Unter Einstellungen eintragen.");
     private readonly ImportColumnPicker mapping = new();
@@ -110,9 +110,9 @@ public sealed partial class TeacherWindow : Window
         panel.Children.Add(Surface(stepsCard, 14));
         panel.Children.Add(Help("Was bedeuten die Fachbegriffe?",
             "LF – Leistungsfach (5-stündig, alle vier Halbjahre).\nBF – Basisfach (meist 2- oder 3-stündig).\nHJ 1–4 – die vier Halbjahre der Kursstufe; KS1 = HJ 1+2, KS2 = HJ 3+4.\n\n" +
-            "Prüfstand einer Wahl:\n• Formal gültig – keine offenen Punkte.\n• Fachlich zu klären – z. B. Vorbildung unbekannt, Sportersatz, Religion/Ethik-Wechsel. Kein Fehler, aber eine Entscheidung der Oberstufenberatung ist nötig.\n• Regelverstoß – die Belegung widerspricht einer Regel (z. B. fehlendes Pflichtfach).\n\n" +
+            "Prüfstand einer Wahl:\n• Formal gültig – keine offenen Punkte.\n• Fachlich zu klären – z. B. Vorbildung unbekannt, Sportersatz, Religion/Ethik-Wechsel. Kein Fehler, aber eine Entscheidung der Oberstufenberatung ist nötig.\n• Regelverletzung – die Belegung widerspricht einer Regel (z. B. fehlendes Pflichtfach).\n\n" +
             "Vorbildung „Unbekannt“ bedeutet: Es liegt keine Angabe vor. Das Programm behandelt das weder als erfüllt noch als nicht erfüllt, sondern als zu klären.\n\n" +
-            "Nachwahl – Eine Person muss nach einer Kursstreichung oder wegen eines Regelverstoßes erneut wählen.\n" +
+            "Nachwahl – Eine Person muss nach einer Kursstreichung oder wegen einer Regelverletzung erneut wählen.\n" +
             "Abgänger – Voraussichtliche Abgänger können in der Kursplanung ausgeblendet werden; bestätigte Abgänger zählen nie zur Planung. Ihre Wahl bleibt gespeichert.\n" +
             "Profil – kleine Datei mit den bestätigten Voraussetzungen einer Person (z. B. IMP, bilingual). Das Schülerprogramm zeigt damit die passenden Fächer an.\n" +
             "Revision – jeder gespeicherte Stand einer Wahl. Nichts wird überschrieben; Wiederherstellen legt einen neuen Stand an."));
@@ -210,7 +210,7 @@ public sealed partial class TeacherWindow : Window
             if (invalidItems.Length > 0)
             {
                 var box = new StackPanel { Spacing = 3 };
-                box.Children.Add(new TextBlock { Text = $"Regelverstöße ({invalidItems.Length})", FontWeight = FontWeight.SemiBold, Foreground = Brush.Parse("#A32D2D") });
+                box.Children.Add(new TextBlock { Text = $"Regelverletzungen ({invalidItems.Length})", FontWeight = FontWeight.SemiBold, Foreground = Brush.Parse("#A32D2D") });
                 foreach (var m in invalidItems)
                 {
                     var line = Text("✗ " + m.Explanation); line.Foreground = Brush.Parse("#8C1D1D");
@@ -442,7 +442,7 @@ public sealed partial class TeacherWindow : Window
             }
             choiceTab.Children.Add(line);
         }
-        var oralItems = new[] { new SubjectItem(null, "— nicht geplant —") }.Concat(session.Catalog.Offers.Where(o => o.Type == CourseType.Bf).Select(o => o.SubjectId).Distinct()
+        var oralItems = new[] { new SubjectItem(null, "— nicht geplant —") }.Concat(session.Catalog.Offers.Where(o => o.Type == CourseType.Bf && o.SubjectId != "GEO").Select(o => o.SubjectId).Distinct()
             .Select(s => new SubjectItem(s, SubjectName(s)))).ToArray();
         ComboBox OralBox(string name, string? current)
         {
@@ -706,6 +706,7 @@ public sealed partial class TeacherWindow : Window
     internal static string DistributionText(string status) => status switch
     {
         "verteilt" => "zugestellt",
+        "Programmquelle_ungeeignet" => "Programmquelle ungeeignet (Ordner prüfen)",
         "nicht_gefunden" => "Ordner nicht gefunden",
         "Zugriff_verweigert" => "kein Schreibzugriff",
         "Profil_abweichend" => "vorhandene Datei weicht ab (nicht überschrieben)",

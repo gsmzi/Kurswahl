@@ -89,7 +89,7 @@ public static class CoursePlanning
             // Suggestions are only personally permitted offers, never an automatic replacement or a promise of a legal complete choice.
             var replacements = catalog.Offers.Where(o => o.Status is OfferStatus.Offered or OfferStatus.Established
                 && !choice.Selections.Any(s => s.SubjectId == o.SubjectId)
-                && (o.SubjectId is not ("I" or "GR" or "SPA" or "RU" or "POR") || languages.Contains(o.SubjectId))
+                && (o.SubjectId is "E" or "F" or "L" || !AcademicRules.IsLanguageSubject(o.SubjectId) || languages.Contains(o.SubjectId))
                 && new ChoiceValidator().GetAvailability(o, profile, catalog).CanSelect)
                 .OrderByDescending(o => removedOffers.Any(r => r.SubjectId == o.SubjectId && r.Type == o.Type))
                 .ThenByDescending(o => needsLf ? o.Type == CourseType.Lf : o.Type != CourseType.Lf)
@@ -126,7 +126,8 @@ public static class CoursePlanning
         {
             var old = preview.Basis.FollowUps.Single(f => f.StudentId == c.StudentId);
             var requiresReselection = c.Validation.Status == ReviewStatus.Invalid;
-            var statusNote = requiresReselection ? "Nachwahl erforderlich (invalid)" : "nach Streichung weiterhin strukturell gültig (" + c.Validation.Status + ")";
+            var statusNote = requiresReselection ? "Nachwahl erforderlich" : c.Validation.Status == ReviewStatus.NeedsReview
+                ? "nach Streichung weiterhin ohne Regelverletzung, fachlich zu klären" : "nach Streichung weiterhin formal gültig";
             return old with { Required = old.Required || requiresReselection, Note = actor + ": " + reason.Trim() + " · " + statusNote };
         }).ToImmutableArray();
         store.CommitCancellation(preview, actor, reason.Trim(), revisions, followUps);
