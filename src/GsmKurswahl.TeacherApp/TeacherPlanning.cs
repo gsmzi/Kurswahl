@@ -78,7 +78,7 @@ public sealed partial class TeacherWindow
         compareCard.Children.Add(Text("Vergleichsziel (aktueller Bestand oder zweiter gespeicherter Stand / Szenario)"));
         compareCard.Children.Add(compareTarget);
         var compareActions = new WrapPanel { Orientation = Orientation.Horizontal };
-        var compareBtn = Button("Gespeicherten Stand anzeigen und mit aktuell vergleichen", () =>
+        var compareBtn = Button("Gewählte Planungsstände vergleichen", () =>
         {
             var previous = (saved.SelectedItem as PlanningItem)?.Document ?? throw new ArgumentException("Planungsstand auswählen.");
             var second = (compareTarget.SelectedItem as PlanningItem)?.Document;
@@ -259,11 +259,11 @@ public sealed partial class TeacherWindow
             cancelHost.Children.Clear();
             var card = new StackPanel { Spacing = 6 };
             card.Children.Add(new TextBlock { Text = $"{title} kommt nicht zustande?", FontSize = 17, FontWeight = FontWeight.SemiBold, Foreground = Ink });
-            card.Children.Add(Text($"{affected.Length} Personen haben diesen Kurs gewählt. Beim Streichen wird er bei allen entfernt und das Angebot gesperrt. Die bisherigen Wahlen bleiben in der Historie; vorher wird automatisch ein Planungsstand gesichert, mit dem sich die Streichung zurücknehmen lässt."));
+            card.Children.Add(Text($"Personen mit diesem Kurs: {affected.Length}. Beim Streichen wird er bei allen entfernt und das Angebot gesperrt. Die bisherigen Wahlen bleiben in der Historie; vorher wird automatisch ein Planungsstand gesichert, mit dem sich die Streichung zurücknehmen lässt."));
             var cancelReason = new TextBox { Name = "CancelReason", Watermark = "Begründung (optional), z. B. zu wenige Wahlen" };
             card.Children.Add(cancelReason);
             var cancelButtons = new WrapPanel { Orientation = Orientation.Horizontal };
-            var confirm = Primary(Button($"Kurs streichen und bei {affected.Length} Personen entfernen", () =>
+            var confirm = Primary(Button($"Kurs streichen und bei {(affected.Length == 1 ? "einer Person" : affected.Length + " Personen")} entfernen", () =>
             {
                 planning.SavePlanningDocument(cancelPreview.Basis with { Name = "Vor Streichung " + title + " · " + DateTime.Now.ToString("g") });
                 CoursePlanning.Confirm(planning, cancelPreview, Actor, string.IsNullOrWhiteSpace(cancelReason.Text) ? "Kurs kommt nicht zustande: " + title : cancelReason.Text!, true);
@@ -271,7 +271,12 @@ public sealed partial class TeacherWindow
                 workspace!.Update(workspace.Active! with { Catalog = cancelPreview.Catalog });
                 var open = cancelPreview.Changes.Count(c => !c.RemovedOffers.IsEmpty && c.Validation.Status == ReviewStatus.Invalid);
                 Refresh(preserveEditor: true); ShowPlanning();
-                SetStatus($"{title} gestrichen und bei {affected.Length} Personen entfernt. {open} brauchen eine Nachwahl: unter „Kurswahlen“ den Filter „Nachwahl offen“ wählen, dort direkt eintragen oder Nachwahlbögen drucken.", FeedbackKind.Success);
+                if (affected.Length > 0)
+                {
+                    try { CreateReselectionSheets(); }
+                    catch (Exception ex) { SetStatus("Kurs gestrichen. Nachwahlbögen konnten nicht erstellt werden: " + ex.Message, FeedbackKind.Warning); return; }
+                }
+                SetStatus($"{title} gestrichen und bei {(affected.Length == 1 ? "einer Person" : affected.Length + " Personen")} entfernt. {open} brauchen eine Nachwahl: unter „Kurswahlen“ den Filter „Nachwahl offen“ wählen, dort direkt eintragen oder Nachwahlbögen drucken.", FeedbackKind.Success);
             }));
             confirm.Name = "CancelConfirm"; confirm.Margin = new Thickness(0, 0, 8, 0); cancelButtons.Children.Add(confirm);
             var abort = Button("Abbrechen", () => cancelHost.Children.Clear()); abort.Name = "CancelAbort"; cancelButtons.Children.Add(abort);
@@ -359,7 +364,7 @@ public sealed partial class TeacherWindow
                 HeaderCol("Fach", "Fachkürzel und Fachbezeichnung"),
                 HeaderCol("LF", "Leistungsfach (5-stündig, schriftliche Abiturprüfung)"),
                 HeaderCol("LF bili", "Leistungsfach bilingual (in englischer Sprache unterrichtet)"),
-                HeaderCol("BF", "Basisfach (3-stündig, mündliche Abiturprüfung möglich)"),
+                HeaderCol("BF", "Basisfach laut Fachangebot"),
                 HeaderCol("BF bili", "Basisfach bilingual (in englischer Sprache unterrichtet)"),
                 HeaderCol("Wahl", "Wahlfächer und Seminarkurse")
             ]);

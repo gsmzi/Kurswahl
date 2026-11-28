@@ -22,7 +22,7 @@ public sealed class ChoiceValidator
         .. ChoiceWorkflow.Definitions
     ];
 
-    public Availability GetAvailability(CourseOffer offer, ProfileContext profile)
+    public Availability GetAvailability(CourseOffer offer, ProfileContext profile, OfferCatalog? catalog = null)
     {
         var violation = CatalogRules.Check(offer).FirstOrDefault();
         if (violation is not null)
@@ -33,14 +33,14 @@ public sealed class ChoiceValidator
             && (profile.Status != ProfileStatus.Verified || profile.Prerequisites.PermanentSportExemption != Knowledge.No
                 || profile.Prerequisites.SportExemptSemesters is not { Length: 0 }))
             return new(false, ReviewStatus.NeedsReview, "LF Sport erfordert bestätigte Auskunft ohne dauerhafte oder teilweise Befreiung; Sonderfall mit Oberstufenberatung klären.");
-        if (AcademicRules.LanguageExcluded(offer.SubjectId, profile))
-            return new(false, ReviewStatus.Invalid, $"Nicht in deiner bestätigten Sprachlaufbahn ({string.Join(", ", AcademicRules.Languages(profile))}). Kurse in einer Fremdsprache setzen Unterricht spätestens ab Klasse 8 voraus (AGVO § 13 Abs. 1 Nr. 3). Stimmt die Angabe nicht, bitte an die Oberstufenberatung wenden.");
+        if (AcademicRules.LanguageExcluded(offer.SubjectId, profile, catalog))
+            return new(false, ReviewStatus.Invalid, $"Nicht in deiner bestätigten Sprachlaufbahn ({string.Join(", ", AcademicRules.Languages(profile, catalog))}). Kurse in einer Fremdsprache setzen Unterricht spätestens ab Klasse 8 voraus (AGVO § 13 Abs. 1 Nr. 3). Stimmt die Angabe nicht, bitte an die Oberstufenberatung wenden.");
         if (offer.SubjectId is "ER" or "KR")
         {
             if (ReligionSubjectUnknown(profile))
                 return new(true, ReviewStatus.NeedsReview, "Religion/Ethik-Fach aus Klasse 10 ist unbekannt oder nicht bestätigt. Beide Religionsfächer und Ethik bleiben vorläufig wählbar; bitte mit der Oberstufenberatung klären.");
             if (profile.Prerequisites.ReligionEthicsGrade10 != offer.SubjectId)
-                return new(false, ReviewStatus.Invalid, "Religion ist nur passend zum bestätigten Fach aus Klasse 10 wählbar (ER: evangelisch, KR: katholisch). Ethik bleibt wählbar. Stimmt die Profilangabe nicht, bitte an die Oberstufenberatung wenden.");
+                return new(false, ReviewStatus.Invalid, "Religion ist nur passend zum bestätigten Fach aus Klasse 10 wählbar. Ethik bleibt wählbar. Stimmt die Profilangabe nicht, bitte an die Oberstufenberatung wenden.");
         }
         if (offer.Requirements.IsEmpty) return new(true, ReviewStatus.NeedsReview, "Vorläufig wählbar; fachliche Freigabe für den Jahrgang steht aus.");
         if (profile.Status != ProfileStatus.Verified)
@@ -86,7 +86,7 @@ public sealed class ChoiceValidator
                 continue;
             }
             if (!catalogViolations.IsEmpty) continue;
-            var availability = GetAvailability(offer, profile);
+            var availability = GetAvailability(offer, profile, catalog);
             if (availability.CanSelect && offer.SubjectId is "ER" or "KR" && ReligionSubjectUnknown(profile))
                 Add("PREREQUISITE-UNKNOWN", availability.Explanation, "Klasse-10-Fach durch die Oberstufenberatung bestätigen lassen.", selection.SubjectId, selection.Semesters);
             if (!availability.CanSelect)
@@ -104,7 +104,7 @@ public sealed class ChoiceValidator
                 && profile.Prerequisites.ReligionEthicsExamPermission == Knowledge.No);
             var explanation = switchedRelOral is not null
                 ? $"{switchedRelOral} wurde in Klasse 10 nicht besucht ({profile.Prerequisites.ReligionEthicsGrade10}): Laut Oberstufenberatung ist es nicht als mündliches Prüfungsfach möglich (AGVO § 21 Abs. 2 Nr. 4/5)."
-                : ChoiceWorkflow.OralError(choice, catalog, profile) ?? "Mündliche Prüfungsplanung passt nicht zu LF, Angebot oder persönlichen Voraussetzungen.";
+                : ChoiceWorkflow.OralError(choice, catalog, profile) ?? "Mündliche Prüfungsplanung passt nicht zu den Leistungsfächern, zum Angebot oder zu den persönlichen Voraussetzungen.";
             messages.Add(new(Definitions.Single(d => d.Id == "PLAN-ORAL"), choice.PlannedOralSubjects, [],
                 explanation, "Zwei zulässige Basisfächer für die mündliche Prüfung planen."));
         }

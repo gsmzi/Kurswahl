@@ -31,6 +31,7 @@ public sealed class ReconciliationTests : IDisposable
         Assert.Equal(ReconciliationKind.OnlyInternal, preview.Items.Single(i => i.StudentId == "demo-002").Kind);
         Assert.Equal(ReconciliationKind.OnlyExternal, preview.Items.Single(i => i.StudentId == "demo-003").Kind);
         Assert.Single(store.History("demo-001")); Assert.Equal(2, store.Students().Length);
+        Assert.Single(service.Preview([External("DEMO-001")], Origin).Items, i => i.Kind == ReconciliationKind.InvalidIdentity);
         Assert.Throws<InvalidOperationException>(() => service.Confirm(preview, "demo-001", false, "Test"));
         Assert.Throws<InvalidOperationException>(() => service.Confirm(preview, "demo-003", true, "Test"));
         Assert.Contains(service.Preview([External(), External()], Origin).Items, i => i.Kind == ReconciliationKind.InvalidIdentity);
@@ -130,5 +131,10 @@ public sealed class ReconciliationTests : IDisposable
         Assert.Contains(itemMismatch.Differences, d => d.Contains("BIO", StringComparison.OrdinalIgnoreCase) && d.Contains("LF bilingual") && d.Contains("ASV BF"));
         Assert.Contains(itemMismatch.Differences, d => d.StartsWith("Mündliche Prüfungsfächer:", StringComparison.Ordinal));
         Assert.Contains(itemMismatch.Differences, d => d.Contains("SEM [3]"));
+
+        var changedOral = extMatch with { PlannedOralSubjects = ["G", "M"] };
+        var confirmed = service.Confirm(service.Preview([changedOral], Origin), "demo-001", true, "Mündliche Planung abgeglichen");
+        Assert.Equal(new[] { "G", "M" }, confirmed.Snapshot.PlannedOralSubjects);
+        Assert.Contains(confirmed.Snapshot.Selections, s => s.OfferId == "BIO-LF-BILI" && s.Variant == CourseVariant.Bilingual);
     }
 }

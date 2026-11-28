@@ -140,7 +140,7 @@ public sealed partial class TeacherWindow
         if (store is IPlanningStore planning && planning.ActivePlanningCatalog() is { } authoritative
             && System.Text.Json.JsonSerializer.Serialize(year.Catalog, DocumentJson.Options) != System.Text.Json.JsonSerializer.Serialize(authoritative, DocumentJson.Options))
         {
-            year = year with { Catalog = authoritative };
+            year = year with { Catalog = authoritative, SubmissionDeadline = authoritative.SubmissionDeadline ?? year.SubmissionDeadline };
             workspace!.Update(year);
         }
         actor.Text = year.Actor;
@@ -305,9 +305,10 @@ public sealed partial class TeacherWindow
                     var enabled = current.Catalog.Offers.Where(o => o.Type == CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established).Select(o => o.Id).ToHashSet();
                     if (box.IsChecked == true) enabled.Add(offer.Id); else enabled.Remove(offer.Id);
                     var prepared = CatalogConfiguration.Prepare(current.Catalog, current.Catalog.GraduationYear, "demo-" + current.Catalog.GraduationYear + "-" + Guid.NewGuid().ToString("N")[..8], enabled);
+                    if (store is SqliteAdministrationStore sql) sql.SaveCatalogChange(current.Catalog, prepared, Actor, "Fachauswahl geändert");
                     workspace.Update(current with { Catalog = prepared });
                     session = new TeacherSession(store!, prepared, current.Actor);
-                    PaintCard(); UpdateLfCounter(prepared); SetStatus("Fachauswahl gespeichert.", FeedbackKind.Success);
+                    PaintCard(); UpdateWorkflowProgress(); UpdateLfCounter(prepared); SetStatus("Fachauswahl gespeichert.", FeedbackKind.Success);
                 }
                 catch (Exception ex) { SetStatus("Fachauswahl nicht gespeichert: " + ex.Message, FeedbackKind.Error); ShowOfferSetup(); }
             };
@@ -338,9 +339,10 @@ public sealed partial class TeacherWindow
                     var enabledOptional = current.Catalog.Offers.Where(o => o.Type != CourseType.Lf && PlanningPresentation.CanCancel(o) && o.Status is OfferStatus.Offered or OfferStatus.Established).Select(o => o.Id).ToHashSet();
                     if (box.IsChecked == true) enabledOptional.Add(offer.Id); else enabledOptional.Remove(offer.Id);
                     var prepared = CatalogConfiguration.Prepare(current.Catalog, current.Catalog.GraduationYear, "demo-" + current.Catalog.GraduationYear + "-" + Guid.NewGuid().ToString("N")[..8], enabledLf, enabledOptional);
+                    if (store is SqliteAdministrationStore sql) sql.SaveCatalogChange(current.Catalog, prepared, Actor, "Fachauswahl geändert");
                     workspace.Update(current with { Catalog = prepared });
                     session = new TeacherSession(store!, prepared, current.Actor);
-                    PaintCard(); SetStatus("Fachauswahl gespeichert.", FeedbackKind.Success);
+                    PaintCard(); UpdateWorkflowProgress(); SetStatus("Fachauswahl gespeichert.", FeedbackKind.Success);
                 }
                 catch (Exception ex) { SetStatus("Fachauswahl nicht gespeichert: " + ex.Message, FeedbackKind.Error); ShowOfferSetup(); }
             };
@@ -355,7 +357,12 @@ public sealed partial class TeacherWindow
             {
                 var value = deadline.SelectedDate is { } date ? DateOnly.FromDateTime(date) : (DateOnly?)null;
                 if (value == workspace.Active!.SubmissionDeadline) return;
-                workspace.Update(workspace.Active! with { SubmissionDeadline = value });
+                var current = workspace.Active!;
+                var next = current.Catalog with { SubmissionDeadline = value };
+                if (store is SqliteAdministrationStore sql) sql.SaveCatalogChange(current.Catalog, next, Actor, "Abgabetermin geändert");
+                workspace.Update(current with { SubmissionDeadline = value, Catalog = next });
+                session = new TeacherSession(store!, next, Actor);
+                UpdateWorkflowProgress();
                 SetStatus(value is null ? "Abgabetermin entfernt." : $"Abgabetermin {value:dd.MM.yyyy} gespeichert; er erscheint nach der nächsten Verteilung im Schülerprogramm.", FeedbackKind.Success);
             }
             catch (Exception ex) { SetStatus("Abgabetermin nicht gespeichert: " + ex.Message, FeedbackKind.Error); }
@@ -412,18 +419,18 @@ public sealed partial class TeacherWindow
         dashboardPanel.Children.Clear(); UpdateWorkflowProgress();
         dashboardPanel.Children.Add(new TextBlock { Text = "Ihr aktueller Jahrgang", FontSize = 23, FontWeight = FontWeight.SemiBold, Foreground = Ink });
         string next; string action; string target;
-        if (collections.Length > 0) { next = $"{collections.Length} Wahlkonflikte benötigen eine Entscheidung."; action = "Konflikte prüfen"; target = "collection"; }
+        if (collections.Length > 0) { next = $"Offene Wahlkonflikte: {collections.Length}."; action = "Konflikte prüfen"; target = "collection"; }
         else if (summary.Students > 0 && summary.Choices == summary.Students)
         {
             next = summary.Reselections > 0 || summary.Reviews > 0
-                ? $"Alle {summary.Choices} Kurswahlen liegen vor ({summary.Reselections} offene Nachwahlen, {summary.Reviews} zu klären). Prüfen Sie die Ergebnisse und planen Sie das Angebot."
-                : $"Alle {summary.Choices} Kurswahlen liegen vollständig vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot.";
+                ? $"Alle Kurswahlen ({summary.Choices}) liegen vor (offene Nachwahlen: {summary.Reselections}, {summary.Reviews} zu klären). Prüfen Sie die Ergebnisse und planen Sie das Angebot."
+                : $"Alle Kurswahlen ({summary.Choices}) liegen vollständig vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot.";
             action = "Kurswahlen prüfen und ändern"; target = "results";
         }
         else if (summary.Students == 0) { next = "Für diesen Jahrgang fehlen noch Schüler."; action = "Schülerliste importieren"; target = "import"; }
-        else if (summary.UnconfirmedMappings > 0) { next = $"{summary.UnconfirmedMappings} Ordnerzuordnungen müssen im pädagogischen Netz geprüft und verteilt werden."; action = "Schülerdateien verteilen"; target = "profiles"; }
-        else if (summary.ProfilesToIssue > 0) { next = $"Für {summary.ProfilesToIssue} Personen fehlen aktuelle Profile (Verteilung erfolgt im pädagogischen Netz)."; action = "Schülerprofile bereitstellen"; target = "profiles"; }
-        else if (summary.ProfilesToDeliver > 0) { next = $"{summary.ProfilesToDeliver} Profile sind noch im pädagogischen Netz zuzustellen oder erneut zu verteilen."; action = "Zustellung bearbeiten"; target = "profiles"; }
+        else if (summary.UnconfirmedMappings > 0) { next = $"Im pädagogischen Netz zu prüfende Ordnerzuordnungen: {summary.UnconfirmedMappings}."; action = "Schülerdateien verteilen"; target = "profiles"; }
+        else if (summary.ProfilesToIssue > 0) { next = $"Noch auszustellende Profile: {summary.ProfilesToIssue} (Verteilung erfolgt im pädagogischen Netz)."; action = "Schülerprofile bereitstellen"; target = "profiles"; }
+        else if (summary.ProfilesToDeliver > 0) { next = $"Noch im pädagogischen Netz zu verteilende Profile: {summary.ProfilesToDeliver}."; action = "Zustellung bearbeiten"; target = "profiles"; }
         else if (summary.Choices < summary.Students) { next = $"Für {summary.Students - summary.Choices} Personen wurde noch keine Kurswahl im pädagogischen Netz eingelesen."; action = "Kurswahlen einsammeln"; target = "collection"; }
         else { next = "Die Kurswahlen liegen vor. Prüfen Sie die Ergebnisse und planen Sie das verbleibende Angebot."; action = "Kurswahlen prüfen und ändern"; target = "results"; }
         var primary = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -434,7 +441,7 @@ public sealed partial class TeacherWindow
         Grid.SetColumn(nextButton, 1); primary.Children.Add(nextButton);
         var nextCard = Surface(primary, 18); nextCard.Background = HighlightAccent; nextCard.BorderBrush = Accent; dashboardPanel.Children.Add(nextCard);
         dashboardPanel.Children.Add(SummaryCards(summary));
-        dashboardPanel.Children.Add(new TextBlock { Text = $"{summary.Reselections} Nachwahlen · Neue Kurswahlen werden bei geöffneter App alle 60 Sekunden eingelesen. Kacheln oben anklicken zum Öffnen.", Foreground = Muted, TextWrapping = TextWrapping.Wrap });
+        dashboardPanel.Children.Add(new TextBlock { Text = $"Offene Nachwahlen: {summary.Reselections} · Neue Kurswahlen werden bei geöffneter App alle 60 Sekunden eingelesen. Kacheln oben anklicken zum Öffnen.", Foreground = Muted, TextWrapping = TextWrapping.Wrap });
         dashboardPanel.Children.Add(new TextBlock { Text = "Weitere Aufgaben", FontWeight = FontWeight.SemiBold });
         var tasks = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var task in new[] {

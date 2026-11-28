@@ -52,7 +52,6 @@ public sealed class ProfileDistribution(IAdministrationStore store)
                 if (old.ProfileRevision > issued.Profile.ProfileRevision) throw new InvalidDataException("veraltet");
                 if (old.ProfileRevision == issued.Profile.ProfileRevision && !before.SequenceEqual(issued.ProfileBytes)) throw new InvalidDataException("Profil_abweichend");
             }
-            Replace(path, issued.ProfileBytes, before);
             if (catalog is not null)
             {
                 ModelGuard.Catalog(catalog);
@@ -67,11 +66,12 @@ public sealed class ProfileDistribution(IAdministrationStore store)
                 }
                 Replace(catalogPath, JsonSerializer.SerializeToUtf8Bytes(catalog, DocumentJson.Options), oldCatalog);
             }
+            Replace(path, issued.ProfileBytes, before);
         }
         catch (DirectoryNotFoundException) { status = "nicht_gefunden"; detail = "Bestätigtes Zielverzeichnis nicht erreichbar."; }
         catch (UnauthorizedAccessException) { status = "Zugriff_verweigert"; detail = "Keine Schreibberechtigung am Ziel."; }
         catch (InvalidDataException ex) { status = ex.Message; detail = "Profil oder Verwaltungsstand abweichend; Vorschau erneuern und Zuordnung prüfen."; }
-        catch (JsonException) { status = "Profil_abweichend"; detail = "Defektes vorhandenes Profil bleibt erhalten."; }
+        catch (Exception ex) when (ex is JsonException or ArgumentException) { status = "Profil_abweichend"; detail = "Vorhandenes Profil oder Fachangebot ist ungültig. Dateien prüfen."; }
         catch (IOException) { status = "Zugriff_verweigert"; detail = "Ziel gesperrt, verändert oder Schreibvorgang fehlgeschlagen; Wiederholung erforderlich."; }
         var entry = new DistributionEntry(Guid.NewGuid(), record.Student.ExternalStudentId, issued.Profile.ProfileRevision, DateTimeOffset.UtcNow, status, detail);
         store.LogDistribution(entry); return entry;

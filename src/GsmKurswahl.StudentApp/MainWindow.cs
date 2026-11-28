@@ -437,9 +437,9 @@ public sealed class MainWindow : Window
         AddRadio(sportGroup, "Prereq_Sport_None", "Prereq_Sport", "Keine Sportbefreiung (reguläre Teilnahme)", sport.IsEmpty,
             () => UpdatePrior(x => x with { SportExemptSemesters = [], PermanentSportExemption = Knowledge.No }));
         AddRadio(sportGroup, "Prereq_Sport_12", "Prereq_Sport", "Sportbefreiung in HJ 1+2", sport.SequenceEqual([1, 2]),
-            () => UpdatePrior(x => x with { SportExemptSemesters = [1, 2], PermanentSportExemption = Knowledge.Yes }));
+            () => UpdatePrior(x => x with { SportExemptSemesters = [1, 2], PermanentSportExemption = Knowledge.No }));
         AddRadio(sportGroup, "Prereq_Sport_34", "Prereq_Sport", "Sportbefreiung in HJ 3+4", sport.SequenceEqual([3, 4]),
-            () => UpdatePrior(x => x with { SportExemptSemesters = [3, 4], PermanentSportExemption = Knowledge.Yes }));
+            () => UpdatePrior(x => x with { SportExemptSemesters = [3, 4], PermanentSportExemption = Knowledge.No }));
         AddRadio(sportGroup, "Prereq_Sport_1234", "Prereq_Sport", "Dauerhafte Sportbefreiung in HJ 1–4", sport.SequenceEqual([1, 2, 3, 4]),
             () => UpdatePrior(x => x with { SportExemptSemesters = [1, 2, 3, 4], PermanentSportExemption = Knowledge.Yes }));
         panel.Children.Add(GroupCard(sportGroup));
@@ -465,7 +465,7 @@ public sealed class MainWindow : Window
             box.IsCheckedChanged += (_, _) => Edit(() => session.SetSelection(offer.Id, box.IsChecked == true ? offer.Schedule.Select(h => h.Semester) : []));
             panel.Children.Add(Option(box, box.IsChecked == true));
         }
-        AddRestricted(panel, session.RestrictedOffers(lf: true), "Leistungsfach-Angebote derzeit nicht wählbar");
+        AddRestricted(panel, session.RestrictedOffers(lf: true), "Derzeit nicht wählbare Leistungsfach-Angebote");
         return panel;
     }
 
@@ -492,7 +492,7 @@ public sealed class MainWindow : Window
         if (hidden.Length > 0 && free > 0)
             panel.Children.Add(new Expander
             {
-                Name = "HiddenOral", Header = $"{hidden.Length} weitere Fächer passen nicht zu einer vollständigen Kombination", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Stretch,
+                Name = "HiddenOral", Header = $"Weitere Fächer ohne vollständige Kombination ({hidden.Length})", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Stretch,
                 Content = Text(string.Join(", ", hidden) + ". Mit diesen Fächern wären zusammen mit deinen Leistungsfächern Deutsch, Mathematik oder eines der drei Aufgabenfelder nicht abgedeckt. Wenn du eines davon mündlich möchtest, ändere zuerst das andere Prüfungsfach oder deine Leistungsfächer.", 12, color: Muted)
             });
         return panel;
@@ -569,7 +569,7 @@ public sealed class MainWindow : Window
     private Control ExtraStep()
     {
         var panel = Step("Weitere Kurse", "Ergänze Kurse, bis du das Planungsziel erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten.");
-        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold, session.CountedCourses >= ChoiceWorkflow.MinimumCourses ? Done : null));
+        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold, ProgressCourses >= ChoiceWorkflow.MinimumCourses ? Done : null));
         var adjustable = session.Choice.Selections.Where(s => s.Type != CourseType.Lf).Select(s => (Selection: s, Offer: session.Catalog.Offers.FirstOrDefault(o => o.Id == s.OfferId)))
             .Where(x => x.Offer is not null && (!session.LockedSemesters(x.Selection.OfferId).Any() || x.Offer.Schedule.Length > session.LockedSemesters(x.Selection.OfferId).Length)).ToArray();
         if (adjustable.Length > 0)
@@ -588,7 +588,7 @@ public sealed class MainWindow : Window
                 panel.Children.Add(Option(box, false));
             }
         }
-        AddRestricted(panel, session.RestrictedOffers(lf: false), "weitere Angebote derzeit nicht wählbar");
+        AddRestricted(panel, session.RestrictedOffers(lf: false), "Weitere derzeit nicht wählbare Angebote");
         return panel;
     }
 
@@ -638,9 +638,9 @@ public sealed class MainWindow : Window
     private static int? TargetStepForRule(string ruleId) => ruleId switch
     {
         "AGVO-LF" or "PLAN-LF" => 1,
-        "PLAN-ORAL" or "AGVO-ORAL" or "AGVO-EXAM" => 2,
-        "AGVO-ART" or "AGVO-RELIGION" or "AGVO-LANGUAGE" or "AGVO-SCIENCE" or "AGVO-BREADTH" or "AGVO-REQUIRED" => 3,
-        "AGVO-COURSES" or "AGVO-SPORT-REPLACEMENT" or "PLAN-MIN-COURSES" => 4,
+        "PLAN-ORAL" or "AGVO-EXAM" => 2,
+        "GSM-RELIGION-EXCLUSIVE" or "AGVO-RELIGION" or "AGVO-LANGUAGE-SCIENCE" or "GSM-RELIGION-CONFESSION" or "AGVO-LANGUAGE-REVIEW" or "AGVO-REQUIRED" => 3,
+        "AGVO-COURSES" or "AGVO-SPORT-REPLACEMENT" or "AGVO-SEMESTERS" or "GSM-GK-CONTINUITY" or "PLAN-MIN-COURSES" => 4,
         _ => null
     };
 
@@ -648,11 +648,11 @@ public sealed class MainWindow : Window
     {
         var panel = Step("Überblick", "Hier siehst du, was noch fehlt und was die Oberstufenberatung mit dir klärt. Gespeicherte Wahlen sammelt die Oberstufenberatung ein; eine eigene Abgabe ist nicht nötig.");
         var messages = session.Validation.Messages;
-        var onlyCountMissing = session.CountedCourses < ChoiceWorkflow.MinimumCourses && session.Choice.Selections.Count(x => x.Type == CourseType.Lf) == 3;
+        var onlyCountMissing = ProgressCourses < ChoiceWorkflow.MinimumCourses && session.Choice.Selections.Count(x => x.Type == CourseType.Lf) == 3;
         var rawTodo = messages.Where(m => m.Rule.Severity == ReviewStatus.Invalid && !(onlyCountMissing && m.Rule.Id == "AGVO-COURSES"))
                 .Select(m => (Text: PlainText(m.Explanation), TargetStep: TargetStepForRule(m.Rule.Id)))
             .Concat(session.Tasks.Where(t => !t.IsSatisfied).Select(t => (Text: t.Title + " ist noch offen (Schritt 3).", TargetStep: (int?)3)))
-            .Concat(session.CountedCourses < ChoiceWorkflow.MinimumCourses ? [(Text: $"Es fehlen noch {ChoiceWorkflow.MinimumCourses - session.CountedCourses} Halbjahreskurse bis zur Mindestzahl von {ChoiceWorkflow.MinimumCourses} (Schritt 4).", TargetStep: (int?)4)] : Array.Empty<(string Text, int? TargetStep)>())
+            .Concat(ProgressCourses < ChoiceWorkflow.MinimumCourses ? [(Text: $"Fehlende Halbjahreskurse bis zur Mindestzahl von {ChoiceWorkflow.MinimumCourses}: {ChoiceWorkflow.MinimumCourses - ProgressCourses} (Schritt 4).", TargetStep: (int?)4)] : Array.Empty<(string Text, int? TargetStep)>())
             .ToArray();
         var seenTodo = new HashSet<string>(StringComparer.Ordinal);
         var todo = rawTodo.Where(item => seenTodo.Add(item.Text)).ToArray();
@@ -722,7 +722,7 @@ public sealed class MainWindow : Window
         };
         panel.Children.Add(export);
 
-        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold, session.CountedCourses >= ChoiceWorkflow.MinimumCourses ? Done : null));
+        panel.Children.Add(Text(Progress(), 15, FontWeight.SemiBold, ProgressCourses >= ChoiceWorkflow.MinimumCourses ? Done : null));
         var table = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto"), Margin = new Thickness(0, 4) };
         var summary = session.Summary;
         for (var i = 0; i < summary.Length; i++)
@@ -811,7 +811,7 @@ public sealed class MainWindow : Window
         legend.Children.Add(Text("gestrichelt = noch offen", 11, color: Muted));
         plan.Children.Add(legend);
         plan.Children.Add(Text(Progress(), 14, FontWeight.SemiBold));
-        plan.Children.Add(new ProgressBar { Minimum = 0, Maximum = ChoiceWorkflow.MinimumCourses, Value = Math.Min(session.CountedCourses, ChoiceWorkflow.MinimumCourses), Height = 8 });
+        plan.Children.Add(new ProgressBar { Minimum = 0, Maximum = ChoiceWorkflow.MinimumCourses, Value = Math.Min(ProgressCourses, ChoiceWorkflow.MinimumCourses), Height = 8 });
         var semesterTotals = new WrapPanel();
         foreach (var semester in session.Summary)
         {
@@ -842,11 +842,14 @@ public sealed class MainWindow : Window
         }, 11, color: Muted);
     }
 
+    private bool CountWithoutSeminar => ChoiceWorkflow.CountWithoutSeminar(session.Profile);
+    private int ProgressCourses => ChoiceWorkflow.CoursesForMinimum(session.Choice, session.Profile);
+
     private string Progress()
     {
-        var count = session.CountedCourses;
+        var count = ProgressCourses;
         var missing = ChoiceWorkflow.MinimumCourses - count;
-        return $"{count} von {ChoiceWorkflow.MinimumCourses} Halbjahreskursen" + (missing > 0 ? $" – noch {missing}" : " – Planungsziel erreicht (nicht geprüft)");
+        return $"{count} von {ChoiceWorkflow.MinimumCourses} Halbjahreskursen" + (CountWithoutSeminar ? " ohne SIA" : "") + (missing > 0 ? $" – noch {missing}" : " – Mindestzahl erreicht");
     }
 
     private void AddRestricted(StackPanel panel, ImmutableArray<CourseOffer> offers, string header)
@@ -854,7 +857,7 @@ public sealed class MainWindow : Window
         if (offers.IsEmpty) return;
         var list = new StackPanel { Spacing = 4 };
         foreach (var offer in offers) list.Children.Add(Text($"{OfferLabel(offer)}: {session.Availability(offer).Explanation}", 12, color: Muted));
-        panel.Children.Add(new Expander { Header = $"{offers.Length} {header}", Content = list, HorizontalAlignment = HorizontalAlignment.Stretch, FontSize = 12 });
+        panel.Children.Add(new Expander { Header = $"{header} ({offers.Length})", Content = list, HorizontalAlignment = HorizontalAlignment.Stretch, FontSize = 12 });
     }
 
     private string OfferLabel(CourseOffer offer)

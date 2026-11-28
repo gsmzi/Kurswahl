@@ -24,7 +24,7 @@ public static class TableExport
             if (value.TrimStart().FirstOrDefault() is '=' or '+' or '-' or '@' || value.StartsWith('\t') || value.StartsWith('\r')) value = "'" + value;
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
-        return Encoding.UTF8.GetBytes(string.Join("\r\n", new[] { table.Headers }.Concat(table.Rows).Select(r => string.Join(';', r.Select(Cell)))) + "\r\n");
+        return [.. Encoding.UTF8.GetPreamble(), .. Encoding.UTF8.GetBytes(string.Join("\r\n", new[] { table.Headers }.Concat(table.Rows).Select(r => string.Join(';', r.Select(Cell)))) + "\r\n")];
     }
     public static byte[] Xlsx(ExportTable table)
     {

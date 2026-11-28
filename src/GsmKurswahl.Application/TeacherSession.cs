@@ -38,7 +38,10 @@ public sealed class TeacherSession(IAdministrationStore store, OfferCatalog cata
         var active = history.LastOrDefault();
         var duplicate = history.Any(r => r.ImportOrigin?.ContentHash == origin.ContentHash && r.ImportOrigin?.SourceId == origin.SourceId);
         var prior = history.LastOrDefault(r => r.Source == RevisionSource.StudentSubmission);
-        var conflict = active is null || duplicate ? "" : active.Source != RevisionSource.StudentSubmission
+        // Older catalog cancellations also appended a revision for pupils whose offers were untouched.
+        // Keep the real head for concurrency, but use the last substantive decision for conflict detection.
+        var decision = history.LastOrDefault(r => r.Source != RevisionSource.OfferCancellation || !r.Changes.IsEmpty);
+        var conflict = decision is null || duplicate ? "" : decision.Source != RevisionSource.StudentSubmission
             ? "Lehrerentscheidung vorhanden. Nur nach bewusster Konfliktentscheidung übernehmen."
             : prior is not null && (choice.DocumentId != prior.Snapshot.DocumentId || choice.Revision <= prior.Snapshot.Revision)
                 ? "Abweichende Dokument-ID oder alte/gleiche Schülerrevision. Konfliktentscheidung erforderlich." : "";

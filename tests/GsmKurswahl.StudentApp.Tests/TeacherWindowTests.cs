@@ -641,7 +641,7 @@ public class TeacherWindowTests
             window.LoadAsvComparisonBytes(System.Text.Encoding.UTF8.GetBytes(",Name mit Vornamen,ASV-ID,Fächer Kursstufe\nKS1,\"Eins, Demo\",demo-001,\"D [5];1-L-X-X-X-X\"\nKS1,\"Zwei, Demo\",demo-002,\"D [5];1-L-X-X-X-X\""), "asv-test.csv");
             window.UpdateLayout();
             var summary = Named<TextBlock>("AsvSummary");
-            Assert.Contains("2 Abweichungen", summary.Text);
+            Assert.Contains("Abweichungen: 2", summary.Text);
             Assert.Equal(2, Named<StackPanel>("AsvResultRows").Children.OfType<Border>().Count());
             Named<TextBox>("AsvSearch").Text = "Demo Zwei";
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();

@@ -70,7 +70,9 @@ public sealed class PlanningTests : IDisposable
             Assert.Equal(RevisionSource.OfferCancellation, store.History("demo-001")[1].Source);
             Assert.True(store.Reselection("demo-001").Required);
             Assert.False(store.Reselection("demo-002").Required);
-            Assert.All(store.Students(), s => Assert.Equal(preview.Catalog.Version, store.History(s.Student.ExternalStudentId).Last().Snapshot.OfferVersion));
+            Assert.Equal(preview.Catalog.Version, store.History("demo-001").Last().Snapshot.OfferVersion);
+            foreach (var id in new[] { "demo-002", "demo-003" })
+                Assert.Equal(RevisionSource.StudentSubmission, Assert.Single(store.History(id)).Source);
             Assert.Throws<InvalidOperationException>(() => CoursePlanning.Confirm(store, preview, "demo-beratung", "Doppelt", true));
         }
         using var reopened = new SqliteAdministrationStore(Database);
@@ -97,7 +99,7 @@ public sealed class PlanningTests : IDisposable
     public void MidTransactionFailureRollsBackAllRevisionsAndSnapshot()
     {
         using var store = new SqliteAdministrationStore(Database); Seed(store);
-        var preview = CoursePlanning.PreviewCancellation(Capture(store), ["BIO-LF-BILI"]);
+        var preview = CoursePlanning.PreviewCancellation(Capture(store), ["M-LF"]);
         var revisions = preview.Changes.Select(c => new ChoiceRevision(Guid.NewGuid(), c.ExpectedActive, c.StudentId, DateTimeOffset.UtcNow,
             "demo", ActorRole.Teacher, RevisionSource.OfferCancellation, "Test", preview.Catalog.Version, "m2-2", c.Choice, [], null)).ToImmutableArray();
         revisions = revisions.SetItem(1, revisions[1] with { PreviousRevisionId = Guid.NewGuid() });
@@ -114,7 +116,7 @@ public sealed class PlanningTests : IDisposable
         Assert.Equal(snapshot.Name, store.PlanningDocuments().Single().Name);
     }
     [Fact]
-    public void SavedScenarioKeepsActiveChoicesAndRestorationCreatesNewRevision()
+    public void SavedScenarioKeepsActiveChoicesAndOfferRestorationPreservesHistory()
     {
         using var store = new SqliteAdministrationStore(Database); Seed(store);
         var basis = Capture(store) with { TargetGroupSize = 17 };
@@ -130,8 +132,8 @@ public sealed class PlanningTests : IDisposable
         var restore = CoursePlanning.PreviewOfferRestoration(current, basis);
         CoursePlanning.Confirm(store, restore, "demo-beratung", "Demo Rücknahme Angebot", true);
         Assert.Equal(OfferStatus.Offered, store.ActivePlanningCatalog()!.Offers.Single(o => o.Id == "BIO-LF-BILI").Status);
-        Assert.Equal(3, store.History("demo-001").Length);
-        Assert.Equal(RevisionSource.Restoration, store.History("demo-001").Last().Source);
+        Assert.Equal(2, store.History("demo-001").Length);
+        Assert.Equal(RevisionSource.OfferCancellation, store.History("demo-001").Last().Source);
         Assert.True(store.Reselection("demo-001").Required);
     }
     [Fact]
@@ -144,7 +146,11 @@ public sealed class PlanningTests : IDisposable
         var distributor = new ProfileDistribution(store); var issued = distributor.Issue(record);
         Assert.Equal("verteilt", distributor.Distribute(record, issued, Catalog).Status);
         Assert.Equal(1, TeacherDashboardBuilder.Build(store, new TeacherSession(store, Catalog, "demo")).Delivered);
-        var preview = CoursePlanning.PreviewCancellation(Capture(store), ["BIO-LF-BILI"]);
+        var annotated = CatalogConfiguration.Annotate(Catalog, "M-LF", CooperationSchool.Ewg, true);
+        store.SaveCourseAnnotations(Catalog, annotated, "demo");
+        Assert.Equal(1, TeacherDashboardBuilder.Build(store, new TeacherSession(store, annotated, "demo")).ProfilesToDeliver);
+        Assert.Equal("verteilt", distributor.Distribute(record, issued, annotated).Status);
+        var preview = CoursePlanning.PreviewCancellation(CoursePlanning.Capture(store, annotated, "demo", "Test", true), ["BIO-LF-BILI"]);
         CoursePlanning.Confirm(store, preview, "demo", "Demo Streichung", true);
         Assert.Equal(0, TeacherDashboardBuilder.Build(store, new TeacherSession(store, preview.Catalog, "demo")).Delivered);
         Assert.Equal("verteilt", distributor.Distribute(record, issued, preview.Catalog).Status);

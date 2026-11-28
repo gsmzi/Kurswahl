@@ -382,13 +382,13 @@ public sealed partial class TeacherWindow
             (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen.", () => ShowPage("people")),
             ($"{summary.Delivered} / {summary.Students}", "Profile zugestellt", "Anzahl der Personen, deren aktuelles persönliches Profil (profil.json) und Fachangebot erfolgreich im Wahlordner abgelegt wurden.", () => ShowPage("profiles")),
             (summary.Choices.ToString(), "Wahlen eingelesen", "Anzahl der Personen, für die bereits eine Kurswahl im Lehrerbestand vorliegt.", () => { choiceFilter = new(); ShowResults(); }),
-            (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen, Sonderfällen (z. B. Sportersatz, Religion/Ethik) oder Regelverstößen.", () => { choiceFilter = new(State: ChoiceStateFilter.NeedsReview); ShowResults(); })];
+            (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen oder Sonderfällen (z. B. Sportersatz, Religion/Ethik).", () => { choiceFilter = new(State: ChoiceStateFilter.NeedsReview); ShowResults(); })];
         if (summary.Students > 0 && summary.Choices == summary.Students)
             values = [
                 (summary.Students.ToString(), "Schüler im Jahrgang", "Gesamtzahl der für diesen Abiturjahrgang im Lehrerbestand gespeicherten Personen.", () => ShowPage("people")),
                 (summary.Choices.ToString(), "Wahlen eingelesen", "Alle Schüler dieses Jahrgangs haben eine erfasste Kurswahl.", () => { choiceFilter = new(); ShowResults(); }),
                 (summary.Reselections.ToString(), "Offene Nachwahlen", "Schüler, die nach einer Kursstreichung oder wegen eines Regelverstoßes erneut wählen müssen.", () => { choiceFilter = new(State: ChoiceStateFilter.ReselectionOpen); ShowResults(); }),
-                (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen, Sonderfällen oder Regelverstößen.", () => { choiceFilter = new(State: ChoiceStateFilter.NeedsReview); ShowResults(); })];
+                (summary.Reviews.ToString(), "Fachlich zu klären", "Wahlen mit offenen Vorbildungsfragen oder Sonderfällen.", () => { choiceFilter = new(State: ChoiceStateFilter.NeedsReview); ShowResults(); })];
         for (var i = 0; i < values.Length; i++)
         {
             var entry = values[i];

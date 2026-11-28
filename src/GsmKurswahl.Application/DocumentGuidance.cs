@@ -66,7 +66,7 @@ public static class DocumentGuidance
                 .Where(o => o.Type == CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established
                     && !lf.Any(s => s.SubjectId == o.SubjectId)
                     && (!onlyCoreAllowed || IsCore(o.SubjectId))
-                    && validator.GetAvailability(o, profile).CanSelect)
+                    && validator.GetAvailability(o, profile, catalog).CanSelect)
                 .OrderByDescending(o => removedOffers.Any(r => r.Type == CourseType.Lf && r.SubjectId == o.SubjectId))
                 .ThenBy(o => SubjectName(catalog, o.SubjectId), StringComparer.CurrentCulture)
                 .ThenBy(o => o.Variant)
@@ -78,7 +78,7 @@ public static class DocumentGuidance
             var text = onlyCoreAllowed
                 ? $"Du brauchst {(missingLf == 1 ? "1 neues Leistungsfach" : $"{missingLf} neue Leistungsfächer")} aus den Kernfächern (Deutsch, Mathematik, deinen fortgeführten Fremdsprachen oder einer Naturwissenschaft), da mindestens zwei Leistungsfächer Kernfächer sein müssen."
                 : needCore > 0
-                    ? $"Du brauchst {missingLf} neue Leistungsfächer über alle vier Halbjahre, darunter mindestens {needCore} Kernfach (Deutsch, Mathematik, fortgeführte Fremdsprache oder Naturwissenschaft)."
+                    ? $"Du brauchst {missingLf} neue Leistungsfächer über alle vier Halbjahre, darunter mindestens {needCore} {(needCore == 1 ? "Kernfach" : "Kernfächer")} (Deutsch, Mathematik, fortgeführte Fremdsprache oder Naturwissenschaft)."
                     : $"Du brauchst {(missingLf == 1 ? "1 neues Leistungsfach" : $"{missingLf} neue Leistungsfächer")} über alle vier Halbjahre.";
             var options = selectableLfs.Length == 0
                 ? null
@@ -141,7 +141,7 @@ public static class DocumentGuidance
             var extras = catalog.Offers
                 .Where(o => o.Type != CourseType.Lf && o.Status is OfferStatus.Offered or OfferStatus.Established
                     && !remaining.Selections.Any(s => s.SubjectId == o.SubjectId || AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, o.SubjectId))
-                    && validator.GetAvailability(o, profile).CanSelect)
+                    && validator.GetAvailability(o, profile, catalog).CanSelect)
                 .OrderBy(o => SubjectName(catalog, o.SubjectId), StringComparer.CurrentCulture)
                 .ThenBy(o => o.Type)
                 .ThenBy(o => o.Variant)
@@ -228,7 +228,7 @@ public static class DocumentGuidance
                     && catalog.Offers.Any(o => o.SubjectId == s.Id
                         && o.Status is OfferStatus.Offered or OfferStatus.Established
                         && (o.Type == CourseType.Lf || oralCandidates.Contains(o.SubjectId))
-                        && validator.GetAvailability(o, profile).CanSelect))
+                        && validator.GetAvailability(o, profile, catalog).CanSelect))
                 .OrderBy(s => s.Name, StringComparer.CurrentCulture)
                 .Select(s => s.Name)
                 .Distinct(StringComparer.Ordinal)
@@ -289,14 +289,14 @@ public static class DocumentGuidance
                 .Where(o => o.Type is CourseType.Bf or CourseType.Elective && o.SubjectId != "SP"
                     && o.Status is OfferStatus.Offered or OfferStatus.Established
                     && !remaining.Selections.Any(s => s.SubjectId == o.SubjectId || AcademicRules.MutuallyExclusiveSubjects(s.SubjectId, o.SubjectId))
-                    && validator.GetAvailability(o, profile).CanSelect)
+                    && validator.GetAvailability(o, profile, catalog).CanSelect)
                 .OrderBy(o => SubjectName(catalog, o.SubjectId), StringComparer.CurrentCulture)
                 .Select(o => FormatOfferLabelWithType(o, catalog))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
             var exemptions = profile.Prerequisites.SportExemptSemesters?.Length ?? 0;
             var text = exemptions > 0
-                ? $"Wegen deiner Sportbefreiung in {exemptions} Halbjahren sind ebenso viele zusätzliche Basis- oder Wahlfachkurse als Ausgleich erforderlich (mindestens 42 Halbjahreskurse ohne die Schüler-Ingenieur-Akademie). Zusätzliche Kurse werden als ganze Schuljahre (HJ 1 und 2 bzw. HJ 3 und 4) gewählt."
+                ? $"Wegen deiner Sportbefreiung in {exemptions} {(exemptions == 1 ? "Halbjahr" : "Halbjahren")} sind ebenso viele zusätzliche Basis- oder Wahlfachkurse als Ausgleich erforderlich (mindestens 42 Halbjahreskurse ohne die Schüler-Ingenieur-Akademie). Zusätzliche Kurse werden als ganze Schuljahre (HJ 1 und 2 bzw. HJ 3 und 4) gewählt."
                 : FormatRuleMessage(message, catalog, remaining);
             return new("Sportersatzkurse", text, extras.Length == 0 ? null : "Mögliche Ersatzkurse: " + string.Join(", ", extras) + ".");
         }

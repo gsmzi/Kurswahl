@@ -130,7 +130,7 @@ Pflichtprüfungen:
 ## 7. Schülerprogramm / Bedienung
 
 - Geführter Ablauf: **signiertes persönliches Profil laden und prüfen** -> persönliche Voraussetzungen anzeigen -> drei LF -> Pflicht-BF -> zusätzliche BF/Wahlfächer -> Halbjahres- und Stundenübersicht -> mögliche Abiturprüfungsfachkombinationen -> Kontrolle -> Abgabe.
-- Beim Wechsel eines LF Pflichten und Basisfächer neu berechnen, aber Nutzerwahl nicht ohne Hinweis destruktiv überschreiben. Nicht wäh lbare Fa echer vorzugsweise ausgegraut mit verständlicher Begründung anzeigen.
+- Beim Wechsel eines LF Pflichten und Basisfächer neu berechnen, aber Nutzerwahl nicht ohne Hinweis destruktiv überschreiben. Nicht wählbare Fächer vorzugsweise ausgegraut mit verständlicher Begründung anzeigen.
 - Sofortige Prüfung und hilfreiche Fehlermeldungen, z.B. 'Du brauchst noch ...', 'GK HJ 3+4 für eine mögliche mündliche Prüfung'.
 - Entwurf jederzeit speichern; vor Abgabe umfassend prüfen. Abgabe erzeugt eigenständigen Versionsstand; bei Nachwahl ein weiterer Versionsstand.
 - Übersicht pro Halbjahr über Fach, LF/BF/Variante, Wochenstunden und Kurszählung, Sonderfälle und noch offene Entscheidungen. Kontrollbogen druckbar.

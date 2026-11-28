@@ -141,9 +141,9 @@ public class WindowTests
             session.GoToStep(3);
             session.ChooseTaskOption("PLAN-AREA-RELIGION", "ETH-BF", true);
             Assert.DoesNotContain(session.Choice.Selections, s => s.SubjectId == grade10);
-            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Austritt aus Religionsunterricht muss beantragt werden.") == true);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Austritt aus dem Religionsunterricht muss beantragt werden.") == true);
             session.NextStep(); session.NextStep();
-            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig.") == true);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig.") == true);
         }
         finally { session.SaveAsync().GetAwaiter().GetResult(); window.Close(); }
     }

@@ -145,6 +145,26 @@ public sealed class AdministrationTests : IDisposable
         File.WriteAllText(Path.Combine(root, "broken.db"), "synthetic broken database");
         Assert.Throws<SqliteException>(() => new SqliteAdministrationStore(Path.Combine(root, "broken.db")));
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LegacyUnaffectedCancellationPreservesPreviousCollectionDecision(bool teacherEdit)
+    {
+        using var store = new SqliteAdministrationStore(DbPath);
+        var record = Record();
+        store.SaveStudent(record, null);
+        var session = new TeacherSession(store, TestData.Catalog, "demo-beratung");
+        var choice = TestData.Choice;
+        var origin = new ImportOrigin("demo-home/aktuell.json", "hash1", "v1", DateTimeOffset.UtcNow, record.WindowsUsername);
+        var first = session.Save(choice, null, RevisionSource.StudentSubmission, "Erste Übernahme", origin);
+        var previous = teacherEdit ? session.Save(choice, first.Id, RevisionSource.TeacherEdit, "Bewusste Bestätigung") : first;
+        var legacy = session.Save(choice with { OfferVersion = "demo-anderes-angebot" }, previous.Id,
+            RevisionSource.OfferCancellation, "Anderes Angebot gestrichen");
+        Assert.Empty(legacy.Changes);
+        var preview = session.Preview(choice with { Revision = choice.Revision + 1 }, choice.StudentId, origin with { ContentHash = "hash2" });
+        Assert.Equal(teacherEdit, preview.Conflict.Length > 0);
+        Assert.Equal(legacy.Id, preview.ExpectedActive);
+    }
     [Fact]
     public void CollectionPreservesTeacherChangesAndRestorationAppends()
     {
@@ -199,6 +219,10 @@ public sealed class AdministrationTests : IDisposable
         var corrected = record with { Version = 2, Student = record.Student with { Prerequisites = PriorEducation.Unknown with { InformaticsImp = Knowledge.Yes } } }; store.SaveStudent(corrected, 1);
         Assert.Equal("veraltet", distribution.Distribute(corrected, issued).Status);
         var newer = distribution.Issue(corrected); Assert.Equal(2, newer.Profile.ProfileRevision);
+        var data = StudentFolderLayout.Data(record.HomeDirectory);
+        File.WriteAllText(Path.Combine(data, "fachangebot.json"), "{");
+        Assert.Equal("Profil_abweichend", distribution.Distribute(corrected, newer, TestData.WorkflowCatalog).Status);
+        Assert.Equal(issued.ProfileBytes, File.ReadAllBytes(Path.Combine(data, "profil.json")));
         Assert.Equal("verteilt", distribution.Distribute(corrected, newer).Status);
         Assert.Equal(Knowledge.Yes, reader.Read(StudentFolderLayout.Data(record.HomeDirectory), "demo-001", 2029).Prerequisites.InformaticsImp);
         Assert.Equal("veraltet", distribution.Distribute(record, issued).Status);

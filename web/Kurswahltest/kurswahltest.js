@@ -130,7 +130,7 @@
       ? sortNumbers(distinct(p.sportExemptSemesters.filter((h) => Number.isInteger(h) && h >= 1 && h <= 4)))
       : (p.sportExemptSemesters === null ? null : []);
     const langs = Array.isArray(p.continuedLanguages)
-      ? distinct(p.continuedLanguages.map((l) => String(l).trim()).filter(Boolean))
+      ? distinct(p.continuedLanguages.map((l) => String(l).trim().toUpperCase()).filter(Boolean))
       : base.continuedLanguages;
     return {
       italianProfile: p.italianProfile || "unknown",
@@ -247,7 +247,7 @@
     },
     languages(profile, catalog = null) {
       if (!AcademicRules.languageCareerKnown(profile)) return ["E", "F", "L"];
-      return ["E", ...profile.prerequisites.continuedLanguages.filter((s) => s !== "E" && AcademicRules.isLanguageSubject(s, catalog))];
+      return ["E", ...profile.prerequisites.continuedLanguages.map((s) => s.toUpperCase()).filter((s) => s !== "E" && AcademicRules.isLanguageSubject(s, catalog))];
     },
     languageExcluded(subject, profile, catalog = null) {
       return subject !== "E" && subject !== "I"
@@ -259,6 +259,7 @@
       if (profile.status !== "verified" || !profile.prerequisites.religionEthicsGrade10) return null;
       if (profile.prerequisites.religionEthicsExamPermission !== "unknown") return null;
       const grade10 = profile.prerequisites.religionEthicsGrade10;
+      if (new Set(choice.selections.filter((s) => s.semesters.length && ["ETH", "ER", "KR"].includes(s.subjectId)).map((s) => s.subjectId)).size > 1) return null;
       return choice.plannedOralSubjects.find((s) => (s === "ETH" || s === "ER" || s === "KR") && s !== grade10) || null;
     },
     scienceSubjects(catalog = null) {
@@ -373,7 +374,7 @@
       const languageCount = full.filter((s) => languages.includes(s)).length;
       const inf = full.includes("INF") && catalog.offers.some((o) => o.subjectId === "INF"
         && choice.selections.some((s) => s.offerId === o.id)
-        && ChoiceValidator.getAvailability(o, profile).canSelect);
+        && ChoiceValidator.getAvailability(o, profile, catalog).canSelect);
 
       if (scienceCount < 1 || languageCount < 1 || !(languageCount >= 2 || scienceCount + (inf ? 1 : 0) >= 2)) {
         const unknownAlternative = scienceCount > 0 && (
@@ -386,7 +387,7 @@
             || profile.prerequisites.informaticsBridge === "unknown"))
         );
         add(unknownAlternative ? "AGVO-LANGUAGE-REVIEW" : "AGVO-LANGUAGE-SCIENCE",
-          "Eine geeignete Sprache und BIO/CH/PH sind nötig; zusätzlich zweite geeignete Sprache oder zweite Naturwissenschaft (berechtigtes INF als Alternative). Italienisch-Profil allein ist keine Sprachlaufbahnbestätigung.");
+          "Eine geeignete Sprache und BIO/CH/PH sind nötig; zusätzlich zweite geeignete Sprache oder zweite Naturwissenschaft (Informatik bei erfüllter Voraussetzung als Alternative). Italienisch-Profil allein ist keine Sprachlaufbahnbestätigung.");
       }
 
       for (const s of choice.selections.filter((sel) => sel.type !== "lf" && sel.subjectId !== "SP")) {
@@ -426,7 +427,7 @@
         relSubjects);
       } else if ((grade10 === "KR" || grade10 === "ER") && chosenRelEthics.includes("ETH")) {
         add("AGVO-RELIGION",
-          "Austritt aus Religionsunterricht muss beantragt werden. Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig."
+          "Austritt aus dem Religionsunterricht muss beantragt werden. Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig."
           + (AcademicRules.assessmentSubject(choice, profile) === "ETH" ? " Du planst Ethik mündlich: Die Feststellungsprüfung findet zu Beginn des 1. Halbjahres statt (AGVO § 21 Abs. 2 Nr. 5)." : "")
           + " Bitte mit der Oberstufenberatung klären.",
           ["ETH"]);
@@ -449,17 +450,17 @@
           add("AGVO-REQUIRED", "Sportbelegung in nicht befreiten Halbjahren fehlt.", ["SP"], requiredSport);
         }
         if (exemptions.length > 0) {
-          add("AGVO-SPORT", `${exemptions.length} Ersatzkurse nötig. Ersatzkurse als ganze Schuljahre (HJ 1+2 bzw. HJ 3+4) zusätzlich wählen; ein Kurs mehr als nötig schadet nicht. Umfang administrativ bestätigen; SIA ist kein Ersatz.`, ["SP"], exemptions);
-          const totalWithoutSia = choice.selections.filter((s) => s.type !== "seminar").reduce((acc, s) => acc + s.semesters.length, 0);
-          const extras = AcademicRules.maximumSportReplacementCourses(choice, profile);
+          add("AGVO-SPORT", `${exemptions.length} ${exemptions.length === 1 ? "Ersatzkurs" : "Ersatzkurse"} nötig. Ersatzkurse als ganze Schuljahre (HJ 1+2 bzw. HJ 3+4) zusätzlich wählen; ein Kurs mehr als nötig schadet nicht. Umfang administrativ bestätigen; SIA ist kein Ersatz.`, ["SP"], exemptions);
+          const totalWithoutSia = ChoiceWorkflow.coursesForMinimum(choice, profile);
+          const extras = AcademicRules.maximumSportReplacementCourses(choice, profile, catalog);
           if (totalWithoutSia < 42 || extras < exemptions.length) {
-            add("AGVO-SPORT-REPLACEMENT", `${exemptions.length} Ersatzkurse erforderlich (mindestens 42 Halbjahreskurse ohne SIA; aktuell ${totalWithoutSia} ohne SIA, höchstens ${extras} zusätzliche Basis-/Wahlfachkurse vorhanden). SIA ersetzt keine Sportkurse.`, ["SP"], exemptions);
+            add("AGVO-SPORT-REPLACEMENT", `${exemptions.length} ${exemptions.length === 1 ? "Ersatzkurs" : "Ersatzkurse"} erforderlich (mindestens 42 Halbjahreskurse ohne SIA; aktuell ${totalWithoutSia} ohne SIA, zusätzlich vorhandene Basis-/Wahlfachkurse: höchstens ${extras}). SIA ersetzt keine Sportkurse.`, ["SP"], exemptions);
           }
         }
       }
 
       if (lf.some((s) => s.subjectId === "SP") && p.permanentSportExemption !== "no") {
-        add("AGVO-SPORT", "LF Sport: dauerhafte auch teilweise Befreiung bzw. fehlende Auskunft erfordert Klärung.", ["SP"]);
+        add("AGVO-SPORT", "LF Sport: dauerhafte, auch teilweise Befreiung bzw. fehlende Auskunft erfordert Klärung.", ["SP"]);
       }
 
       if (lf.length === 3 && AcademicRules.examOptions(choice, catalog, profile).length === 0) {
@@ -482,13 +483,13 @@
 
       return messages;
     },
-    maximumSportReplacementCourses(choice, profile) {
+    maximumSportReplacementCourses(choice, profile, catalog) {
       const available = new Set();
       for (const s of choice.selections.filter((sel) => (sel.type === "bf" || sel.type === "elective") && sel.subjectId !== "SP")) {
         for (const h of s.semesters) available.add(`${s.subjectId}|${h}`);
       }
       const mandatory = new Set();
-      for (const r of ChoiceWorkflow.required(choice, profile).filter((req) => req.subjectId !== "SP")) {
+      for (const r of ChoiceWorkflow.required({ ...choice, plannedOralSubjects: [] }, profile).filter((req) => req.subjectId !== "SP")) {
         for (const h of r.semesters) mandatory.add(`${r.subjectId}|${h}`);
       }
       const full = choice.selections.filter(AcademicRules.four).map((s) => s.subjectId);
@@ -496,10 +497,11 @@
       if (arts.length === 0) arts.push("BK");
       const religions = full.filter((s) => s === "ETH" || s === "ER" || s === "KR");
       if (religions.length === 0) religions.push("ETH");
-      const allowedLangs = AcademicRules.languages(profile);
+      const allowedLangs = AcademicRules.languages(profile, catalog);
       const languages = full.filter((s) => allowedLangs.includes(s));
       if (languages.length === 0) languages.push("E");
-      const sciences = full.filter((s) => SCIENCES.includes(s));
+      const allowedSciences = AcademicRules.scienceSubjects(catalog);
+      const sciences = full.filter((s) => allowedSciences.includes(s));
       if (sciences.length === 0) sciences.push("BIO");
 
       let max = 0;
@@ -508,7 +510,7 @@
           for (const language of languages) {
             for (const science of sciences) {
               const seconds = full.filter((s) => (allowedLangs.includes(s) && s !== language)
-                || (SCIENCES.includes(s) && s !== science)
+                || (allowedSciences.includes(s) && s !== science)
                 || (s === "INF" && profile.status === "verified"
                   && (profile.prerequisites.informaticsBridge === "yes" || profile.prerequisites.informaticsImp === "yes")));
               if (seconds.length === 0) seconds.push("CH");
@@ -625,7 +627,7 @@
       makeRule("PREREQUISITE-UNKNOWN", "Persönliche Voraussetzung ungeklärt", "Pflichtenheft §§5,5a; GSM-Nutzerfestlegung 11.11.2026", "INF/I/bilingual/Religionswahl", RULE_VERSION, "needs_review"),
       ...CatalogRules.Definitions
     ],
-    getAvailability(offer, profile) {
+    getAvailability(offer, profile, catalog) {
       const violation = CatalogRules.checkOffer(offer)[0] || null;
       if (violation) {
         return { canSelect: false, status: "invalid", explanation: `${violation.rule.id}: ${violation.explanation} Bitte an die Oberstufenberatung wenden.` };
@@ -638,11 +640,11 @@
           || !Array.isArray(profile.prerequisites.sportExemptSemesters) || profile.prerequisites.sportExemptSemesters.length !== 0)) {
         return { canSelect: false, status: "needs_review", explanation: "LF Sport erfordert bestätigte Auskunft ohne dauerhafte oder teilweise Befreiung; Sonderfall mit Oberstufenberatung klären." };
       }
-      if (AcademicRules.languageExcluded(offer.subjectId, profile)) {
+      if (AcademicRules.languageExcluded(offer.subjectId, profile, catalog)) {
         return {
           canSelect: false,
           status: "invalid",
-          explanation: `Nicht in deiner bestätigten Sprachlaufbahn (${AcademicRules.languages(profile).join(", ")}). Kurse in einer Fremdsprache setzen Unterricht spätestens ab Klasse 8 voraus (AGVO § 13 Abs. 1 Nr. 3). Stimmt die Angabe nicht, bitte an die Oberstufenberatung wenden.`
+          explanation: `Nicht in deiner bestätigten Sprachlaufbahn (${AcademicRules.languages(profile, catalog).join(", ")}). Kurse in einer Fremdsprache setzen Unterricht spätestens ab Klasse 8 voraus (AGVO § 13 Abs. 1 Nr. 3). Stimmt die Angabe nicht, bitte an die Oberstufenberatung wenden.`
         };
       }
       if (offer.subjectId === "ER" || offer.subjectId === "KR") {
@@ -650,7 +652,7 @@
           return { canSelect: true, status: "needs_review", explanation: "Religion/Ethik-Fach aus Klasse 10 ist unbekannt oder nicht bestätigt. Beide Religionsfächer und Ethik bleiben vorläufig wählbar; bitte mit der Oberstufenberatung klären." };
         }
         if (profile.prerequisites.religionEthicsGrade10 !== offer.subjectId) {
-          return { canSelect: false, status: "invalid", explanation: "Religion ist nur passend zum bestätigten Fach aus Klasse 10 wählbar (ER: evangelisch, KR: katholisch). Ethik bleibt wählbar. Stimmt die Profilangabe nicht, bitte an die Oberstufenberatung wenden." };
+          return { canSelect: false, status: "invalid", explanation: "Religion ist nur passend zum bestätigten Fach aus Klasse 10 wählbar. Ethik bleibt wählbar. Stimmt die Profilangabe nicht, bitte an die Oberstufenberatung wenden." };
         }
       }
       if (offer.requirements.length === 0) {
@@ -702,7 +704,7 @@
           continue;
         }
         if (catalogViolations.length > 0) continue;
-        const availability = ChoiceValidator.getAvailability(offer, profile);
+        const availability = ChoiceValidator.getAvailability(offer, profile, catalog);
         if (availability.canSelect && (offer.subjectId === "ER" || offer.subjectId === "KR") && religionSubjectUnknown(profile)) {
           add("PREREQUISITE-UNKNOWN", availability.explanation, "Klasse-10-Fach durch die Oberstufenberatung bestätigen lassen.", selection.subjectId, selection.semesters);
         }
@@ -723,7 +725,7 @@
           && profile.prerequisites.religionEthicsExamPermission === "no");
         const explanation = switchedRelOral
           ? `${switchedRelOral} wurde in Klasse 10 nicht besucht (${profile.prerequisites.religionEthicsGrade10}): Laut Oberstufenberatung ist es nicht als mündliches Prüfungsfach möglich (AGVO § 21 Abs. 2 Nr. 4/5).`
-          : (ChoiceWorkflow.oralError(choice, catalog, profile) || "Mündliche Prüfungsplanung passt nicht zu LF, Angebot oder persönlichen Voraussetzungen.");
+          : (ChoiceWorkflow.oralError(choice, catalog, profile) || "Mündliche Prüfungsplanung passt nicht zu den Leistungsfächern, zum Angebot oder zu den persönlichen Voraussetzungen.");
         messages.push({
           rule: ChoiceValidator.AllDefinitions().find((d) => d.id === "PLAN-ORAL"),
           subjectIds: choice.plannedOralSubjects.slice(),
@@ -790,7 +792,7 @@
       const ids = catalog.offers.filter((o) => o.type === "bf" && o.subjectId !== "GEO"
         && (AcademicRules.field(o.subjectId, ctx, catalog) !== 0 || o.subjectId === "SP")
         && !lf.includes(o.subjectId)
-        && ChoiceValidator.getAvailability(o, ctx).canSelect
+        && ChoiceValidator.getAvailability(o, ctx, catalog).canSelect
         && !(o.subjectId === "SP" && ctx.status === "verified"
           && (ctx.prerequisites.permanentSportExemption === "yes" || (Array.isArray(ctx.prerequisites.sportExemptSemesters) && ctx.prerequisites.sportExemptSemesters.length > 0)))
         && !((o.subjectId === "ETH" || o.subjectId === "ER" || o.subjectId === "KR") && ctx.status === "verified"
@@ -811,17 +813,17 @@
       const lf = ChoiceWorkflow._lf(choice);
       const sciences = AcademicRules.scienceSubjects(catalog);
       if (lf.length !== 3 || distinct(lf).length !== 3) return "PLAN-LF: Bitte genau drei verschiedene Leistungsfächer wählen.";
-      if (lf.some((s) => AcademicRules.field(s, context, catalog) === 0 && s !== "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Demoangebots klären.";
+      if (lf.some((s) => AcademicRules.field(s, context, catalog) === 0 && s !== "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Fachangebots klären.";
       if (lf.filter((s) => CORE_SUBJECTS.includes(s) || sciences.includes(s) || AcademicRules.languages(context, catalog).includes(s)).length < 2) {
         return "PLAN-LF: Mindestens zwei LF aus Deutsch, Mathematik, fortgeführten Fremdsprachen oder BIO/CH/PH wählen.";
       }
       const badLf = choice.selections.filter((s) => s.type === "lf").some((s) => s.semesters.length !== 4
         || !catalog.offers.some((o) => o.id === s.offerId && o.subjectId === s.subjectId && o.type === s.type
-          && o.variant === s.variant && ChoiceValidator.getAvailability(o, context).canSelect));
+          && o.variant === s.variant && ChoiceValidator.getAvailability(o, context, catalog).canSelect));
       if (badLf) return "PLAN-LF: Angebot oder Belegung der Leistungsfächer korrigieren.";
       const candidates = ChoiceWorkflow.oralCandidates(choice, catalog, context);
       if (!candidates.some((a) => candidates.some((b) => a !== b && ChoiceWorkflow._combination(choice, [a, b], context, catalog)))) {
-        return "PLAN-ORAL: Mit diesen LF ist im verfügbaren Demoangebot keine Kombination für Deutsch, Mathematik und alle Aufgabenfelder möglich.";
+        return "PLAN-ORAL: Mit diesen LF ist im verfügbaren Fachangebot keine Kombination für Deutsch, Mathematik und alle Aufgabenfelder möglich.";
       }
       return null;
     },
@@ -868,6 +870,13 @@
         ? ChoiceWorkflow._combination(choice, [planned[0], c], profile, catalog)
         : candidates.some((d) => d !== c && ChoiceWorkflow._combination(choice, [c, d], profile, catalog))));
     },
+    countWithoutSeminar(profile) {
+      return profile.status === "verified" && (profile.prerequisites.sportExemptSemesters || []).length > 0;
+    },
+    coursesForMinimum(choice, profile) {
+      return ChoiceWorkflow.countWithoutSeminar(profile) ? choice.selections.filter((s) => s.type !== "seminar")
+        .reduce((count, s) => count + s.semesters.length, 0) : ChoiceWorkflow.countedCourses(choice);
+    },
     countedCourses(choice) {
       return choice.selections.reduce((sum, s) => sum + s.semesters.length, 0);
     },
@@ -892,9 +901,9 @@
         const chosenOfferIds = matching.map((s) => s.offerId);
         const candidates = catalog.offers.filter((o) => o.type !== "lf" && subjects.includes(o.subjectId)
           && !lf.includes(o.subjectId) && four.every((h) => o.schedule.some((sh) => sh.semester === h)));
-        const optionOfferIds = candidates.filter((o) => ChoiceValidator.getAvailability(o, profile).canSelect).map((o) => o.id);
+        const optionOfferIds = candidates.filter((o) => ChoiceValidator.getAvailability(o, profile, catalog).canSelect).map((o) => o.id);
         const restricted = candidates.filter((o) => !optionOfferIds.includes(o.id))
-          .map((o) => ({ offerId: o.id, explanation: ChoiceValidator.getAvailability(o, profile).explanation }));
+          .map((o) => ({ offerId: o.id, explanation: ChoiceValidator.getAvailability(o, profile, catalog).explanation }));
         const have = lf.concat(matching.filter((s) => optionOfferIds.includes(s.offerId)).map((s) => s.subjectId));
         return {
           id: ruleId,
@@ -918,7 +927,7 @@
       const tasks = [
         area("PLAN-AREA-ART", "Kunst oder Musik", "Wähle eines der beiden Fächer für HJ 1–4.", ["BK", "MU"], 1),
         area("PLAN-AREA-RELIGION", "Religion oder Ethik",
-          "Wähle ein Fach für HJ 1–4. Religion wird passend zum bestätigten Klasse-10-Fach angeboten (ER: evangelisch, KR: katholisch). Bei unbekannten oder ungeprüften Angaben bleiben beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; Wechsel und mündliche Prüfung ggf. klären.",
+          "Wähle ein Fach für HJ 1–4. Religion wird passend zum bestätigten Klasse-10-Fach angeboten. Bei unbekannten oder ungeprüften Angaben bleiben beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; Wechsel und mündliche Prüfung ggf. klären.",
           ["ER", "KR", "ETH"], 1),
         area("PLAN-AREA-LANGUAGE", "Mindestens eine Fremdsprache",
           "Englisch, Französisch oder Latein für HJ 1–4. Eine passende LF-Belegung erfüllt die Pflicht bereits. Italienisch nur mit bestätigter geeigneter Sprachlaufbahn.",
@@ -944,7 +953,7 @@
 
       const secondary = full.find((s) => s.subjectId !== firstLanguage && s.subjectId !== firstScience
         && (languages.includes(s.subjectId) || sciences.includes(s.subjectId) || s.subjectId === "INF")
-        && catalog.offers.some((o) => o.id === s.offerId && ChoiceValidator.getAvailability(o, profile).canSelect)) || null;
+        && catalog.offers.some((o) => o.id === s.offerId && ChoiceValidator.getAvailability(o, profile, catalog).canSelect)) || null;
       const satisfied = secondary !== null && (secondary.subjectId !== "INF" || firstScience !== null);
       const candidateSubjects = distinct([
         ...languages,
@@ -960,14 +969,14 @@
         && o.subjectId !== firstScience
         && !lfSubjects.includes(o.subjectId)
         && four.every((h) => o.schedule.some((sh) => sh.semester === h)));
-      const canSelectBreadth = (offer) => ChoiceValidator.getAvailability(offer, profile).canSelect
+      const canSelectBreadth = (offer) => ChoiceValidator.getAvailability(offer, profile, catalog).canSelect
         && (offer.subjectId !== "I" || languages.includes("I"));
 
       tasks.push({
         id: "PLAN-AREA-BREADTH",
         rule: def("PLAN-AREA-BREADTH"),
         title: "Zweite Fremdsprache oder zweite Naturwissenschaft",
-        hint: "Wähle zusätzlich eine andere Fremdsprache oder Naturwissenschaft für HJ 1–4. Berechtigtes Informatik kann die zweite Naturwissenschaft ersetzen. Beide Wege sind gleichwertige Alternativen.",
+        hint: "Wähle zusätzlich eine andere Fremdsprache oder Naturwissenschaft für HJ 1–4. Das Basisfach Informatik (bei erfüllter Voraussetzung) kann die zweite Naturwissenschaft ersetzen. Beide Wege sind gleichwertige Alternativen.",
         semesters: four.slice(),
         choose: secondary && secondary.type === "lf" ? 0 : 1,
         open: satisfied ? 0 : 1,
@@ -978,7 +987,7 @@
           offerId: o.id,
           explanation: o.subjectId === "I" && !languages.includes("I")
             ? "Geeignete fortgeführte Italienisch-Sprachlaufbahn muss im Profil bestätigt werden."
-            : ChoiceValidator.getAvailability(o, profile).explanation
+            : ChoiceValidator.getAvailability(o, profile, catalog).explanation
         })),
         get isSatisfied() { return this.open === 0; },
         get isExclusive() { return this.choose === 1; }
@@ -988,7 +997,7 @@
       for (const req of reqList) {
         if (choice.selections.some((s) => s.subjectId === req.subjectId)) continue;
         const variants = catalog.offers.filter((o) => o.subjectId === req.subjectId && o.type === "bf"
-          && ChoiceValidator.getAvailability(o, profile).canSelect
+          && ChoiceValidator.getAvailability(o, profile, catalog).canSelect
           && req.semesters.every((h) => o.schedule.some((sh) => sh.semester === h)));
         if (variants.length < 2) continue;
         const name = catalog.subjects.find((s) => s.id === req.subjectId).name;
@@ -1020,7 +1029,7 @@
       for (const task of ChoiceWorkflow.tasks(choice, catalog, profile).filter((t) => !t.isSatisfied)) {
         notes.push(`${task.rule.id}: ${task.title} – noch ${task.open} offen.`);
       }
-      const count = ChoiceWorkflow.countedCourses(choice);
+      const count = ChoiceWorkflow.coursesForMinimum(choice, profile);
       if (count < MINIMUM_COURSES) {
         notes.push(`PLAN-MIN-COURSES: ${count} von mindestens ${MINIMUM_COURSES} Halbjahreskursen (12 LF + 30 weitere) geplant.`);
       }
@@ -1074,7 +1083,7 @@
     }
 
     function availability(offer) {
-      return ChoiceValidator.getAvailability(offer, profile);
+      return ChoiceValidator.getAvailability(offer, profile, catalog);
     }
 
     function applyRequired() {
@@ -1201,7 +1210,7 @@
             value: verified && p.religionEthicsGrade10
               ? `${subjectName(p.religionEthicsGrade10)} (Belegung/Prüfung: ${val(p.religionEthicsPermission)} / ${val(p.religionEthicsExamPermission)})`
               : "ungeprüft",
-            effect: "Bestimmt die angebotene Religion (ER: evangelisch, KR: katholisch). Bei unbekannten oder ungeprüften Angaben sind beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; bei Wechsel kann für die mündliche Prüfung eine Feststellungsprüfung nötig sein.",
+            effect: "Bestimmt die angebotene Religion. Bei unbekannten oder ungeprüften Angaben sind beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; bei Wechsel kann für die mündliche Prüfung eine Feststellungsprüfung nötig sein.",
             isVerified: verified
           },
           {
@@ -1346,6 +1355,10 @@
           className: "",
           prerequisites: normalized
         };
+        const exempt = normalized.sportExemptSemesters || [];
+        choice = { ...choice, selections: choice.selections.map((s) => s.subjectId === "SP" && s.type === "bf"
+          ? { ...s, semesters: s.semesters.filter((h) => !exempt.includes(h)) } : s).filter((s) => s.semesters.length) };
+        isDirty = true;
         emit();
       },
       previousStep() {
@@ -1904,10 +1917,16 @@
       return `${session.subjectName(offer.subjectId)} · ${type}${offer.variant === "bilingual" ? " · bilingual" : ""} · ${hours.join("/")} h · HJ ${sems}${CourseAnnotations.suffix(offer)}`;
     }
 
+    function countWithoutSeminar() {
+      return ChoiceWorkflow.countWithoutSeminar(session.profile);
+    }
+    function progressCourses() {
+      return ChoiceWorkflow.coursesForMinimum(session.choice, session.profile);
+    }
     function progressText() {
-      const count = session.countedCourses;
+      const count = progressCourses();
       const missing = MINIMUM_COURSES - count;
-      return `${count} von ${MINIMUM_COURSES} Halbjahreskursen` + (missing > 0 ? ` – noch ${missing}` : " – Planungsziel erreicht (nicht geprüft)");
+      return `${count} von ${MINIMUM_COURSES} Halbjahreskursen` + (countWithoutSeminar() ? " ohne SIA" : "") + (missing > 0 ? ` – noch ${missing}` : " – Mindestzahl erreicht");
     }
 
     function scheduleAutosave() {
@@ -1947,7 +1966,7 @@
         }));
       }
       parent.appendChild(el("details", { className: "expander" }, [
-        el("summary", { textContent: `${offers.length} ${header}` }),
+        el("summary", { textContent: `${header} (${offers.length})` }),
         body
       ]));
     }
@@ -2046,9 +2065,9 @@
       addRadio(sportGroup, "Prereq_Sport_None", "Prereq_Sport", "Keine Sportbefreiung (reguläre Teilnahme)", sport.length === 0,
         () => updatePrior((x) => ({ ...x, sportExemptSemesters: [], permanentSportExemption: "no" })));
       addRadio(sportGroup, "Prereq_Sport_12", "Prereq_Sport", "Sportbefreiung in HJ 1+2", arraysEqual(sport, [1, 2]),
-        () => updatePrior((x) => ({ ...x, sportExemptSemesters: [1, 2], permanentSportExemption: "yes" })));
+        () => updatePrior((x) => ({ ...x, sportExemptSemesters: [1, 2], permanentSportExemption: "no" })));
       addRadio(sportGroup, "Prereq_Sport_34", "Prereq_Sport", "Sportbefreiung in HJ 3+4", arraysEqual(sport, [3, 4]),
-        () => updatePrior((x) => ({ ...x, sportExemptSemesters: [3, 4], permanentSportExemption: "yes" })));
+        () => updatePrior((x) => ({ ...x, sportExemptSemesters: [3, 4], permanentSportExemption: "no" })));
       addRadio(sportGroup, "Prereq_Sport_1234", "Prereq_Sport", "Dauerhafte Sportbefreiung in HJ 1–4", arraysEqual(sport, [1, 2, 3, 4]),
         () => updatePrior((x) => ({ ...x, sportExemptSemesters: [1, 2, 3, 4], permanentSportExemption: "yes" })));
       container.appendChild(sportGroup);
@@ -2085,7 +2104,7 @@
         const lbl = el("label", { className: `option-label${disabled ? " disabled" : ""}` }, [box, el("span", { textContent: offerLabel(offer) })]);
         container.appendChild(optionBox(lbl, isChosen));
       }
-      addRestricted(container, session.restrictedOffers(true), "Leistungsfach-Angebote derzeit nicht wählbar");
+      addRestricted(container, session.restrictedOffers(true), "Derzeit nicht wählbare Leistungsfach-Angebote");
     }
 
     function renderOralStep(container) {
@@ -2125,7 +2144,7 @@
         .map((s) => session.subjectName(s));
       if (hidden.length > 0 && free > 0) {
         container.appendChild(el("details", { className: "expander" }, [
-          el("summary", { textContent: `${hidden.length} weitere Fächer passen nicht zu einer vollständigen Kombination` }),
+          el("summary", { textContent: `Weitere Fächer ohne vollständige Kombination (${hidden.length})` }),
           el("p", {
             className: "small-muted",
             textContent: hidden.join(", ") + ". Mit diesen Fächern wären zusammen mit deinen Leistungsfächern Deutsch, Mathematik oder eines der drei Aufgabenfelder nicht abgedeckt. Wenn du eines davon mündlich möchtest, ändere zuerst das andere Prüfungsfach oder deine Leistungsfächer."
@@ -2222,7 +2241,7 @@
       container.appendChild(el("p", { className: "step-hint", textContent: "Ergänze Kurse, bis du das Planungsziel erreichst. Regulär wählst du ganze Schuljahre (HJ 1+2 bzw. HJ 3+4). Einzelhalbjahre werden nur bei einer passenden Ausnahme angeboten." }));
       container.appendChild(el("p", {
         className: "section-heading",
-        style: session.countedCourses >= MINIMUM_COURSES ? "color: var(--done);" : undefined,
+        style: progressCourses() >= MINIMUM_COURSES ? "color: var(--done);" : undefined,
         textContent: progressText()
       }));
 
@@ -2287,7 +2306,7 @@
           ]), false));
         }
       }
-      addRestricted(container, session.restrictedOffers(false), "weitere Angebote derzeit nicht wählbar");
+      addRestricted(container, session.restrictedOffers(false), "Weitere derzeit nicht wählbare Angebote");
     }
 
     function buildPrintSheet() {
@@ -2412,18 +2431,19 @@
         case "PLAN-LF":
           return 1;
         case "PLAN-ORAL":
-        case "AGVO-ORAL":
         case "AGVO-EXAM":
           return 2;
-        case "AGVO-ART":
+        case "GSM-RELIGION-EXCLUSIVE":
         case "AGVO-RELIGION":
-        case "AGVO-LANGUAGE":
-        case "AGVO-SCIENCE":
-        case "AGVO-BREADTH":
+        case "AGVO-LANGUAGE-SCIENCE":
+        case "GSM-RELIGION-CONFESSION":
+        case "AGVO-LANGUAGE-REVIEW":
         case "AGVO-REQUIRED":
           return 3;
         case "AGVO-COURSES":
         case "AGVO-SPORT-REPLACEMENT":
+        case "AGVO-SEMESTERS":
+        case "GSM-GK-CONTINUITY":
         case "PLAN-MIN-COURSES":
           return 4;
         default:
@@ -2436,12 +2456,12 @@
       container.appendChild(el("p", { className: "step-hint", textContent: "Hier siehst du, was noch fehlt und welche Punkte die Oberstufenberatung in der echten Wahl mit dir klärt. In dieser Testversion findet keine Abgabe an die Schule statt." }));
 
       const messages = session.validation.messages;
-      const onlyCountMissing = session.countedCourses < MINIMUM_COURSES && session.choice.selections.filter((x) => x.type === "lf").length === 3;
+      const onlyCountMissing = progressCourses() < MINIMUM_COURSES && session.choice.selections.filter((x) => x.type === "lf").length === 3;
       const rawTodo = [
         ...messages.filter((m) => m.rule.severity === "invalid" && !(onlyCountMissing && m.rule.id === "AGVO-COURSES"))
           .map((m) => ({ text: plainText(m.explanation, session.catalog), targetStep: targetStepForRule(m.rule.id) })),
         ...session.tasks.filter((t) => !t.isSatisfied).map((t) => ({ text: t.title + " ist noch offen (Schritt 3).", targetStep: 3 })),
-        ...(session.countedCourses < MINIMUM_COURSES ? [{ text: `Es fehlen noch ${MINIMUM_COURSES - session.countedCourses} Halbjahreskurse bis zur Mindestzahl von ${MINIMUM_COURSES} (Schritt 4).`, targetStep: 4 }] : [])
+        ...(progressCourses() < MINIMUM_COURSES ? [{ text: `Fehlende Halbjahreskurse bis zur Mindestzahl von ${MINIMUM_COURSES}: ${MINIMUM_COURSES - progressCourses()} (Schritt 4).`, targetStep: 4 }] : [])
       ];
       const seenTodo = new Set();
       const todo = rawTodo.filter((item) => {
@@ -2502,7 +2522,7 @@
 
       container.appendChild(el("p", {
         className: "section-heading",
-        style: session.countedCourses >= MINIMUM_COURSES ? "color: var(--done);" : undefined,
+        style: progressCourses() >= MINIMUM_COURSES ? "color: var(--done);" : undefined,
         textContent: progressText()
       }));
       const sumTable = el("table", { className: "summary-table" });
@@ -2606,7 +2626,7 @@
       ]);
       planPanelEl.appendChild(legend);
       planPanelEl.appendChild(el("p", { style: "margin:0; font-size:14px; font-weight:600;", textContent: progressText() }));
-      const pct = Math.min(100, Math.round((Math.min(session.countedCourses, MINIMUM_COURSES) / MINIMUM_COURSES) * 100));
+      const pct = Math.min(100, Math.round((Math.min(progressCourses(), MINIMUM_COURSES) / MINIMUM_COURSES) * 100));
       planPanelEl.appendChild(el("div", { className: "progress-track" }, el("div", { className: "progress-fill", style: `width: ${pct}%;` })));
       planPanelEl.appendChild(el("div", { className: "semester-totals" },
         session.summary.map((s) => el("span", { textContent: `HJ ${s.semester}: ${s.courseCount} Kurse · ${s.weeklyHours} Wochenstunden` }))));

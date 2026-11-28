@@ -12,7 +12,7 @@ Deutschsprachige Avalonia-Desktopanwendungen für die schulinterne Kurswahl. M1 
 - Je Angebot beschreibende Markierungen „Koopkurs am EWG“, „Koopkurs am GSM“ und unabhängig „Aufsetzerkurs“. Unter **Einstellungen → Jahrgang verwalten → Fachangebot ansehen / für Schülerprogramm exportieren → Koopkurse und Aufsetzerkurse markieren**; auch bei der Ersteinrichtung erreichbar. Änderungen werden sofort gespeichert. Sie verändern keine Wahlen, Stunden oder Regeln. Für Schüleransicht und Schülerausdruck das Fachangebot erneut verteilen.
 - Alle PDF-Ausgaben und Word-Nachwahlbögen verwenden die GSM-Schulvorlage mit Logo, Titelkasten und einheitlichen Seitenrändern. Kontrollbögen trennen Belegung, mündliche Planung und offene Punkte; Nachwahlbögen zeigen Anlass, verbleibende Kurse und Rückmeldefeld. Weitere Einzelheiten: [Schulvorlage und Druckausgaben](docs/SCHULVORLAGE.md).
 
-**Keine verbindliche Freigabe:** Der Rechtsstand für Abitur 2029, interne KOE-Sonderfälle und administrative Entscheidungen sind noch abzugleichen. Auch eine strukturell vollständige Wahl bleibt `needs_review`; eindeutig fehlende Belegungen sind `invalid`. Es gibt keine verbindliche Abgabe. Der bisherige Sicherheitsrahmen beschränkt den lauffähigen Stand weiterhin auf synthetische demo-IDs und Demo-Kataloge. Keine Echtdaten verwenden. Die technische M3-Lehrerverwaltung ist implementiert; Bedienung und Betriebsgrenzen: [Lehrerverwaltung](docs/LEHRERVERWALTUNG.md).
+**Keine verbindliche Freigabe:** Der Rechtsstand für Abitur 2029, interne KOE-Sonderfälle und administrative Entscheidungen sind noch abzugleichen. Eine vollständig geprüfte Wahl kann `valid` erreichen; offene Prüffragen ergeben `needs_review`; eindeutig fehlende Belegungen sind `invalid`. Es gibt keine verbindliche Abgabe. Der bisherige Sicherheitsrahmen beschränkt den lauffähigen Stand weiterhin auf synthetische demo-IDs und Demo-Kataloge. Keine Echtdaten verwenden. Die technische M3-Lehrerverwaltung ist implementiert; Bedienung und Betriebsgrenzen: [Lehrerverwaltung](docs/LEHRERVERWALTUNG.md).
 
 ## Architektur
 
@@ -24,7 +24,7 @@ Deutschsprachige Avalonia-Desktopanwendungen für die schulinterne Kurswahl. M1 
 | ImportExport | PDF-Kontrollbogen und Importvorschauvertrag; nur Domain |
 | Application | UI-unabhängige Schülerlogik auf Domain/Rules |
 | StudentApp | Avalonia-Schüleroberfläche, Zusammensetzung der Komponenten |
-| AdministrationStorage | Nur lehrerseitig: SQLite, append-only Historie, Signierung und Verteilung; nur Domain |
+| AdministrationStorage | Nur lehrerseitig: SQLite, append-only Historie, Profilerstellung und Verteilung; nur Domain |
 | TeacherApp | Importvorschau CSV/XLSX, Stammdaten, Konto-/Home-Zuordnung, Profile, Einsammeln, Bearbeitung, Historie, Filter, Nachwahl und Angebotsvorbereitung |
 
 Keine Rechtsregeln in UI oder Exportadapter. Planung, Schülerwahl und Verwaltungsrevisionen bleiben getrennt. Keine Onlinezugriffe durch die Desktopprogramme.
@@ -53,7 +53,7 @@ Tatsächliche Ergebnisse und fehlgeschlagene Zwischenläufe: [Testprotokoll](doc
 
 ## Lehrerprogramm: Jahrgang öffnen und weiterarbeiten
 
-Beim ersten Start führt ein Assistent durch Jahrgang (Vorschlag 2029), Fachauswahl, Schülerimport und Kontozuordnung. Danach lädt die App automatisch den zuletzt aktiven Jahrgang und zeigt offene Aufgaben: Zuordnungen prüfen, Profile bereitstellen, Zustellungen wiederholen oder Kurswahlen einsammeln. Speicherort, bestehende Datenbanken und Zertifikate sind unter Einstellungen erreichbar; der Jahrgangswechsel unter Jahrgang verwalten. Standardablage ist der lokale Benutzer-Datenordner, alternativ ein ausdrücklich gewähltes lokales Verzeichnis. [Bedienung und Fehlerbehandlung](docs/LEHRERVERWALTUNG.md).
+Beim ersten Start führt ein Assistent durch Jahrgang (Vorschlag 2029), Fachauswahl, Schülerimport und Kontozuordnung. Danach lädt die App automatisch den zuletzt aktiven Jahrgang und zeigt offene Aufgaben: Zuordnungen prüfen, Profile bereitstellen, Zustellungen wiederholen oder Kurswahlen einsammeln. Speicherort, bestehende Datenbanken sind unter Einstellungen erreichbar; der Jahrgangswechsel unter Jahrgang verwalten. Standardablage ist der lokale Benutzer-Datenordner, alternativ ein gewähltes geschütztes Verzeichnis (im pädagogischen Netz auch U:). [Bedienung und Fehlerbehandlung](docs/LEHRERVERWALTUNG.md).
 
 Beim Start darf nur eine Instanz pro Lehrer-Programmordner laufen, auch wenn mehrere Rechner denselben Ordner auf dem Tauschlaufwerk verwenden. Die mitgelieferte Datei `lehrerprogramm.sperre` bleibt neben der Lehrer-EXE und wird ausschließlich lesend exklusiv geöffnet; Leserechte auf dem Programmordner reichen aus. Ein zweiter Start zeigt „Das Lehrerprogramm wird bereits verwendet“. Fehlt die Datei oder ist der Ordner nicht erreichbar, bleibt der Start gesperrt. Beim Beenden wird die Sperre freigegeben; die Datei bleibt liegen. Die Testpaket-Starter verwenden trotz lokaler Programmkopie dieselbe Sperre im gemeinsamen Paketordner. Unabhängige Paket-/Programmkopien haben getrennte Sperren. Verwaltungsdaten bleiben lokal; getrennte Bestände werden nicht zusammengeführt. Details und Schulnetz-Prüfbedarf: [Startsperre](docs/LEHRERVERWALTUNG.md#startsperre-bei-gemeinsamer-programmablage-12112026).
 
@@ -65,7 +65,7 @@ Beim Start darf nur eine Instanz pro Lehrer-Programmordner laufen, auch wenn meh
 4. Pflichtbereiche beantworten, weitere Kurse ergänzen, Halbjahresplan rechts kontrollieren. Eine Fremdsprache und eine Naturwissenschaft sind Pflicht. Anschließend erscheint immer die gleichwertige Alternative zweite Fremdsprache oder zweite Naturwissenschaft; LF zählen mit. Englisch, Französisch und Latein sind reguläre Angebote; Italienisch erfordert eine bestätigte geeignete Sprachlaufbahn. INF ersetzt nie die erste Naturwissenschaft. Bekannte Sportbefreiungen werden bei automatischen Pflichten berücksichtigt; vorhandene Kurse bleiben bei Änderungen erhalten.
 5. Im Überblick Fehler und Klärungsfälle lesen, Prüfungsoptionen ansehen und **Kontrollbogen als PDF exportieren** wählen. Der Export enthält den aktuellen, gegebenenfalls noch ungespeicherten Entwurf.
 
-Autosave nach 1,5 Sekunden ohne Änderung ist abschaltbar. Laden und Schließen schützen ungespeicherte Änderungen durch Rückfrage. LF-/Prüfungswechsel löschen zusätzliche Kurse nicht automatisch. Eine neue Profilrevision wird beim nächsten Programmstart eingelesen und bewertet die erhaltene Wahl neu. Der Offlineclient kann veraltete, noch gültig signierte Profile nicht zuverlässig erkennen; maßgeblich bleibt der aktuelle Lehrerbestand.
+Autosave nach 1,5 Sekunden ohne Änderung ist abschaltbar. Laden und Schließen schützen ungespeicherte Änderungen durch Rückfrage. LF-/Prüfungswechsel löschen zusätzliche Kurse nicht automatisch. Eine neue Profilrevision wird beim nächsten Programmstart eingelesen und bewertet die erhaltene Wahl neu. Der Offlineclient kann veraltete, verteilte Profile nicht zuverlässig erkennen; maßgeblich bleibt der aktuelle Lehrerbestand.
 
 ## Konfiguration und Dateiversionen
 
@@ -73,7 +73,7 @@ Autosave nach 1,5 Sekunden ohne Änderung ist abschaltbar. Laden und Schließen 
 
 Das Profil heißt `profil.json` und liegt im Wahlordner (ohne Signatur, Nutzerentscheidung 27.10.2026). Es ist nur Arbeitshilfe; verbindlich prüft das Lehrerprogramm gegen den eigenen Bestand.
 
-Aktuelle Versionen: Wahl v2, Fachangebot v2, Profil v2, Arbeitsstand/Transport v2, Lehrerdatenbank 4. Alle älteren Versionen bleiben lesbar und werden nur im Speicher umgewandelt; neuere Versionen werden abgewiesen. Kompatibilitätsvertrag und Versionstabelle: [Dateiformat](docs/DATEIFORMAT.md).
+Aktuelle Versionen: Wahl v2, Fachangebot v3, Profil v2, Arbeitsstand/Transport v3, Lehrerdatenbank im Format 1.0. Alle veröffentlichten Versionen seit der jeweiligen Kompatibilitätsgrenze bleiben lesbar und werden nur im Speicher umgewandelt; neuere Versionen werden abgewiesen. Kompatibilitätsvertrag und Versionstabelle: [Dateiformat](docs/DATEIFORMAT.md).
 
 ## Manueller Probelauf
 
@@ -91,7 +91,7 @@ dotnet publish src/GsmKurswahl.TeacherApp -c Release -r win-x64 --self-contained
 
 Den gesamten jeweiligen Ausgabeordner verteilen. Der zuvor versuchte selbstenthaltende M1-Publish scheiterte an fehlenden Runtimepaketen; ein M2-Standalone-Paket wird mit diesem Entwicklungsstand nicht als getestet behauptet. Frameworkabhängiger Publish ist mit `--self-contained false` ohne Runtime-ID möglich und benötigt .NET 10 auf dem Zielgerät. Keine automatische Verteilung.
 
-M3 technisch umgesetzt: Jahrgang/LF-Angebote vor Ausgabe konfigurieren, Klasse-10-Import, Profilsignierung/-verteilung, separater SQLite-Lehrerbestand und Historie. Native Schulnetz-/Zertifikatsprüfung und fachliche Freigabe bleiben offen. Einstieg: [M3-Bedienung und Betrieb](docs/LEHRERVERWALTUNG.md), synthetisches Importsample `samples/klasse10-demo.csv`. M4: Planungen und Streichungen. M5: ASV nach Muster, Netzpilot und endgültiges Release. M6 (Ausbaustufe, nur Konzept): Online-Kurswahl im Browser mit Anmeldung über das Schulverzeichnis (LDAP), siehe [M6-Konzept](docs/M6_ONLINE_ANMELDUNG.md). Fachliche Grenzen und Entscheidungen: [Offene Punkte](docs/OFFENE_PUNKTE.md), [Regel-/Quellenstand](docs/RECHTSQUELLEN.md), [Entwicklungsanweisungen](AGENTS.md).
+M3 technisch umgesetzt: Jahrgang/LF-Angebote vor Ausgabe konfigurieren, Klasse-10-Import, Profilerstellung und -verteilung, separater SQLite-Lehrerbestand und Historie. Native Schulnetzprüfung und fachliche Freigabe bleiben offen. Einstieg: [M3-Bedienung und Betrieb](docs/LEHRERVERWALTUNG.md), synthetisches Importsample `samples/klasse10-demo.csv`. M4: Planungen und Streichungen. M5: ASV-Abgleich, Netzpilot und endgültiges Release. M6 (Ausbaustufe, nur Konzept): Online-Kurswahl im Browser mit Anmeldung über das Schulverzeichnis (LDAP), siehe [M6-Konzept](docs/M6_ONLINE_ANMELDUNG.md). Fachliche Grenzen und Entscheidungen: [Offene Punkte](docs/OFFENE_PUNKTE.md), [Regel-/Quellenstand](docs/RECHTSQUELLEN.md), [Entwicklungsanweisungen](AGENTS.md).
 
 Für die Verteilung im pädagogischen Netz ist `M:\Allgemein` voreingestellt. Nach Fachauswahl und Schülerimport unter **Wahl → Schülerdateien verteilen** die Ziele `Klasse\Nachname.Vorname` prüfen und gemeinsam bestätigen. Einzelne Vorschläge für abweichende Namen (z. B. mit Endziffer `2` oder Zweitnamen) brauchen ein eigenes Häkchen. Bei offenen Zuordnungen lässt sich ein freier Ordner der jeweiligen Klasse aus der Vorschau auswählen. Bei geöffneter App werden neue Wahlen aus bestätigten Ordnern alle 60 Sekunden eingelesen. [Schülerzuordnung und Verteilung](docs/LEHRERVERWALTUNG.md#gemeinsame-verteilung-und-automatisches-einsammeln).
 
@@ -103,7 +103,7 @@ Die ID wird aus genau diesem Einzelprofil gelesen. Sie ist keine Berechtigungsbe
 
 ## M4-Kursplanung (28.10.2026)
 
-Unter **Kursplanung** zuerst die Erweiterung des lokalen Lehrerbestands ausdrücklich aktivieren. Sie ergänzt Datenbankschema 1 um Planungsstände und Entscheidungen (Schema 2); es gibt keine automatische Migration beim Start. Ältere Programme können die erweiterte Datenbank nicht öffnen.
+Planungsstände und Entscheidungen gehören zum Grundschema des Lehrerbestands (Format 1.0).
 
 - **Auswertung:** Nachfrage je Angebotskennung (einschließlich LF/BF und normal/bilingual) und Halbjahr, LF-Kombinationen und gemeinsame Belegungen. „Alle“, „Abgänger“ und „planungsrelevant“ werden getrennt gezeigt. Bestätigte Abgänger zählen nie zur Planung; voraussichtliche sind umschaltbar. Die direkt in der Kopfleiste einstellbare Zielgruppengröße liefert nur eine aufgerundete Schätzung, keine Untis-Gruppen oder Stundenplanung.
 - **Planungsstände:** vollständiger Jahrgangsstand mit Angebot, Verwaltungsrevisionen, Stammdaten/Voraussetzungen, Nachwahlvermerken, Regelversion und Analyseparametern. Unveränderlich speichern und wahlweise mit dem aktuellen Stand oder einem anderen gespeicherten Stand/Szenario vergleichen. Szenarien werden ausdrücklich als solche angezeigt und verändern keine aktiven Wahlen.
@@ -111,7 +111,7 @@ Unter **Kursplanung** zuerst die Erweiterung des lokalen Lehrerbestands ausdrüc
 - **Übernahme:** Angebot, neue Verwaltungsrevisionen und Nachwahlvermerke werden gemeinsam in einer SQLite-Transaktion gespeichert. Originale Schülerwünsche bleiben in der Historie. Auch unbetroffene Wahlen erhalten die neue Angebotsversion, damit sie keinen künstlichen Versionsfehler bekommen. Das aktuelle Fachangebot anschließend erneut über die Schülerdateiverteilung zustellen; die Übersicht zeigt den Bedarf.
 - **Rücknahme:** ein gespeichertes Angebot als Wiederherstellung simulieren und ausdrücklich übernehmen. Das erzeugt neue Revisionen. Entfernte Schülerwünsche werden anschließend bei Bedarf einzeln aus der Wahlhistorie wiederhergestellt; Nachwahlen werden nicht automatisch als erledigt markiert.
 
-Bestehende fachliche Freigabegrenzen bleiben bestehen: `needs_review` ist keine verbindlich gültige Wahl. ASV-Adapter, Exportpaket und Schulnetz-Pilot gehören weiterhin zu M5.
+Bestehende fachliche Freigabegrenzen bleiben bestehen: `needs_review` ist keine verbindlich gültige Wahl. Der ASV-Abgleich ist verfügbar. Der Schulnetz-Pilot steht aus.
 
 ## Fertiger Testjahrgang mit 80 Schülern
 
@@ -119,7 +119,7 @@ Bestehende fachliche Freigabegrenzen bleiben bestehen: `needs_review` ist keine 
 
 Vier Klassen (10a–10d) mit je 20 Personen, 16 LF-Kombinationen, normale/bilinguale BIO-Angebote, Fremdsprachen, Informatik, Psychologie und SIA. 68 aktive, 8 voraussichtliche und 4 bestätigte Abgänger: die Auswertung zählt je Filter 76 oder 68 planungsrelevante Personen. Zwei Ausgangsstände und das separate Szenario „BIO LF bilingual entfällt“ stehen unter Kursplanung bereit.
 
-Alle 80 Wahlen werden beim Erzeugen mit dem produktiven Regelkern auf Invalid-Meldungen geprüft. Sie sind strukturell vollständig; `needs_review` bleibt wegen offener Jahrgangsfreigabe bestehen. Keine verbindliche Abgabe wird fingiert. Daten ausschließlich synthetisch. Das Startskript baut bei fehlender EXE mit .NET 10; nach Quellcodeänderungen die Testversion wie oben beschrieben neu bauen.
+Alle 80 Wahlen werden beim Erzeugen mit dem produktiven Regelkern auf Invalid-Meldungen geprüft. Sie sind strukturell vollständig; der Prüfstatus richtet sich nach den persönlichen Voraussetzungen und den Regelbefunden. Keine verbindliche Abgabe wird fingiert. Daten ausschließlich synthetisch. Das Startskript baut bei fehlender EXE mit .NET 10; nach Quellcodeänderungen die Testversion wie oben beschrieben neu bauen.
 
 ## Testpaket für Kolleginnen und Kollegen
 
@@ -155,9 +155,9 @@ Der normale Verwaltungsort wird von den Startern nicht geöffnet. Das Paket enth
 
 ## Arbeitsphasen und kompakte Kursplanung (28.10.2026)
 
-Die obere Navigation lautet jetzt **Übersicht → Wahl → Wahlergebnisse → Kursplanung**. Unter Wahl stehen Fachauswahl, Schülerimport/Vorbildung, Verteilung und Einsammeln bereit. Nur dort wird der vierstufige Verlauf angezeigt. Jahrgangsverwaltung liegt unter Einstellungen.
+Die obere Navigation lautet jetzt **Übersicht → Wahl → Kurswahlen → Kursplanung → ASV-Abgleich**. Unter Wahl stehen Fachauswahl, Schülerimport/Vorbildung, Verteilung und Einsammeln bereit. Nur dort wird der vierstufige Verlauf angezeigt. Jahrgangsverwaltung liegt unter Einstellungen.
 
-Wahlergebnisse zeigt die eingelesenen Kurswahlen als Tabelle mit LF, BF/Wahlfächern und direkt änderbarem Abgängerstatus. Voraussetzungen und Kontozuordnungen stehen weiterhin unter Wahl → Schülerbestand zur Verfügung; die verbindliche Prüfung nutzt sie unverändert. Offene Nachwahlen/ungültige Wahlen sind markiert, Prüfdetails stehen im Tooltip.
+Der Bereich **Kurswahlen** zeigt die eingelesenen Kurswahlen als Tabelle mit LF, BF/Wahlfächern und direkt änderbarem Abgängerstatus. Voraussetzungen und Kontozuordnungen stehen weiterhin unter Wahl → Schülerbestand zur Verfügung; die verbindliche Prüfung nutzt sie unverändert. Offene Nachwahlen/ungültige Wahlen sind markiert, Prüfdetails stehen im Tooltip.
 
 Die Kursplanung zeigt alle Fächer in einer kompakten Matrix mit separaten Spalten für LF/BF und bilinguale Varianten. Im breiten Fenster stehen zwei Tabellenblöcke nebeneinander; im schmalen Fenster ein Block. Der Abgängerfilter liegt direkt oben und aktualisiert die Zahlen sofort. Bestätigte Abgänger bleiben ausgeschlossen. Eine Zahl bezeichnet identische Halbjahreszahlen; abweichende KS1-/KS2-Zahlen werden getrennt dargestellt. Unterschiedliche Einzelhalbjahre (z. B. GK/GEO) bleiben explizit sichtbar. Null bedeutet keine Nachfrage, ein Strich bedeutet kein entsprechendes Angebot/Zeitraum.
 
@@ -169,11 +169,11 @@ Testversion-GK-Geo.cmd öffnet 80 synthetische Schüler in einem separaten Besta
 
 ## Netzwechsel, Drucken und Nachwahlbögen (28.10.2026)
 
-Das Verteilen der Schülerdateien und das Einsammeln erfolgen im **pädagogischen Netz**; dort ist das Lehrerprogramm im Allgemeinen nicht vorinstalliert. Vor dem Wechsel ins pädagogische Netz im Verwaltungsnetz unter **Wahl → Schülerdateien verteilen → Paket für pädagogisches Netz speichern (.zip inkl. Programm) …** ein Paket mit Lehrerprogramm, selbstenthaltendem Schülerprogramm (falls vorhanden), Transportstand (`.gsm-transfer`), Starter (`Lehrerprogramm starten.cmd`) und Anleitung erzeugen (alternativ über **Stand für pädagogisches Netz speichern …** nur die `.gsm-transfer`-Datei). Im pädagogischen Netz das ZIP vollständig in einen **lokalen** Ordner entpacken, `Lehrerprogramm starten.cmd` starten und den vorgeschlagenen **Transportstand übernehmen und öffnen** (legt den Unterordner `Arbeitsstand` an). Dort das Schülerlaufwerk prüfen/zuordnen, Schülerdateien verteilen und die Wahlen einsammeln.
+Das Verteilen der Schülerdateien und das Einsammeln erfolgen im **pädagogischen Netz**; dort ist das Lehrerprogramm im Allgemeinen nicht vorinstalliert. Vor dem Wechsel ins pädagogische Netz im Verwaltungsnetz unter **Wahl → Schülerdateien verteilen → Paket für pädagogisches Netz speichern (.zip inkl. Programm) …** ein Paket mit Lehrerprogramm, selbstenthaltendem Schülerprogramm (falls vorhanden), Transportstand (`.gsm-transfer`), Starter (`Lehrerprogramm starten.cmd`) und Anleitung erzeugen (alternativ über **Stand für pädagogisches Netz speichern …** nur die `.gsm-transfer`-Datei). Im pädagogischen Netz das ZIP vollständig in einen geschützten Ordner (z. B. auf U:) entpacken, `Lehrerprogramm starten.cmd` starten und den vorgeschlagenen **Transportstand übernehmen und öffnen** (legt den Unterordner `Arbeitsstand` an). Dort das Schülerlaufwerk prüfen/zuordnen, Schülerdateien verteilen und die Wahlen einsammeln.
 
 Nach dem Einsammeln und Klären offener Konflikte (bzw. dem abschließenden Einsammeln) unter **Wahl → Kurswahlen einsammeln → Stand für Verwaltungsnetz speichern …** die Rück-Transportdatei sichern und im Verwaltungsnetz über **Transportdatei öffnen …** laden. **Wichtig:** Sobald die Transportdatei sicher im Verwaltungsnetz angekommen und geöffnet ist, das Lehrerprogramm im pädagogischen Netz schließen und den gesamten dort entpackten Paketordner (samt Programm, Transportdatei und lokalem `Arbeitsstand`) sowie das ZIP vollständig löschen.
 
-Die `.gsm-transfer`-Datei selbst enthält den aktiven Jahrgang mit Stammdaten, Voraussetzungen, Fachangebot, Schülerwahlen, Revisionen, Nachwahlvermerken, Profil-/Verteilungsprotokollen und Planungsständen; beim Paket-Export (`.zip`) werden die Programmordner sauber ohne lokale Laufzeitdatenbanken oder Sperrdateien dazugepackt (Wahlordner der Schüler sind nicht enthalten). Eine einzelne `aktuell.json` oder eine manuell kopierte laufende SQLite-Datei reicht für den Netzwechsel nicht. Weiterarbeit erfolgt stets lokal, nie direkt im Archiv oder auf einem Netzlaufwerk. Keine Zusammenführung: Nach dem Netzwechsel ausschließlich den übernommenen Stand weiterbearbeiten; der ältere lokale Bestand bleibt zur Sicherheit erhalten. Der normale Programmstart merkt sich den neuen Ort. Die ausdrücklich auf einen Demo-Ordner festgelegten Teststarter öffnen dagegen weiterhin ihren ursprünglichen Testbestand; einen übernommenen Stand dort erneut über Einstellungen auswählen.
+Die `.gsm-transfer`-Datei selbst enthält den aktiven Jahrgang mit Stammdaten, Voraussetzungen, Fachangebot, Schülerwahlen, Revisionen, Nachwahlvermerken, Profil-/Verteilungsprotokollen und Planungsständen; beim Paket-Export (`.zip`) werden die Programmordner sauber ohne lokale Laufzeitdatenbanken oder Sperrdateien dazugepackt (Wahlordner der Schüler sind nicht enthalten). Eine einzelne `aktuell.json` oder eine manuell kopierte laufende SQLite-Datei reicht für den Netzwechsel nicht. Weiterarbeit erfolgt im entpackten Ordner, im pädagogischen Netz auch auf U:. Den Bestand jeweils nur an einem Arbeitsplatz öffnen. Keine Zusammenführung: Nach dem Netzwechsel ausschließlich den übernommenen Stand weiterbearbeiten; der ältere lokale Bestand bleibt zur Sicherheit erhalten. Der normale Programmstart merkt sich den neuen Ort. Die ausdrücklich auf einen Demo-Ordner festgelegten Teststarter öffnen dagegen weiterhin ihren ursprünglichen Testbestand; einen übernommenen Stand dort erneut über Einstellungen auswählen.
 
 **Drucken …** in der Kursplanung speichert die angezeigte Fächer-/Wahlzahlenmatrix einschließlich Abgängerfilter und Stand als A4-PDF und öffnet sie im PDF-Programm. Dort kann über Strg+P auf Papier gedruckt werden. Die UI zeigt keine Gruppengröße oder geschätzten Gruppen mehr; das historische Datenfeld bleibt für gespeicherte Planungsstände kompatibel.
 
@@ -181,9 +181,9 @@ Die Streichungsauswahl blendet D/M/E für BF und LF sowie die fest vorgesehenen 
 
 ## M5: Abgleich und Abschluss (28.10.2026)
 
-Unter **Abgleich / Abschluss** stehen ein allgemeiner CSV/XLSX-Kurswahlabgleich mit frei zuordenbaren Spalten, Einzelbestätigung und neuer Lehrerrevision, gefilterte Belegungs-/Abgleichsexporte sowie manuelle ASV-Übertragungsvermerke bereit. Der konkrete ASV-Adapter wartet auf eine anonymisierte Musterdatei. Verbindliche Gegenprüfung nutzt aktuelle geschützte Stammdaten; `needs_review` bleibt erhalten.
+Unter **ASV-Abgleich** lässt sich der ASV-BW-Export „zz Kursstufe Fächerwahl“ als XLSX oder CSV mit Kursen, Halbjahren und mündlichen Fächern vergleichen. Abweichungen lassen sich exportieren und unter **Kurswahlen** prüfen.
 
-Übertragungsvermerke benötigen die ausdrücklich aktivierte Erweiterung von Datenbankschema 2 auf 3. Vorher sichern; ältere Programme können Schema 3 nicht öffnen. Sicherung/Wiederherstellung verwendet den bestehenden vollständigen Jahrgangstransport; Wiederherstellung stets als neuer lokaler Bestand. Die Kursplanung exportiert angezeigte Nachfragezahlen jetzt auch nach CSV/XLSX.
+Jahrgangssicherung und Wiederherstellung verwenden den vollständigen Jahrgangstransport. Die Kursplanung exportiert Nachfragezahlen nach CSV/XLSX.
 
 Bedienung, Formate, Backup-/Wiederherstellungsablauf und Schulnetz-Pilotplan: [M5-Abschluss](docs/M5_ABSCHLUSS.md). Synthetisches, bewusst unvollständiges Prüffallsample: `samples/kursabgleich-demo.csv`. Programmpaket, Versionsnummer und Aktualisierung: [BETRIEB.md](docs/BETRIEB.md). Releasevorbereitung: `./scripts/Publish-Release.ps1` (Schülerprogramm immer selbstenthaltend für Windows x64, also ohne .NET-Installation auf Schülerrechnern; Lehrerprogramm frameworkabhängig, mit `-SelfContained` ebenfalls selbstenthaltend; GSM-Vorgaben `schulvorgaben.json` liegen automatisch neben dem Lehrerprogramm, `-Schulvorgaben <Datei>` ersetzt sie, siehe [Lehrerverwaltung](docs/LEHRERVERWALTUNG.md)). Keine Produktivfreigabe und kein Deployment.
 

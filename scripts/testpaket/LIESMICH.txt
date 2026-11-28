@@ -68,8 +68,7 @@ Schülerprogramm:
   Schueler 6   Bili, Italienisch und beide INF-Zugangswege fehlen ausdrücklich.
   Schueler 7   Vorbildung unbekannt: fachlich zu klären.
 
-Vollständige Wahlen sind Vorwahlentwürfe. Fachliche Freigabegrenzen bleiben
-sichtbar (needs_review); eine verbindliche Abgabe wird nicht vorgetäuscht.
+Vollständige Wahlen sind Vorwahlentwürfe. Offene Prüffragen ergeben needs_review, vollständig geprüfte Wahlen können valid erreichen; eine verbindliche Abgabe wird nicht vorgetäuscht.
 
 Lehrer und Schüler zusammen:
 

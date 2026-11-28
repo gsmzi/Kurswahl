@@ -304,7 +304,7 @@ public sealed partial class TeacherWindow
             var profile = new ProfileContext(ProfileStatus.Verified, record.Student.Prerequisites);
             var addItems = catalog.Offers.Where(o => o.Status is OfferStatus.Offered or OfferStatus.Established && !draft.Selections.Any(s => s.OfferId == o.Id))
                 .OrderBy(o => o.Type == CourseType.Lf ? 0 : 1).ThenBy(o => SubjectName(o.SubjectId), StringComparer.CurrentCulture).ThenBy(o => o.Type)
-                .Select(o => new FilterItem(o.Id, OfferLabel(o.Id) + (new ChoiceValidator().GetAvailability(o, profile).CanSelect ? "" : "  (persönliche Voraussetzung fehlt/unklar)"))).ToArray();
+                .Select(o => new FilterItem(o.Id, OfferLabel(o.Id) + (new ChoiceValidator().GetAvailability(o, profile, catalog).CanSelect ? "" : "  (persönliche Voraussetzung fehlt/unklar)"))).ToArray();
             var add = new ComboBox { Name = "ChoiceAdd", ItemsSource = addItems, PlaceholderText = "Kurs hinzufügen …", MinWidth = 300, Margin = new Thickness(0, 8, 0, 0) };
             add.SelectionChanged += (_, _) =>
             {
@@ -317,14 +317,15 @@ public sealed partial class TeacherWindow
                 Set(offer, offer.Type == CourseType.Bf && required is not null && offer.SubjectId is "GK" or "GEO" ? required.Semesters : offer.Schedule.Select(s => s.Semester));
             };
             gridHost.Children.Add(add);
-            var oralSubjects = draft.Selections.Where(s => s.Type == CourseType.Bf).Select(s => s.SubjectId).Distinct().OrderBy(SubjectName, StringComparer.CurrentCulture).ToArray();
+            var oralSubjects = draft.Selections.Where(s => s.Type == CourseType.Bf && s.SubjectId != "GEO").Select(s => s.SubjectId).Distinct().OrderBy(SubjectName, StringComparer.CurrentCulture).ToArray();
             var oralRow = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
             oralRow.Children.Add(new TextBlock { Text = "Mündlich geplant:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
             var oralBoxes = new List<ComboBox>();
             for (var i = 0; i < 2; i++)
             {
                 var current = draft.PlannedOralSubjects.ElementAtOrDefault(i);
-                var items = new[] { new FilterItem(null, "— nicht geplant —") }.Concat(oralSubjects.Select(s => new FilterItem(s, SubjectName(s)))).ToArray();
+                var items = new[] { new FilterItem(null, "— nicht geplant —") }.Concat(oralSubjects.Select(s => new FilterItem(s, SubjectName(s)))).ToList();
+                if (current is not null && !oralSubjects.Contains(current)) items.Add(new FilterItem(current, SubjectName(current) + " (derzeit nicht wählbar)"));
                 var box = new ComboBox { Name = "ChoiceOral" + (i + 1), ItemsSource = items, SelectedItem = items.FirstOrDefault(x => x.Value == current) ?? items[0], MinWidth = 170, Margin = new Thickness(0, 0, 8, 0) };
                 oralBoxes.Add(box); oralRow.Children.Add(box);
             }
@@ -422,7 +423,7 @@ public sealed partial class TeacherWindow
     {
         var lists = choiceFilter.OfferId is { } offerId
             ? [ChoiceOverview.Members(states, session!.Catalog, offerId, choiceFilter.Semester)]
-            : ChoiceOverview.AllCourseLists(states, session!.Catalog);
+            : ChoiceOverview.AllCourseLists(states, session!.Catalog, choiceFilter.Semester);
         return PlanningPrint.CourseLists(session.Catalog.GraduationYear, lists.Where(l => !l.Members.IsEmpty).Select(l => new CourseListPrint(
             l.Title + (choiceFilter.ClassName is { } c ? " · Klasse " + c : ""),
             [.. l.Members.Select((m, i) => new[] { (i + 1).ToString(), m.Student.Student.DisplayName, m.Student.Student.ClassName,

@@ -267,7 +267,7 @@ public sealed partial class TeacherWindow : Window
         prereqTab.Children.Add(Labeled("Religion/Ethik: Prüfung freigegeben", relExamPermBox, "Ist die mündliche Prüfung im gewählten Fach trotz Wechsel zugelassen, z. B. nach bestandener Feststellungsprüfung?"));
         prereqTab.Children.Add(Labeled("Sportbefreiung", sportBox, "Halbjahre mit Sportbefreiung. Für jedes befreite Halbjahr ist ein zusätzlicher Basis- oder Wahlfachkurs nötig; der Seminarkurs zählt nicht. Keine Diagnosen eintragen."));
         prereqTab.Children.Add(Labeled("Dauerhafte Sportbefreiung", permSportBox, "Dauerhafte, auch teilweise Befreiung zum Wahlzeitpunkt. Schließt LF Sport als normale Wahl aus."));
-        prereqTab.Children.Add(Labeled("Fortgeführte Fremdsprachen", langBox, "Sprachen mit bestätigter Sprachlaufbahn (z. B. E, F, L). Englisch, Französisch und Latein zählen ohnehin; wichtig ist die Bestätigung vor allem für Italienisch und weitere Sprachen."));
+        prereqTab.Children.Add(Labeled("Fortgeführte Fremdsprachen", langBox, "Sprachen mit bestätigter Sprachlaufbahn (z. B. E, F, L). Englisch zählt immer. Bei einer Eintragung alle bestätigten Sprachen aufführen. Ohne Eintrag bleiben Französisch und Latein mit Prüfhinweis wählbar."));
         prereqTab.Children.Add(prereqErrorBox);
         var savePrereq = Button("Vorbildung und Abgängerstatus speichern", () =>
         {
@@ -300,7 +300,7 @@ public sealed partial class TeacherWindow : Window
                 }
                 var updatedPrior = new PriorEducation((Knowledge)italianBox.SelectedItem!, (Knowledge)bridgeBox.SelectedItem!, (Knowledge)impBox.SelectedItem!, (Knowledge)biliBox.SelectedItem!, ((SubjectItem)relGrade10Box.SelectedItem!).Id, semesters)
                 {
-                    ContinuedLanguages = [.. (langBox.Text ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase)],
+                    ContinuedLanguages = [.. (langBox.Text ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(s => s.ToUpperInvariant()).Distinct()],
                     ReligionEthicsPermission = (Knowledge)relPermBox.SelectedItem!,
                     ReligionEthicsExamPermission = (Knowledge)relExamPermBox.SelectedItem!,
                     PermanentSportExemption = (Knowledge)permSportBox.SelectedItem!
@@ -411,7 +411,7 @@ public sealed partial class TeacherWindow : Window
         var selections = new List<(CourseOffer Offer, int Semester, CheckBox Box)>();
         var profile = new ProfileContext(ProfileStatus.Verified, record.Student.Prerequisites);
         GsmKurswahl.Rules.Availability? ReligionAvailability(CourseOffer offer) => offer.SubjectId is "ER" or "KR"
-            ? new GsmKurswahl.Rules.ChoiceValidator().GetAvailability(offer, profile) : null;
+            ? new GsmKurswahl.Rules.ChoiceValidator().GetAvailability(offer, profile, session!.Catalog) : null;
         var extraOffers = choice.Selections.Where(s => session!.Catalog.Offers.All(o => o.Id != s.OfferId))
             .Select(s => new CourseOffer(s.OfferId, s.SubjectId, s.Type, s.Variant, OfferStatus.Cancelled,
                 [.. s.Semesters.Order().Select(h => new SemesterHours(h, 0))], []))
@@ -495,6 +495,12 @@ public sealed partial class TeacherWindow : Window
         {
             var diff = string.Join("\n", revision.Changes.Select(c => $"   {OfferLabel(c.OfferId)}: {Semesters(c.Before)} → {Semesters(c.After)}"));
             var oralSummary = revision.Snapshot.PlannedOralSubjects.IsEmpty ? "keine" : string.Join(", ", revision.Snapshot.PlannedOralSubjects.Select(SubjectName));
+            var previousOral = history.FirstOrDefault(r => r.Id == revision.PreviousRevisionId)?.Snapshot.PlannedOralSubjects ?? [];
+            if (!previousOral.SequenceEqual(revision.Snapshot.PlannedOralSubjects))
+            {
+                var from = previousOral.IsEmpty ? "keine" : string.Join(", ", previousOral.Select(SubjectName));
+                diff = (diff + $"\n   Mündliche Planung: {from} → {oralSummary}").TrimStart('\n');
+            }
             var card = new StackPanel { Spacing = 4 };
             card.Children.Add(new TextBlock { Text = $"{revision.ChangedAt.LocalDateTime:g} · {FormatRevisionSource(revision.Source)} · {revision.ActorId} ({FormatActorRole(revision.ActorRole)})", FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap });
             card.Children.Add(Text($"Begründung: {revision.Reason}\nMündlich geplant: {oralSummary}" + (diff.Length > 0 ? "\nÄnderungen:\n" + diff : "")));
@@ -522,7 +528,7 @@ public sealed partial class TeacherWindow : Window
 
         // ---- Section 5: Deletion (deliberate and irreversible, collapsed danger zone)
         var deletion = new StackPanel { Spacing = 8 };
-        deletion.Children.Add(Text("Entfernt diese Person vollständig aus dem Lehrerbestand dieses Jahrgangs: Stammdaten, Vorbildung, alle Kurswahlstände, Nachwahl- und Übertragungsvermerke, Profile, Zustellberichte, archivierte Schülerdateien und die Person in gespeicherten Planungsständen. Zurück bleibt nur ein Protokolleintrag ohne Name und Schüler-ID. Dateien im Wahlordner werden nicht verändert. Vorher ggf. „Jahrgang sichern“."));
+        deletion.Children.Add(Text("Entfernt diese Person vollständig aus dem Lehrerbestand dieses Jahrgangs: Stammdaten, Vorbildung, alle Kurswahlstände, Nachwahlvermerke, Profile, Zustellberichte, archivierte Schülerdateien und die Person in gespeicherten Planungsständen. Zurück bleibt nur ein Protokolleintrag ohne Name und Schüler-ID. Dateien im Wahlordner werden nicht verändert. Vorher ggf. „Jahrgang sichern“."));
         var deleteReason = new TextBox { Name = "DeleteStudentReason", Watermark = "Löschgrund (z. B. Schulwechsel, Löschfrist erreicht)" };
         var deleteConfirm = new CheckBox { Name = "DeleteStudentConfirm", Content = $"Ich möchte {record.Student.DisplayName} ({id}) endgültig löschen" };
         var deleteErrorBox = InlineErrorBox("StudentDeleteError", out var deleteErrorText);
@@ -591,7 +597,7 @@ public sealed partial class TeacherWindow : Window
             if (Path.GetExtension(path).ToLowerInvariant() is not (".csv" or ".xlsx")) throw new ArgumentException("Bitte eine Schülerliste als .xlsx oder .csv auswählen. Kurswahlen werden unter „Kurswahlen einsammeln“ gelesen.");
             if (new FileInfo(path).Length > 16_000_000) throw new InvalidDataException("Importdatei überschreitet 16 MB.");
             var bytes = await File.ReadAllBytesAsync(path);
-            table = Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ? StudentTableImport.Xlsx(new MemoryStream(bytes)) : StudentTableImport.Csv(Encoding.UTF8.GetString(bytes));
+            table = Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase) ? StudentTableImport.Xlsx(new MemoryStream(bytes)) : StudentTableImport.Csv(bytes);
             var mappingVersion = "m3-table-v1"; importFormatNotice = null;
             if (AsvStudentImport.Detect(table))
             {

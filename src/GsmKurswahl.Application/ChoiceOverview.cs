@@ -39,7 +39,7 @@ public static class ChoiceOverview
         if (filter.ClassName is not null && student.ClassName != filter.ClassName) return false;
         if (filter.OfferId is not null && !(state.Active?.Snapshot.Selections.Any(s => s.OfferId == filter.OfferId
             && (filter.Semester is not { } h || s.Semesters.Contains(h))) ?? false)) return false;
-        if (filter.OfferId is null && filter.Semester is { } semester && state.Active is null) return false;
+        if (filter.OfferId is null && filter.Semester is { } semester && state.Active?.Snapshot.Selections.Any(s => s.Semesters.Contains(semester)) != true) return false;
         return filter.State switch
         {
             ChoiceStateFilter.WithoutChoice => state.Active is null,
@@ -71,11 +71,11 @@ public static class ChoiceOverview
         return new(offer, OfferTitle(catalog, offer) + (semester is { } hj ? " · HJ " + hj : ""), members);
     }
 
-    public static ImmutableArray<CourseList> AllCourseLists(IEnumerable<TeacherState> states, OfferCatalog catalog)
+    public static ImmutableArray<CourseList> AllCourseLists(IEnumerable<TeacherState> states, OfferCatalog catalog, int? semester = null)
     {
         var all = states.ToArray();
         return [.. catalog.Offers.OrderBy(o => catalog.Subjects.FirstOrDefault(s => s.Id == o.SubjectId)?.Name ?? o.SubjectId, StringComparer.CurrentCulture)
-            .ThenBy(o => o.Type).ThenBy(o => o.Variant).Select(o => Members(all, catalog, o.Id)).Where(l => !l.Members.IsEmpty)];
+            .ThenBy(o => o.Type).ThenBy(o => o.Variant).Select(o => Members(all, catalog, o.Id, semester)).Where(l => !l.Members.IsEmpty)];
     }
 
     // The teacher's working copy is judged exactly like every stored choice: current offer, current rules, protected prerequisites.

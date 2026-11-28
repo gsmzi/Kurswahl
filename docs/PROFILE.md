@@ -1,6 +1,6 @@
 # Schülerseitige Profilprüfung (Stand: 27.10.2026 – ohne Zertifikats-/SID-Pflicht)
 
-Der Schülerclient liest `profil.json` im gleichen konfigurierten Verzeichnis wie die Wahl (`aktuell.json`). Er schreibt diese Datei niemals. Das Profilschema v1 ist unabhängig vom Wahlschema v2 und Katalogschema v1. Auf eine separate Zertifikatssignatur (`profil.sig`), `profile-trust.json` und die Pflicht zur Windows-SID-Zuordnung wird gemäß Nutzerentscheidung vom 27.10.2026 verzichtet.
+Der Schülerclient liest `profil.json` im gleichen konfigurierten Verzeichnis wie die Wahl (`aktuell.json`). Er schreibt diese Datei niemals. Das Profilschema v2 ist unabhängig vom Wahlschema v2 und Katalogschema v3. Auf eine separate Zertifikatssignatur (`profil.sig`), `profile-trust.json` und die Pflicht zur Windows-SID-Zuordnung wird gemäß Nutzerentscheidung vom 27.10.2026 verzichtet.
 
 ## Austauschvertrag
 

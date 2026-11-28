@@ -94,7 +94,7 @@ public sealed class ReconciliationWindowTests
 
             var summary = Named<TextBlock>("AsvSummary").Text ?? "";
             Assert.Contains("1 deckungsgleich", summary);
-            Assert.Contains("1 Abweichungen", summary);
+            Assert.Contains("Abweichungen: 1", summary);
             Assert.Contains("1 nur in GSM-Kurswahl", summary);
             Assert.Contains("1 nur in ASV", summary);
 

@@ -192,6 +192,29 @@ public class AcademicRulesTests
         Assert.DoesNotContain(Check(c, p, catalog).Messages, m => m.Rule.Id == "AGVO-LANGUAGE-SCIENCE");
         Assert.Contains(ChoiceWorkflow.Tasks(c, catalog, p), t => t.Id == "PLAN-AREA-BREADTH" && t.IsSatisfied);
     }
+    [Fact]
+    public void OralPlanningDoesNotConsumeSportReplacementSemesters()
+    {
+        var choice = Choice("D-LF", "M-LF", "W-LF", "E-BF", "BIO-BF", "CH-BF", "G-BF", "BK-BF", "ETH-BF", "GK-BF", "GEO-BF");
+        choice = choice with { Selections = [.. choice.Selections.Select(s => s.SubjectId switch
+        {
+            "GK" => s with { Semesters = [1, 2, 3, 4] },
+            "GEO" => s with { Semesters = [3, 4] },
+            _ => s
+        })] };
+        var profile = Profile with { Prerequisites = Profile.Prerequisites with { SportExemptSemesters = [1, 2, 3, 4] } };
+        foreach (var oral in new[] { "G", "GK" })
+            Assert.Equal(4, AcademicRules.MaximumSportReplacementCourses(choice with { PlannedOralSubjects = ["E", oral] }, profile, TestData.WorkflowCatalog));
+    }
+
+    [Fact]
+    public void LowerCaseLanguagesInAnExistingProfileRemainSelectable()
+    {
+        var profile = Profile with { Prerequisites = Profile.Prerequisites with { ContinuedLanguages = ["e", "f", "l"] } };
+        Assert.Equal(new[] { "E", "F", "L" }, AcademicRules.Languages(profile));
+        Assert.False(AcademicRules.LanguageExcluded("F", profile));
+    }
+
     [Fact] public void SportReplacementRemainsRequiredAtFortyTwoAndSiaCannotReplaceIt()
     {
         var sia = TestData.Offer("SIA-SK", "SIA", CourseType.Seminar) with { Schedule = [new(1, 3), new(2, 3)] };
@@ -237,8 +260,8 @@ public class AcademicRulesTests
         var result = Check(Complete, p, catalog);
         var relMsg = Assert.Single(result.Messages.Where(m => m.Rule.Id == "AGVO-RELIGION"));
         Assert.Equal(ReviewStatus.NeedsReview, relMsg.Rule.Severity);
-        Assert.Contains("Austritt aus Religionsunterricht muss beantragt werden.", relMsg.Explanation);
-        Assert.Contains("Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig.", relMsg.Explanation);
+        Assert.Contains("Austritt aus dem Religionsunterricht muss beantragt werden.", relMsg.Explanation);
+        Assert.Contains("Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig.", relMsg.Explanation);
         Assert.Null(AcademicRules.AssessmentSubject(Complete, p));
         Assert.Equal(new[] { "ETH" }, AcademicRules.ReligionChange(Complete, p));
         // Planning ETH orally is no rule violation; the assessment is reported for planning.

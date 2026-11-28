@@ -50,7 +50,7 @@ public static class ChoiceWorkflow
     public static ImmutableArray<string> OralCandidates(CourseChoice choice, OfferCatalog catalog, ProfileContext? profile = null) =>
         [.. catalog.Offers.Where(o => o.Type == CourseType.Bf && o.SubjectId != "GEO"
             && (AcademicRules.Field(o.SubjectId, profile ?? ProfileContext.Missing, catalog) != 0 || o.SubjectId == "SP") && !Lf(choice).Contains(o.SubjectId)
-            && new ChoiceValidator().GetAvailability(o, profile ?? ProfileContext.Missing).CanSelect
+            && new ChoiceValidator().GetAvailability(o, profile ?? ProfileContext.Missing, catalog).CanSelect
             && !(o.SubjectId == "SP" && profile?.Status == ProfileStatus.Verified
                 && (profile.Prerequisites.PermanentSportExemption == Knowledge.Yes || profile.Prerequisites.SportExemptSemesters is { Length: > 0 }))
             && !(o.SubjectId is "ETH" or "ER" or "KR" && profile?.Status == ProfileStatus.Verified
@@ -72,15 +72,15 @@ public static class ChoiceWorkflow
         var lf = Lf(choice);
         var sciences = AcademicRules.ScienceSubjects(catalog);
         if (lf.Length != 3 || lf.Distinct().Count() != 3) return "PLAN-LF: Bitte genau drei verschiedene Leistungsfächer wählen.";
-        if (lf.Any(s => AcademicRules.Field(s, context, catalog) == 0 && s != "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Demoangebots klären.";
+        if (lf.Any(s => AcademicRules.Field(s, context, catalog) == 0 && s != "SP")) return "PLAN-LF: needs_review – Fachzuordnung außerhalb des bekannten Fachangebots klären.";
         if (lf.Count(s => Core.Contains(s) || sciences.Contains(s) || AcademicRules.Languages(context, catalog).Contains(s)) < 2) return "PLAN-LF: Mindestens zwei LF aus Deutsch, Mathematik, fortgeführten Fremdsprachen oder BIO/CH/PH wählen.";
         if (choice.Selections.Where(s => s.Type == CourseType.Lf).Any(s => s.Semesters.Length != 4
             || !catalog.Offers.Any(o => o.Id == s.OfferId && o.SubjectId == s.SubjectId && o.Type == s.Type
-                && o.Variant == s.Variant && new ChoiceValidator().GetAvailability(o, context).CanSelect)))
+                && o.Variant == s.Variant && new ChoiceValidator().GetAvailability(o, context, catalog).CanSelect)))
             return "PLAN-LF: Angebot oder Belegung der Leistungsfächer korrigieren.";
         var candidates = OralCandidates(choice, catalog, context);
         if (!candidates.Any(a => candidates.Any(b => a != b && Combination(choice, [a, b], context, catalog))))
-            return "PLAN-ORAL: Mit diesen LF ist im verfügbaren Demoangebot keine Kombination für Deutsch, Mathematik und alle Aufgabenfelder möglich.";
+            return "PLAN-ORAL: Mit diesen LF ist im verfügbaren Fachangebot keine Kombination für Deutsch, Mathematik und alle Aufgabenfelder möglich.";
         return null;
     }
 
@@ -123,6 +123,12 @@ public static class ChoiceWorkflow
             : candidates.Any(d => d != c && Combination(choice, [c, d], profile, catalog))))];
     }
 
+    public static bool CountWithoutSeminar(ProfileContext profile) =>
+        profile.Status == ProfileStatus.Verified && profile.Prerequisites.SportExemptSemesters is { Length: > 0 };
+
+    public static int CoursesForMinimum(CourseChoice choice, ProfileContext profile) =>
+        CountWithoutSeminar(profile) ? choice.Selections.Where(s => s.Type != CourseType.Seminar).Sum(s => s.Semesters.Length) : CountedCourses(choice);
+
     public static int CountedCourses(CourseChoice choice) => choice.Selections.Sum(s => s.Semesters.Length);
 
     public static ImmutableArray<ChoiceTask> Tasks(CourseChoice choice, OfferCatalog catalog, ProfileContext profile)
@@ -144,9 +150,9 @@ public static class ChoiceWorkflow
             var chosen = matching.Select(s => s.OfferId).ToImmutableArray();
             var candidates = catalog.Offers.Where(o => o.Type != CourseType.Lf && subjects.Contains(o.SubjectId) && !lf.Contains(o.SubjectId)
                 && four.All(h => o.Schedule.Any(s => s.Semester == h))).ToArray();
-            var options = candidates.Where(o => validator.GetAvailability(o, profile).CanSelect).Select(o => o.Id).ToImmutableArray();
+            var options = candidates.Where(o => validator.GetAvailability(o, profile, catalog).CanSelect).Select(o => o.Id).ToImmutableArray();
             var restricted = candidates.Where(o => !options.Contains(o.Id))
-                .Select(o => new RestrictedOffer(o.Id, validator.GetAvailability(o, profile).Explanation)).ToImmutableArray();
+                .Select(o => new RestrictedOffer(o.Id, validator.GetAvailability(o, profile, catalog).Explanation)).ToImmutableArray();
             var have = lf.Concat(matching.Where(s => options.Contains(s.OfferId)).Select(s => s.SubjectId)).ToArray();
             return new(ruleId, Definitions.Single(d => d.Id == ruleId), title, hint, four, choose,
                 Math.Max(0, needed - fulfilled(have)), options, chosen, lf, restricted);
@@ -155,7 +161,7 @@ public static class ChoiceWorkflow
         var tasks = new List<ChoiceTask>
         {
             Area("PLAN-AREA-ART", "Kunst oder Musik", "Wähle eines der beiden Fächer für HJ 1–4.", ["BK", "MU"], 1, have => have.Length),
-            Area("PLAN-AREA-RELIGION", "Religion oder Ethik", "Wähle ein Fach für HJ 1–4. Religion wird passend zum bestätigten Klasse-10-Fach angeboten (ER: evangelisch, KR: katholisch). Bei unbekannten oder ungeprüften Angaben bleiben beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; Wechsel und mündliche Prüfung ggf. klären.",
+            Area("PLAN-AREA-RELIGION", "Religion oder Ethik", "Wähle ein Fach für HJ 1–4. Religion wird passend zum bestätigten Klasse-10-Fach angeboten. Bei unbekannten oder ungeprüften Angaben bleiben beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; Wechsel und mündliche Prüfung ggf. klären.",
                 ["ER", "KR", "ETH"], 1, have => have.Length),
             Area("PLAN-AREA-LANGUAGE", "Mindestens eine Fremdsprache", "Englisch, Französisch oder Latein für HJ 1–4. Eine passende LF-Belegung erfüllt die Pflicht bereits. Italienisch nur mit bestätigter geeigneter Sprachlaufbahn.",
                 AcademicRules.Languages(profile, catalog), 1, have => have.Length),
@@ -173,30 +179,30 @@ public static class ChoiceWorkflow
             : null;
         var secondary = full.Where(s => s.SubjectId != firstLanguage && s.SubjectId != firstScience
             && (languages.Contains(s.SubjectId) || sciences.Contains(s.SubjectId) || s.SubjectId == "INF")
-            && catalog.Offers.Any(o => o.Id == s.OfferId && validator.GetAvailability(o, profile).CanSelect)).FirstOrDefault();
+            && catalog.Offers.Any(o => o.Id == s.OfferId && validator.GetAvailability(o, profile, catalog).CanSelect)).FirstOrDefault();
         var satisfied = secondary is not null && (secondary.SubjectId != "INF" || firstScience is not null);
         var candidateSubjects = languages.Concat(sciences).Concat(["INF", "I"]).Concat(catalog.Subjects.Where(s => s.IsForeignLanguage).Select(s => s.Id)).Distinct().ToArray();
         var candidates = catalog.Offers.Where(o => o.Type == CourseType.Bf && candidateSubjects.Contains(o.SubjectId)
             && o.SubjectId != firstLanguage && o.SubjectId != firstScience && !Lf(choice).Contains(o.SubjectId)
             && four.All(h => o.Schedule.Any(s => s.Semester == h))).ToArray();
-        bool CanSelect(CourseOffer offer) => validator.GetAvailability(offer, profile).CanSelect
+        bool CanSelect(CourseOffer offer) => validator.GetAvailability(offer, profile, catalog).CanSelect
             && (offer.SubjectId != "I" || languages.Contains("I"));
         tasks.Add(new("PLAN-AREA-BREADTH", Definitions.Single(r => r.Id == "PLAN-AREA-BREADTH"),
             "Zweite Fremdsprache oder zweite Naturwissenschaft",
-            "Wähle zusätzlich eine andere Fremdsprache oder Naturwissenschaft für HJ 1–4. Berechtigtes Informatik kann die zweite Naturwissenschaft ersetzen. Beide Wege sind gleichwertige Alternativen.",
+            "Wähle zusätzlich eine andere Fremdsprache oder Naturwissenschaft für HJ 1–4. Das Basisfach Informatik (bei erfüllter Voraussetzung) kann die zweite Naturwissenschaft ersetzen. Beide Wege sind gleichwertige Alternativen.",
             four, secondary?.Type == CourseType.Lf ? 0 : 1, satisfied ? 0 : 1,
             [.. candidates.Where(CanSelect).Select(o => o.Id)],
             secondary is { Type: not CourseType.Lf } ? [secondary.OfferId] : [],
             secondary?.Type == CourseType.Lf ? [secondary.SubjectId] : [],
             [.. candidates.Where(o => !CanSelect(o)).Select(o => new RestrictedOffer(o.Id,
-                o.SubjectId == "I" && !languages.Contains("I") ? "Geeignete fortgeführte Italienisch-Sprachlaufbahn muss im Profil bestätigt werden." : validator.GetAvailability(o, profile).Explanation))]));
+                o.SubjectId == "I" && !languages.Contains("I") ? "Geeignete fortgeführte Italienisch-Sprachlaufbahn muss im Profil bestätigt werden." : validator.GetAvailability(o, profile, catalog).Explanation))]));
         // A subject-level oral choice does not decide between normal/bilingual offers.
         // Ask explicitly even when another course already satisfies the general area.
         foreach (var required in Required(choice, profile).Reverse())
         {
             if (choice.Selections.Any(s => s.SubjectId == required.SubjectId)) continue;
             var variants = catalog.Offers.Where(o => o.SubjectId == required.SubjectId && o.Type == CourseType.Bf
-                && validator.GetAvailability(o, profile).CanSelect
+                && validator.GetAvailability(o, profile, catalog).CanSelect
                 && required.Semesters.All(h => o.Schedule.Any(s => s.Semester == h))).ToArray();
             if (variants.Length < 2) continue;
             var name = catalog.Subjects.Single(s => s.Id == required.SubjectId).Name;
@@ -215,7 +221,7 @@ public static class ChoiceWorkflow
                 notes.Add($"PLAN-REQUIRED: {required.SubjectId} benötigt HJ {string.Join(", ", required.Semesters)}; Belegung ergänzen oder Angebot klären.");
         foreach (var task in Tasks(choice, catalog, profile).Where(t => !t.IsSatisfied))
             notes.Add($"{task.Rule.Id}: {task.Title} – noch {task.Open} offen.");
-        var count = CountedCourses(choice);
+        var count = CoursesForMinimum(choice, profile);
         if (count < MinimumCourses)
             notes.Add($"PLAN-MIN-COURSES: {count} von mindestens {MinimumCourses} Halbjahreskursen (12 LF + 30 weitere) geplant.");
         notes.Add("Die Oberstufenberatung klärt die in den Prüfhinweisen genannten offenen Fragen. Der Regelstand für deinen Abiturjahrgang und die endgültige Anrechnung müssen fachlich bestätigt werden.");

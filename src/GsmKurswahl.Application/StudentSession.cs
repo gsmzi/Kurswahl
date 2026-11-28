@@ -78,7 +78,7 @@ public sealed class StudentSession
                 new("BILI", "Durchgängig bilingualer Bildungsgang", Value(p.ContinuousBilingual), Offers(Requirement.ContinuousBilingual, "Im Angebot nicht vorhanden."), verified),
                 new("REL", "Religion/Ethik in Klasse 10",
                     verified && p.ReligionEthicsGrade10 is { } subject ? $"{SubjectName(subject)} (Belegung/Prüfung: {Value(p.ReligionEthicsPermission)} / {Value(p.ReligionEthicsExamPermission)})" : "ungeprüft",
-                    "Bestimmt die angebotene Religion (ER: evangelisch, KR: katholisch). Bei unbekannten oder ungeprüften Angaben sind beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; bei Wechsel kann für die mündliche Prüfung eine Feststellungsprüfung nötig sein.", verified),
+                    "Bestimmt die angebotene Religion. Bei unbekannten oder ungeprüften Angaben sind beide Religionsfächer vorläufig wählbar; bitte mit der Oberstufenberatung klären. Ethik bleibt wählbar; bei Wechsel kann für die mündliche Prüfung eine Feststellungsprüfung nötig sein.", verified),
                 new("SP", "Sportbefreiung",
                     verified && p.SportExemptSemesters is { } semesters ? (semesters.IsEmpty ? "keine" : "HJ " + string.Join(", ", semesters)) + $" (dauerhaft: {Value(p.PermanentSportExemption)})" : "ungeprüft",
                     "Bei Befreiung sind Ersatzkurse nötig und Sport entfällt als LF/mündliches Prüfungsfach; Prüfung durch die Oberstufenberatung.", verified)
@@ -315,6 +315,10 @@ public sealed class StudentSession
             IssuedAt = DateTimeOffset.UtcNow,
             Detail = "Unverbindliche Selbstauskunft (Testversion für zu Hause – keine schulische Bestätigung)"
         };
+        if (prerequisites.SportExemptSemesters is { Length: > 0 } exempt)
+            Choice = Choice with { Selections = [.. Choice.Selections.Select(s => s.SubjectId == "SP" && s.Type == CourseType.Bf
+                ? s with { Semesters = [.. s.Semesters.Except(exempt)] } : s).Where(s => !s.Semesters.IsEmpty)] };
+        IsDirty = true;
         Changed?.Invoke();
     }
 
@@ -333,7 +337,7 @@ public sealed class StudentSession
             Detail = "Unverbindliche Selbstauskunft (Testversion für zu Hause)"
         };
 
-    public Availability Availability(CourseOffer offer) => validator.GetAvailability(offer, Profile);
+    public Availability Availability(CourseOffer offer) => validator.GetAvailability(offer, Profile, Catalog);
 
     public void SetSelection(string offerId, IEnumerable<int> semesters)
     {
@@ -449,7 +453,7 @@ public sealed class StudentSession
                     ? $"Entwurf aus älterem Dateiformat (Version {loaded.UpgradedFromSchema}) geladen (Revision {Choice.Revision}). Beim nächsten Speichern wird das aktuelle Format geschrieben; die bisherige Datei bleibt als Sicherung erhalten."
                     : versionUpdated
                     ? $"Entwurf geladen (Revision {Choice.Revision}) und an aktuellen Angebots-/Regelstand angepasst. Bitte Wahl prüfen und speichern."
-                    : $"Entwurf geladen (Revision {Choice.Revision}). Weiterhin fachlich zu klären.";
+                    : $"Entwurf geladen (Revision {Choice.Revision}).";
             }
             LoadFailed = false;
         }
@@ -473,7 +477,7 @@ public sealed class StudentSession
             var candidate = Choice with { Revision = contentToken is null ? Choice.Revision : Choice.Revision + 1, UpdatedAt = DateTimeOffset.UtcNow };
             var saved = await store.SaveAsync(candidate, contentToken, cancellationToken);
             Choice = saved.Choice; contentToken = saved.ContentToken; IsDirty = false;
-            Message = $"Entwurf gespeichert (Revision {Choice.Revision}) – nicht eingereicht, fachlich zu klären.";
+            Message = $"Entwurf gespeichert (Revision {Choice.Revision}) – nicht eingereicht.";
         }
         catch { Message = "Speichern fehlgeschlagen. Ungespeicherter Entwurf bleibt geöffnet."; throw; }
         finally { IsBusy = false; Changed?.Invoke(); }

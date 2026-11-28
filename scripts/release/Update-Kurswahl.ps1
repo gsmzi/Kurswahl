@@ -97,64 +97,69 @@ if ($installiert) {
 
 # Extract and verify before anything in the root folder changes.
 $pruefordner = Join-Path $updates ('_pruefung-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
-[System.IO.Compression.ZipFile]::ExtractToDirectory($paket.Zip.FullName, $pruefordner)
-$inhalt = $pruefordner
-$oben = @(Get-ChildItem -LiteralPath $pruefordner)
-if ($oben.Count -eq 1 -and $oben[0].PSIsContainer) { $inhalt = $oben[0].FullName }
-foreach ($teil in @('TeacherApp', 'StudentApp')) { if (-not (Test-Path -LiteralPath (Join-Path $inhalt $teil))) { throw "Paket unvollständig: $teil fehlt." } }
-$anzahl = Test-Hashes $inhalt @()
-Write-Log "Paket geprüft: $anzahl Dateien, Prüfsummen in Ordnung."
-
-# The teacher program holds lehrerprogramm.sperre exclusively while it runs (also from another computer).
-$sperre = Join-Path $Stammordner 'TeacherApp\lehrerprogramm.sperre'
-if (Test-Path -LiteralPath $sperre) {
-    try { $probe = [System.IO.File]::Open($sperre, 'Open', 'Read', 'None'); $probe.Dispose() }
-    catch { Remove-Item -LiteralPath $pruefordner -Recurse -Force; throw 'Das Lehrerprogramm ist noch geöffnet (auch an einem anderen Rechner möglich). Bitte schließen und Aktualisieren.cmd erneut starten.' }
-}
-
-# Swap with backup; on any error the previous state is moved back.
-$altName = if ($installiert) { $installiert.version } else { 'ohne-version' }
-$ziel = Join-Path $sicherung ($altName + '_' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss-fff'))
-New-Item -ItemType Directory -Path $ziel -Force | Out-Null
-$verschoben = @()
-$schulvorgaben = Join-Path $Stammordner 'TeacherApp\schulvorgaben.json'
-$behalteVorgaben = Test-Path -LiteralPath $schulvorgaben
 try {
-    foreach ($teil in $ersetzt + $einzeldateien) {
-        $quelle = Join-Path $Stammordner $teil
-        if (Test-Path -LiteralPath $quelle) { Move-Item -LiteralPath $quelle -Destination (Join-Path $ziel $teil); $verschoben += $teil }
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($paket.Zip.FullName, $pruefordner)
+    $inhalt = $pruefordner
+    $oben = @(Get-ChildItem -LiteralPath $pruefordner)
+    if ($oben.Count -eq 1 -and $oben[0].PSIsContainer) { $inhalt = $oben[0].FullName }
+    foreach ($teil in @('TeacherApp', 'StudentApp')) { if (-not (Test-Path -LiteralPath (Join-Path $inhalt $teil))) { throw "Paket unvollständig: $teil fehlt." } }
+    $anzahl = Test-Hashes $inhalt @()
+    Write-Log "Paket geprüft: $anzahl Dateien, Prüfsummen in Ordnung."
+
+    # The teacher program holds lehrerprogramm.sperre exclusively while it runs (also from another computer).
+    $sperre = Join-Path $Stammordner 'TeacherApp\lehrerprogramm.sperre'
+    if (Test-Path -LiteralPath $sperre) {
+        try { $probe = [System.IO.File]::Open($sperre, 'Open', 'Read', 'None'); $probe.Dispose() }
+        catch { throw 'Das Lehrerprogramm ist noch geöffnet (auch an einem anderen Rechner möglich). Bitte schließen und Aktualisieren.cmd erneut starten.' }
     }
-    foreach ($teil in $ersetzt + $einzeldateien) {
-        $neu = Join-Path $inhalt $teil
-        if (Test-Path -LiteralPath $neu) { Move-Item -LiteralPath $neu -Destination (Join-Path $Stammordner $teil) }
-    }
-    $ignorieren = @()
-    if ($behalteVorgaben) {
-        Copy-Item -LiteralPath (Join-Path $ziel 'TeacherApp\schulvorgaben.json') -Destination $schulvorgaben -Force
-        $ignorieren += 'TeacherApp\schulvorgaben.json'
-        Write-Log 'Bisherige Schulvorgaben (TeacherApp\schulvorgaben.json) übernommen.'
-    }
-    # _Update itself: replace the script last (PowerShell has already read this file).
-    $neuesSkript = Join-Path $inhalt '_Update\Update-Kurswahl.ps1'
-    if (Test-Path -LiteralPath $neuesSkript) { Copy-Item -LiteralPath $neuesSkript -Destination (Join-Path $Stammordner '_Update\Update-Kurswahl.ps1') -Force }
-    $ignorieren += '_Update\Update-Kurswahl.ps1'
-    $geprueft = Test-Hashes $Stammordner $ignorieren
-    Write-Log "Eingesetzt und geprüft: $geprueft Dateien."
-}
-catch {
-    Write-Log "FEHLER: $($_.Exception.Message) – stelle vorherigen Stand wieder her."
-    foreach ($teil in $ersetzt + $einzeldateien) {
-        $eingesetzt = Join-Path $Stammordner $teil
-        if (Test-Path -LiteralPath (Join-Path $ziel $teil)) {
-            if (Test-Path -LiteralPath $eingesetzt) { Remove-Item -LiteralPath $eingesetzt -Recurse -Force }
-            Move-Item -LiteralPath (Join-Path $ziel $teil) -Destination $eingesetzt
+
+    # Swap with backup; on any error the previous state is moved back.
+    $altName = if ($installiert) { $installiert.version } else { 'ohne-version' }
+    $ziel = Join-Path $sicherung ($altName + '_' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss-fff'))
+    New-Item -ItemType Directory -Path $ziel -Force | Out-Null
+    $verschoben = @()
+    $schulvorgaben = Join-Path $Stammordner 'TeacherApp\schulvorgaben.json'
+    $behalteVorgaben = Test-Path -LiteralPath $schulvorgaben
+    try {
+        foreach ($teil in $ersetzt + $einzeldateien) {
+            $quelle = Join-Path $Stammordner $teil
+            if (Test-Path -LiteralPath $quelle) { Move-Item -LiteralPath $quelle -Destination (Join-Path $ziel $teil); $verschoben += $teil }
         }
+        foreach ($teil in $ersetzt + $einzeldateien) {
+            $neu = Join-Path $inhalt $teil
+            if (Test-Path -LiteralPath $neu) { Move-Item -LiteralPath $neu -Destination (Join-Path $Stammordner $teil) }
+        }
+        $ignorieren = @()
+        if ($behalteVorgaben) {
+            Copy-Item -LiteralPath (Join-Path $ziel 'TeacherApp\schulvorgaben.json') -Destination $schulvorgaben -Force
+            $ignorieren += 'TeacherApp\schulvorgaben.json'
+            Write-Log 'Bisherige Schulvorgaben (TeacherApp\schulvorgaben.json) übernommen.'
+        }
+        # _Update itself: replace the script last (PowerShell has already read this file).
+        $neuesSkript = Join-Path $inhalt '_Update\Update-Kurswahl.ps1'
+        if (Test-Path -LiteralPath $neuesSkript) {
+            New-Item -ItemType Directory -Path (Join-Path $Stammordner '_Update') -Force | Out-Null
+            Copy-Item -LiteralPath $neuesSkript -Destination (Join-Path $Stammordner '_Update\Update-Kurswahl.ps1') -Force
+        }
+        $ignorieren += '_Update\Update-Kurswahl.ps1'
+        $geprueft = Test-Hashes $Stammordner $ignorieren
+        Write-Log "Eingesetzt und geprüft: $geprueft Dateien."
     }
-    Write-Log 'Vorheriger Stand wiederhergestellt.'
-    throw
+    catch {
+        Write-Log "FEHLER: $($_.Exception.Message) – stelle vorherigen Stand wieder her."
+        foreach ($teil in $ersetzt + $einzeldateien) {
+            $eingesetzt = Join-Path $Stammordner $teil
+            if (Test-Path -LiteralPath (Join-Path $ziel $teil)) {
+                if (Test-Path -LiteralPath $eingesetzt) { Remove-Item -LiteralPath $eingesetzt -Recurse -Force }
+                Move-Item -LiteralPath (Join-Path $ziel $teil) -Destination $eingesetzt
+            }
+        }
+        Write-Log 'Vorheriger Stand wiederhergestellt.'
+        throw
+    }
 }
 finally {
-    if (Test-Path -LiteralPath $pruefordner) { Remove-Item -LiteralPath $pruefordner -Recurse -Force }
+    if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($pruefordner)) -eq [IO.Path]::GetFullPath($updates) -and (Test-Path -LiteralPath $pruefordner)) { Remove-Item -LiteralPath $pruefordner -Recurse -Force }
 }
 
 $eingespielt = Join-Path $updates 'eingespielt'

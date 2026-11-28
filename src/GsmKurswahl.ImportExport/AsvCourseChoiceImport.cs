@@ -218,7 +218,7 @@ public static partial class AsvCourseChoiceImport
         return -1;
     }
 
-    private static string DecodeCsvText(byte[] bytes)
+    internal static string DecodeCsvText(byte[] bytes)
     {
         string text;
         try
@@ -227,12 +227,12 @@ public static partial class AsvCourseChoiceImport
         }
         catch (DecoderFallbackException)
         {
-            text = Encoding.Latin1.GetString(bytes);
+            text = CodePagesEncodingProvider.Instance.GetEncoding(1252)!.GetString(bytes);
         }
         return text.TrimStart('\uFEFF');
     }
 
-    private static char DetectSeparator(string text)
+    internal static char DetectSeparator(string text)
     {
         var firstLine = FirstNonEmptyLine(text);
         if (firstLine.Length == 0) return ',';

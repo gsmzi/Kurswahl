@@ -41,6 +41,11 @@ try {
     $root = Join-Path $work 'GSM-Kurswahl'
     # First installation: unpack 1.0.0 and rename the folder.
     $first = New-Package '1.0.0' 'A'
+    $fresh = Join-Path $work 'Erstinstallation'
+    $incoming = New-Item -ItemType Directory -Path (Join-Path $fresh 'Updates') -Force
+    Copy-Item -LiteralPath $first -Destination $incoming.FullName
+    & $shell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'scripts/release/Update-Kurswahl.ps1') -Stammordner $fresh *> (Join-Path $work 'letzter-lauf.txt')
+    Assert-True ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath (Join-Path $fresh '_Update/Update-Kurswahl.ps1'))) 'Erstinstallation legt den Updateordner an'
     Expand-Archive -LiteralPath $first -DestinationPath (Join-Path $work 'install')
     Move-Item -LiteralPath (Join-Path $work 'install\GSM-Kurswahl-1.0.0') -Destination $root
     Set-Content -LiteralPath (Join-Path $root 'TeacherApp\schulvorgaben.json') -Value '{"schemaVersion":1,"distributionRoot":"X:\\Eigen"}'
@@ -67,6 +72,7 @@ try {
     # Tampered package is rejected before anything changes.
     Copy-Item -LiteralPath (New-Package '1.0.3' 'D' -Tamper) -Destination (Join-Path $root 'Updates')
     Assert-True ((Invoke-Update $root) -ne 0) 'manipuliertes Paket wird abgewiesen'
+    Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $root 'Updates') -Directory -Filter '_pruefung-*').Count -eq 0) 'Vorprüfung hinterlässt keinen Prüfordner'
     Assert-True ((Get-Content (Join-Path $root 'StudentApp\GsmKurswahl.StudentApp.exe')) -eq 'schueler C') 'Stand nach Prüfsummenfehler unverändert'
     Remove-Item -LiteralPath (Join-Path $root 'Updates\GSM-Kurswahl-1.0.3.zip')
 

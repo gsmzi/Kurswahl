@@ -15,7 +15,7 @@ public sealed class ChoiceReconciliation(IAdministrationStore store, OfferCatalo
     {
         var students = store.Students().Where(s => s.Student.GraduationYear == catalog.GraduationYear).ToArray();
         var items = new List<ReconciliationItem>();
-        foreach (var id in students.Select(s => s.Student.ExternalStudentId).Union(external.Select(e => e.StudentId)).Order(StringComparer.Ordinal))
+        foreach (var id in students.Select(s => s.Student.ExternalStudentId).Union(external.Select(e => e.StudentId), StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))
         {
             var records = students.Where(s => string.Equals(s.Student.ExternalStudentId, id, StringComparison.OrdinalIgnoreCase)).ToArray();
             var candidates = external.Where(e => string.Equals(e.StudentId, id, StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -230,7 +230,9 @@ public sealed class ChoiceReconciliation(IAdministrationStore store, OfferCatalo
         var now = DateTimeOffset.UtcNow;
         var basis = current?.Snapshot ?? new CourseChoice(2, Guid.NewGuid(), external.StudentId, external.GraduationYear,
             catalog.Version, ChoiceValidator.Version, 1, now, now, SubmissionStatus.Draft, ElectionPhase.Preliminary, [], []);
-        return basis with { Selections = external.Selections, OfferVersion = catalog.Version, RuleVersion = ChoiceValidator.Version,
+        return basis with { Selections = [.. external.Selections.Select(s => external.IgnoreBilingualVariant && basis.Selections.FirstOrDefault(b => b.SubjectId == s.SubjectId && b.Type == s.Type && b.Variant == CourseVariant.Bilingual) is { } bilingual
+                ? bilingual with { Semesters = s.Semesters } : s)],
+            PlannedOralSubjects = external.CompareOralSubjects ? external.PlannedOralSubjects : basis.PlannedOralSubjects, OfferVersion = catalog.Version, RuleVersion = ChoiceValidator.Version,
             UpdatedAt = now, SubmissionStatus = SubmissionStatus.Draft };
     }
     private static bool Same(ImmutableArray<CourseSelection> a, ImmutableArray<CourseSelection> b) =>

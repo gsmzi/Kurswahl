@@ -15,7 +15,7 @@ public sealed record PedagogicalPackageResult(
 
 /// <summary>
 /// Exports a runnable local package (.zip) for distributing and collecting choices in the pedagogical network.
-/// Keeps the inner .gsm-transfer v2 archive unchanged and avoids copying local runtime databases or locks.
+/// Keeps the inner .gsm-transfer v3 archive unchanged and avoids copying local runtime databases or locks.
 /// </summary>
 public static class PedagogicalTransferPackage
 {

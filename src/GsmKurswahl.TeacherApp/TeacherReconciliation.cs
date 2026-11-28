@@ -27,7 +27,8 @@ public sealed partial class TeacherWindow
                 c.Grade10, string.Join(c.ChangeDuringCourse ? " → " : "/", c.Chosen),
                 string.Join(", ", c.State.Active!.Snapshot.PlannedOralSubjects.Where(o => o is "ETH" or "ER" or "KR")),
                 c.AssessmentSubject is null ? "nein" : "ja, " + c.AssessmentSubject,
-                c.ChangeDuringCourse ? "Abmeldung beantragen; weder Religion noch Ethik mündlich (KOE 3.3)"
+                c.ChangeDuringCourse && !c.Chosen.Contains("ETH") ? "Wechsel der Religionsgemeinschaft: Zustimmung beider Religionsgemeinschaften klären"
+                    : c.ChangeDuringCourse ? "Abmeldung beantragen; weder Religion noch Ethik mündlich (KOE 3.3)"
                     : c.Grade10 is "KR" or "ER" && c.Chosen.Contains("ETH") ? "Austritt aus dem Religionsunterricht beantragen" : "" })]);
     }
 
@@ -111,7 +112,7 @@ public sealed partial class TeacherWindow
             if (changed == 0 && onlyExternal == 0 && invalid == 0 && onlyInternalActive == 0)
                 SetStatus($"ASV-Abgleich abgeschlossen ({fileName}): Alle {items.Count(i => i.Kind == ReconciliationKind.Identical)} Personen sind deckungsgleich.", FeedbackKind.Success);
             else
-                SetStatus($"ASV-Abgleich abgeschlossen ({fileName}): {changed} Abweichungen, {onlyInternalActive} aktive nur in GSM-Kurswahl, {onlyExternal} nur in ASV, {invalid} unklare/fehlende ASV-ID.", FeedbackKind.Warning);
+                SetStatus($"ASV-Abgleich abgeschlossen ({fileName}): Abweichungen: {changed}, {onlyInternalActive} aktive nur in GSM-Kurswahl, {onlyExternal} nur in ASV, {invalid} unklare/fehlende ASV-ID.", FeedbackKind.Warning);
         }
         catch (Exception ex)
         {
@@ -149,7 +150,7 @@ public sealed partial class TeacherWindow
         var summaryText = new TextBlock
         {
             Name = "AsvSummary",
-            Text = $"Datei: {current.FileName} · {identical} deckungsgleich · {changed} Abweichungen · {onlyInternal} nur in GSM-Kurswahl · {onlyExternal} nur in ASV · {invalid} unklare/fehlende ASV-ID",
+            Text = $"Datei: {current.FileName} · {identical} deckungsgleich · Abweichungen: {changed} · {onlyInternal} nur in GSM-Kurswahl · {onlyExternal} nur in ASV · {invalid} unklare/fehlende ASV-ID",
             FontWeight = FontWeight.SemiBold,
             Foreground = allGreen ? Green : (changed > 0 || invalid > 0 ? Brush.Parse("#8C1D1D") : Yellow),
             TextWrapping = TextWrapping.Wrap

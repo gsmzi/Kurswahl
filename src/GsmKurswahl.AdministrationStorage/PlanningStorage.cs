@@ -52,19 +52,27 @@ public sealed partial class SqliteAdministrationStore
             ? o with { CooperationSchool = old.CooperationSchool, IsTopUpCourse = old.IsTopUpCourse } : o)] };
         if (string.IsNullOrWhiteSpace(actor) || Json(withoutChanges) != Json(expected))
             throw new ArgumentException("Nur Kursmarkierungen dürfen hier geändert werden.");
+        SaveCatalogChange(expected, next, actor, "Kursmarkierungen aktualisiert");
+    }
+
+    public void SaveCatalogChange(OfferCatalog expected, OfferCatalog next, string actor, string reason)
+    {
+        ModelGuard.Catalog(next);
+        if (next.GraduationYear != expected.GraduationYear || string.IsNullOrWhiteSpace(actor) || string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Jahrgang, Bearbeiter und Anlass prüfen.");
         using var tx = db.BeginTransaction();
         if (ActivePlanningCatalog() is { } current && Json(current) != Json(expected))
             throw new InvalidOperationException("Fachangebot inzwischen geändert. Jahrgang neu öffnen.");
         // Append a full catalog snapshot; no pupil revisions or follow-up changes.
         Execute("INSERT INTO planning_decisions(body) VALUES($p0)", Json(new PlanningDecision(1, Guid.NewGuid(), DateTimeOffset.UtcNow,
-            actor, "Kursmarkierungen aktualisiert", Guid.Empty, next)));
+            actor, reason, Guid.Empty, next)));
         tx.Commit();
     }
     public void CommitCancellation(CancellationPreview preview, string actor, string reason,
         ImmutableArray<ChoiceRevision> revisions, ImmutableArray<PlanningFollowUp> followUps)
     {
         ValidatePlanning(preview.Basis); ModelGuard.Catalog(preview.Catalog);
-        if (preview.Basis.IsScenario || string.IsNullOrWhiteSpace(actor) || string.IsNullOrWhiteSpace(reason) || revisions.Length != preview.Basis.Choices.Length
+        if (preview.Basis.IsScenario || string.IsNullOrWhiteSpace(actor) || string.IsNullOrWhiteSpace(reason) || !revisions.Select(r => r.StudentId).Order().SequenceEqual(preview.Changes.Where(c => !c.RemovedOffers.IsEmpty).Select(c => c.StudentId).Order())
             || preview.Catalog.GraduationYear != preview.Basis.Catalog.GraduationYear || preview.Catalog.Version == preview.Basis.Catalog.Version)
             throw new ArgumentException("Ungültige Planungsbestätigung.");
         using var tx = db.BeginTransaction();

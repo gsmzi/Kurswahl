@@ -97,7 +97,7 @@ public static class StudentDirectories
         if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
 
         var givenNames = string.Concat(name[prefix.Length..].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        if (givenNames.EndsWith('2')) givenNames = givenNames[..^1];
+        givenNames = givenNames.TrimEnd("0123456789".ToCharArray());
         if (string.Equals(givenNames, string.Concat(firstNames), StringComparison.OrdinalIgnoreCase)) return true;
 
         // The ASV export can contain only the Rufname. An attached name is a suggestion for individual review.

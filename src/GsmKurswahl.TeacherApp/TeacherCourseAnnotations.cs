@@ -24,10 +24,11 @@ public sealed partial class TeacherWindow
                 {
                     var basis = session.Catalog;
                     var next = CatalogConfiguration.Annotate(basis, offer.Id, (CooperationSchool)school.SelectedIndex, topUp.IsChecked == true);
-                    if (store is SqliteAdministrationStore sql && sql.ActivePlanningCatalog() is not null)
+                    if (store is SqliteAdministrationStore sql)
                         sql.SaveCourseAnnotations(basis, next, Actor);
                     workspace!.Update(workspace.Active! with { Catalog = next });
                     session = new TeacherSession(store!, next, Actor);
+                    UpdateWorkflowProgress();
                     SetStatus("Kursmarkierung gespeichert. Für Schüleransicht und Schülerausdruck bitte erneut verteilen.", FeedbackKind.Success);
                 }
                 catch (Exception ex)

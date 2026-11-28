@@ -12,7 +12,12 @@ public sealed record StudentImportRow(int Row, StudentRecord? Candidate, string 
 public static class StudentTableImport
 {
     public static readonly string[] Fields = ["studentId", "name", "firstName", "lastName", "folder", "class", "year", "username", "home", "italian", "bridge", "imp", "bilingual", "religion", "sport", "languages", "religionPermission", "religionExamPermission", "permanentSport", "departure"];
-    public static ImportTable Csv(string text, char separator = ';') => Table(ReadCsvRows(text, separator));
+    public static ImportTable Csv(byte[] bytes)
+    {
+        var text = AsvCourseChoiceImport.DecodeCsvText(bytes);
+        return Csv(text, AsvCourseChoiceImport.DetectSeparator(text));
+    }
+    public static ImportTable Csv(string text, char separator = ';') => Table(ReadCsvRows(text.TrimStart('\uFEFF'), separator));
     internal static List<ImmutableArray<string>> ReadCsvRows(string text, char separator = ';')
     {
         if (text.Length > 8_000_000) throw new InvalidDataException("Importdatei zu groß.");
@@ -136,7 +141,7 @@ public static class StudentTableImport
                 var religion = Value("religion").ToUpperInvariant();
                 if (religion is not ("" or "ETH" or "ER" or "KR")) throw new ArgumentException("Religion/Ethik ungültig.");
                 var prior = new PriorEducation(Known("italian"), Known("bridge"), Known("imp"), Known("bilingual"), religion.Length == 0 ? null : religion, semesters)
-                { ContinuedLanguages = [.. Value("languages").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct()], ReligionEthicsPermission = Known("religionPermission"), ReligionEthicsExamPermission = Known("religionExamPermission"), PermanentSportExemption = Known("permanentSport") };
+                { ContinuedLanguages = [.. Value("languages").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(s => s.ToUpperInvariant()).Distinct()], ReligionEthicsPermission = Known("religionPermission"), ReligionEthicsExamPermission = Known("religionExamPermission"), PermanentSportExemption = Known("permanentSport") };
                 var departure = Value("departure").ToLowerInvariant() switch { "" or "aktiv" => DepartureStatus.Active, "voraussichtlich" => DepartureStatus.ExpectedDeparture, "bestaetigt" or "bestätigt" => DepartureStatus.ConfirmedDeparture, _ => throw new ArgumentException("Abgängerstatus ungültig.") };
                 var student = new AdministrativeStudent(Guid.NewGuid(), id, name, Value("class"), year, departure, prior)
                 { FirstName = firstName, LastName = lastName };

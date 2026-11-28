@@ -37,7 +37,7 @@ public static class AcademicRules
         profile.Status == ProfileStatus.Verified && !profile.Prerequisites.ContinuedLanguages.IsDefaultOrEmpty;
     public static string[] Languages(ProfileContext profile, OfferCatalog? catalog = null) =>
         LanguageCareerKnown(profile)
-            ? ["E", .. profile.Prerequisites.ContinuedLanguages.Where(s => s != "E" && IsLanguageSubject(s, catalog))]
+            ? ["E", .. profile.Prerequisites.ContinuedLanguages.Select(s => s.ToUpperInvariant()).Where(s => s != "E" && IsLanguageSubject(s, catalog))]
             : ["E", "F", "L"];
     // A language outside a confirmed career cannot be attended as LF/BF at all. Italian keeps its own profile check.
     public static bool LanguageExcluded(string subject, ProfileContext profile, OfferCatalog? catalog = null) =>
@@ -50,6 +50,7 @@ public static class AcademicRules
     {
         if (profile.Status != ProfileStatus.Verified || profile.Prerequisites.ReligionEthicsGrade10 is not { } grade10) return null;
         if (profile.Prerequisites.ReligionEthicsExamPermission != Knowledge.Unknown) return null;
+        if (choice.Selections.Where(s => !s.Semesters.IsEmpty && s.SubjectId is "ETH" or "ER" or "KR").Select(s => s.SubjectId).Distinct().Count() > 1) return null;
         return choice.PlannedOralSubjects.FirstOrDefault(s => s is "ETH" or "ER" or "KR" && s != grade10);
     }
     // Chosen ETH/ER/KR subjects that differ from class 10, in order of their first semester.
@@ -137,13 +138,13 @@ public static class AcademicRules
         var scienceCount = full.Count(sciences.Contains);
         var languageCount = full.Count(languages.Contains);
         var inf = full.Contains("INF") && catalog.Offers.Any(o => o.SubjectId == "INF"
-            && choice.Selections.Any(s => s.OfferId == o.Id) && new ChoiceValidator().GetAvailability(o, profile).CanSelect);
+            && choice.Selections.Any(s => s.OfferId == o.Id) && new ChoiceValidator().GetAvailability(o, profile, catalog).CanSelect);
         if (scienceCount < 1 || languageCount < 1 || !(languageCount >= 2 || scienceCount + (inf ? 1 : 0) >= 2))
         {
             var unknownAlternative = scienceCount > 0 && (full.Any(s => (s is "I" or "F" or "L" or "GR" or "SPA" or "RU" or "POR" || catalog.Subjects.FirstOrDefault(x => x.Id == s)?.IsForeignLanguage == true) && !languages.Contains(s) && !LanguageExcluded(s, profile, catalog))
                 || (full.Contains("INF") && (profile.Status != ProfileStatus.Verified
                     || profile.Prerequisites.InformaticsImp == Knowledge.Unknown || profile.Prerequisites.InformaticsBridge == Knowledge.Unknown)));
-            Add(unknownAlternative ? "AGVO-LANGUAGE-REVIEW" : "AGVO-LANGUAGE-SCIENCE", "Eine geeignete Sprache und BIO/CH/PH sind nötig; zusätzlich zweite geeignete Sprache oder zweite Naturwissenschaft (berechtigtes INF als Alternative). Italienisch-Profil allein ist keine Sprachlaufbahnbestätigung.");
+            Add(unknownAlternative ? "AGVO-LANGUAGE-REVIEW" : "AGVO-LANGUAGE-SCIENCE", "Eine geeignete Sprache und BIO/CH/PH sind nötig; zusätzlich zweite geeignete Sprache oder zweite Naturwissenschaft (Informatik bei erfüllter Voraussetzung als Alternative). Italienisch-Profil allein ist keine Sprachlaufbahnbestätigung.");
         }
         foreach (var s in choice.Selections.Where(s => s.Type != CourseType.Lf && s.SubjectId != "SP"))
         {
@@ -167,7 +168,7 @@ public static class AcademicRules
                 ? $"Wechsel während der Kursstufe ({string.Join(" -> ", relSubjects)}): Die Abmeldung vom Religionsunterricht muss beantragt werden. Danach kann weder Religion noch Ethik mündliches Prüfungsfach sein (KOE 2026 Kap. 3.3); eine Feststellungsprüfung ist dafür nicht vorgesehen."
                 : $"Wechsel des Religionsfachs während der Kursstufe ({string.Join(" -> ", relSubjects)}): höchstens zwei Kurse einer anderen Religionsgemeinschaft und nur mit Zustimmung beider Religionsgemeinschaften (AGVO § 11 Abs. 3). Religion kann dann nicht mündliches Prüfungsfach sein.", relSubjects);
         else if (p.ReligionEthicsGrade10 is "KR" or "ER" && chosenRelEthics.Contains("ETH"))
-            Add("AGVO-RELIGION", "Austritt aus Religionsunterricht muss beantragt werden. Für mündliche Prüfung in Ethik ist Feststellungsprüfung notwendig."
+            Add("AGVO-RELIGION", "Austritt aus dem Religionsunterricht muss beantragt werden. Für eine mündliche Prüfung in Ethik ist eine Feststellungsprüfung notwendig."
                 + (AssessmentSubject(choice, profile) == "ETH" ? " Du planst Ethik mündlich: Die Feststellungsprüfung findet zu Beginn des 1. Halbjahres statt (AGVO § 21 Abs. 2 Nr. 5)." : "")
                 + " Bitte mit der Oberstufenberatung klären.", ["ETH"]);
         else if (switchedRelEthics)
@@ -185,15 +186,15 @@ public static class AcademicRules
                 Add("AGVO-REQUIRED", "Sportbelegung in nicht befreiten Halbjahren fehlt.", ["SP"], requiredSport);
             if (exemptions.Length > 0)
             {
-                Add("AGVO-SPORT", $"{exemptions.Length} Ersatzkurse nötig. Ersatzkurse als ganze Schuljahre (HJ 1+2 bzw. HJ 3+4) zusätzlich wählen; ein Kurs mehr als nötig schadet nicht. Umfang administrativ bestätigen; SIA ist kein Ersatz.", ["SP"], [.. exemptions]);
-                var totalWithoutSia = choice.Selections.Where(s => s.Type != CourseType.Seminar).Sum(s => s.Semesters.Length);
-                var extras = MaximumSportReplacementCourses(choice, profile);
+                Add("AGVO-SPORT", $"{exemptions.Length} {(exemptions.Length == 1 ? "Ersatzkurs" : "Ersatzkurse")} nötig. Ersatzkurse als ganze Schuljahre (HJ 1+2 bzw. HJ 3+4) zusätzlich wählen; ein Kurs mehr als nötig schadet nicht. Umfang administrativ bestätigen; SIA ist kein Ersatz.", ["SP"], [.. exemptions]);
+                var totalWithoutSia = ChoiceWorkflow.CoursesForMinimum(choice, profile);
+                var extras = MaximumSportReplacementCourses(choice, profile, catalog);
                 if (totalWithoutSia < 42 || extras < exemptions.Length)
-                    Add("AGVO-SPORT-REPLACEMENT", $"{exemptions.Length} Ersatzkurse erforderlich (mindestens 42 Halbjahreskurse ohne SIA; aktuell {totalWithoutSia} ohne SIA, höchstens {extras} zusätzliche Basis-/Wahlfachkurse vorhanden). SIA ersetzt keine Sportkurse.", ["SP"], [.. exemptions]);
+                    Add("AGVO-SPORT-REPLACEMENT", $"{exemptions.Length} {(exemptions.Length == 1 ? "Ersatzkurs" : "Ersatzkurse")} erforderlich (mindestens 42 Halbjahreskurse ohne SIA; aktuell {totalWithoutSia} ohne SIA, zusätzlich vorhandene Basis-/Wahlfachkurse: höchstens {extras}). SIA ersetzt keine Sportkurse.", ["SP"], [.. exemptions]);
             }
         }
         if (lf.Any(s => s.SubjectId == "SP") && p.PermanentSportExemption != Knowledge.No)
-            Add("AGVO-SPORT", "LF Sport: dauerhafte auch teilweise Befreiung bzw. fehlende Auskunft erfordert Klärung.", ["SP"]);
+            Add("AGVO-SPORT", "LF Sport: dauerhafte, auch teilweise Befreiung bzw. fehlende Auskunft erfordert Klärung.", ["SP"]);
         if (lf.Length == 3 && ExamOptions(choice, catalog, profile).IsEmpty)
             Add("AGVO-EXAM", "Die belegten Kurse ergeben keine mögliche mündliche Zweierkombination für Deutsch, Mathematik und alle Aufgabenfelder.");
         var summaries = ChoiceValidator.Summarize(choice, catalog);
@@ -207,25 +208,27 @@ public static class AcademicRules
         return messages.ToImmutable();
     }
 
-    public static int MaximumSportReplacementCourses(CourseChoice choice, ProfileContext profile)
+    public static int MaximumSportReplacementCourses(CourseChoice choice, ProfileContext profile, OfferCatalog? catalog = null)
     {
         var available = choice.Selections.Where(s => s.Type is CourseType.Bf or CourseType.Elective && s.SubjectId != "SP")
             .SelectMany(s => s.Semesters.Select(h => (s.SubjectId, h))).ToHashSet();
-        var mandatory = ChoiceWorkflow.Required(choice, profile).Where(r => r.SubjectId != "SP")
+        var mandatory = ChoiceWorkflow.Required(choice with { PlannedOralSubjects = [] }, profile).Where(r => r.SubjectId != "SP")
             .SelectMany(r => r.Semesters.Select(h => (r.SubjectId, h))).ToHashSet();
         var full = choice.Selections.Where(Four).Select(s => s.SubjectId).ToArray();
         var arts = full.Intersect(["BK", "MU"]).DefaultIfEmpty("BK");
         var religions = full.Intersect(["ETH", "ER", "KR"]).DefaultIfEmpty("ETH");
-        var languages = full.Intersect(Languages(profile)).DefaultIfEmpty("E");
-        var sciences = full.Intersect(Sciences).DefaultIfEmpty("BIO");
+        var allowedLanguages = Languages(profile, catalog);
+        var allowedSciences = ScienceSubjects(catalog);
+        var languages = full.Intersect(allowedLanguages).DefaultIfEmpty("E");
+        var sciences = full.Intersect(allowedSciences).DefaultIfEmpty("BIO");
         var max = 0;
         foreach (var art in arts)
         foreach (var religion in religions)
         foreach (var language in languages)
         foreach (var science in sciences)
         {
-            var seconds = full.Where(s => (Languages(profile).Contains(s) && s != language)
-                || (Sciences.Contains(s) && s != science)
+            var seconds = full.Where(s => (allowedLanguages.Contains(s) && s != language)
+                || (allowedSciences.Contains(s) && s != science)
                 || (s == "INF" && profile.Status == ProfileStatus.Verified
                     && (profile.Prerequisites.InformaticsBridge == Knowledge.Yes || profile.Prerequisites.InformaticsImp == Knowledge.Yes))).DefaultIfEmpty("CH");
             foreach (var second in seconds)

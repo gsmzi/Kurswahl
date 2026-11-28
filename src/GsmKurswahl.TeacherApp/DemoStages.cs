@@ -135,11 +135,13 @@ public static class DemoStages
     {
         var prerequisites = row.Record.Student.Prerequisites;
         if (id == "schueler-4-alle-voraussetzungen")
-            prerequisites = prerequisites with { ItalianProfile = Knowledge.Yes, InformaticsBridge = Knowledge.Yes, InformaticsImp = Knowledge.Yes, ContinuousBilingual = Knowledge.Yes };
+            prerequisites = prerequisites with { ItalianProfile = Knowledge.Yes, ContinuedLanguages = [.. prerequisites.ContinuedLanguages.Union(["I"])], InformaticsBridge = Knowledge.Yes, InformaticsImp = Knowledge.Yes, ContinuousBilingual = Knowledge.Yes };
         if (id == "schueler-5-sportbefreit") prerequisites = prerequisites with { SportExemptSemesters = [3, 4] };
         if (id == "schueler-6-ohne-zusatzrechte")
             prerequisites = prerequisites with { ItalianProfile = Knowledge.No, InformaticsBridge = Knowledge.No, InformaticsImp = Knowledge.No, ContinuousBilingual = Knowledge.No };
         if (id == "schueler-7-vorbildung-unbekannt") prerequisites = PriorEducation.Unknown;
+        if (id == "schueler-4-alle-voraussetzungen")
+            catalog = catalog with { Offers = [.. catalog.Offers.Select(o => o.Id == "I-BF" ? o with { Status = OfferStatus.Offered } : o)] };
         var data = Directory.CreateDirectory(StudentFolderLayout.Data(root)).FullName;
         var profile = new StudentProfile(SchemaVersions.Profile, 1, row.Choice.StudentId, "", catalog.GraduationYear, DateTimeOffset.UtcNow, prerequisites)
         { DisplayName = row.Record.Student.DisplayName, ClassName = row.Record.Student.ClassName };

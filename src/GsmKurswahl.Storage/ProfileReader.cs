@@ -53,12 +53,7 @@ public sealed class ProfileReader
             if (profile.StudentId != studentId || profile.GraduationYear != graduationYear)
                 return Invalid("Schüler-ID oder Abiturjahrgang stimmt nicht mit dem Profil überein.");
             var p = profile.Prerequisites;
-            if (p is null || p.ContinuedLanguages.IsDefault || p.ContinuedLanguages.Any(string.IsNullOrWhiteSpace)
-                || p.ContinuedLanguages.Distinct().Count() != p.ContinuedLanguages.Length
-                || (p.SportExemptSemesters is { } semesters && (semesters.IsDefault || semesters.Any(h => h is < 1 or > 4)
-                    || semesters.Distinct().Count() != semesters.Length))
-                || (p.ReligionEthicsGrade10 is not null and not ("ETH" or "ER" or "KR")))
-                return Invalid("Persönliche Angaben sind widersprüchlich oder ungültig.");
+            ModelGuard.PriorEducation(p);
             return new(ProfileStatus.Verified, p)
             {
                 Revision = profile.ProfileRevision, IssuedAt = profile.IssuedAt,
